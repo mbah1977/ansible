@@ -5,5 +5,4 @@
 - name: start httpd
   service: name=httpd state=started enabled=yes
 - name: copy httpd.conf
-  copy: dest=/etc/httpd/conf/httpd.conf content="{{lookup('file','/etc/httpd/conf/httpd.conf')}}" 
-
+  copy: force=yes dest=/etc/httpd/conf/httpd.conf content="{{lookup('file','/etc/httpd/conf/httpd.conf')}}" 
