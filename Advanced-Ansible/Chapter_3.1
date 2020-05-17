@@ -1,0 +1,441 @@
+
+Chapter 3. Managing Task Execution
+Controlling Privilege Escalation
+Guided Exercise: Controlling Privilege Escalation
+Controlling Task Execution
+Guided Exercise: Controlling Task Execution
+Running Selected Tasks
+Guided Exercise: Running Selected Tasks
+Optimizing Execution for Speed
+Guided Exercise: Optimizing Execution for Speed
+Lab: Managing Task Execution
+Summary
+Abstract
+
+Goal	Control and optimize the execution of tasks by Ansible Playbooks.
+Objectives	
+Control automatic privilege escalation at the play, role, task, or block level.
+
+Configure tasks that can run before roles or after normal handlers, and notify multiple handlers at once.
+
+Label tasks with tags, and run only tasks labeled with specific tags or start playbook execution at a specific task.
+
+Optimize your playbook to run more efficiently, and use callback plugins to profile and analyze which tasks consume the most time.
+
+Sections	
+Controlling Privilege Escalation (and Guided Exercise)
+
+Controlling Task Execution (and Guided Exercise)
+
+Running Selected Tasks (and Guided Exercise)
+
+Optimizing Execution for Speed (and Guided Exercise)
+
+Lab	
+Managing Task Execution
+
+Controlling Privilege Escalation
+Objectives
+After completing this section, you should be able to:
+
+Control automatic privilege escalation.
+
+Narrow privilege escalation to the relevant context.
+
+Privilege Escalation Strategies
+Ansible Playbooks can achieve privilege escalation at many different levels. Depending on the level on which you intend to control the privilege escalation, Ansible uses directives or connection variables. For plays, roles, blocks, and tasks you need to use the privilege escalation directives: become, become_user, become_method, and become_flags.
+
+Privilege Escalation by Configuration
+
+If you have the become Boolean set to yes (or true) in the privilege_escalation section of your Ansible configuration file, then all plays in your playbook will use privilege escalation by default. Those plays will use the current become_method to switch to the current become_user when running on the managed hosts.
+
+You can also override the configuration file and specify privilege escalation settings when you launch the playbook using command-line options. The following table compares configuration directives and command-line options:
+
+Table 3.1. Privilege Escalation Directives and Options
+
+Configuration Directive	Command-line Option
+become	
+--become or -b
+
+become_method	
+--become-method=BECOME_METHOD
+
+become_user	
+--become-user=BECOME_USER
+
+become_password	
+--ask-become-pass or -K
+
+
+IMPORTANT
+If the Ansible configuration file specifies become: false, but the command-line includes the -b option, then Ansible will ignore the configuration file and uses privilege escalation by default.
+
+Privilege Escalation in Plays
+
+When you write a playbook, you might need privilege escalation for some plays but not for all plays. You can explicitly specify whether or not privilege escalation should be used by each play. If the play does not specify whether or not to use privilege escalation, the default setting from the configuration file or the command-line is used.
+
+Here is an example of a playbook that contains three plays. The first play uses become: true to use privilege escalation no matter what the configuration file or command-line options specify. The second play uses become: false to not use privilege escalation, even if the configuration file or command-line options specify to do so. The third play does not have a become directive and will use privilege escalation based on the default settings from the Ansible configuration file or the command line. The ansible_user_id variable displays the user name of the user on the managed host that is running the current play.
+
+---
+- name: Become the user "manager"
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Show the user used by this play
+      debug:
+        var: ansible_user_id
+
+- name: Do not use privilege escalation
+  hosts: webservers
+  become: false
+  tasks:
+    - name: Show the user used by this play
+      debug:
+        var: ansible_user_id
+
+- name: Use privilege escalation based on defaults
+  hosts: webservers
+  tasks:
+    - name: Show the user used by this play
+      debug:
+        var: ansible_user_id
+To ensure that privilege escalation is used or is not used by your play, specify the setting explicitly in the playbook. Specifying the escalation method, or privileged user in configuration settings or inventory variables, may be necessary depending on the play or the hosts in question.
+
+Privilege Escalation in Tasks
+
+You can also turn on (or off) privilege escalation for just one task in the play. To do this, add the appropriate become directive to the task.
+
+---
+- name: Play with two tasks, one uses privilege escalation
+  hosts: all
+  become: false
+  tasks:
+    - name: This task needs privileges
+      yum:
+        name: perl
+        state: installed
+      become: true
+
+    - name: This task does not need privileges
+      shell: perl -v
+      register: perlcheck
+      failed_when: perlcheck.rc != 0
+In the preceding example, the play has privilege escalation turned off by default, but the first task uses privilege escalation.
+
+Privilege Escalation in Blocks
+
+If you have a subset of tasks in your play that require (or do not require) privilege escalation, you can set become on a block. All tasks in the block share the same privilege escalation setting, and this setting overrides the setting made at the play level.
+
+The following examples show things you can do with this mechanism:
+
+Turn on privilege escalation for a subset of tasks in your play.
+
+Turn off privilege escalation for a subset of tasks in your play.
+
+Use with become_user to use privilege escalation to perform a subset of tasks as some other regular user used by your application (such as a database user) instead of root.
+
+To use this option, add the necessary directives to the block dictionary. In the following example, the playbook contains one play that has privilege escalation turned off by default. The play consists of a block (containing two tasks) and a task. The tasks in the block will use privilege escalation, even though it is turned off by default for the play. The final task will not use privilege escalation because it is outside of the block.
+
+---
+- name: Deploy web services
+  hosts: webservers
+  become: false
+  tasks:
+
+    - block:
+      - name: Ensure httpd is installed
+        yum:
+          name: httpd
+          state: installed
+      - name: Start and enable webserver
+        service:
+          name: httpd
+          state: started
+          enabled: yes
+      become: true
+
+    - name: Test website from itself, do not become
+      uri:
+        url: http://{{ ansible_host }}
+        return_content: yes
+      register: webpage
+      failed_when: webpage.status != 200
+Privilege Escalation in Roles
+
+There are two basic ways for a role to perform privilege escalation.
+
+The first option is for the role itself to have privilege escalation variables set inside it, or on its tasks. The role's documentation may specify whether you have to set other variables such as become_method to use the role.
+
+You can also specify this information yourself, in the Ansible configuration or playbook.
+
+Alternatively, you can set the privilege escalation settings on the play that calls the role, as previously discussed. Or, you can adjust these settings on individual roles, just like you can on individual tasks or blocks:
+
+- name: Example play with one role
+  hosts: localhost
+  roles:
+    - role: role-name
+      become: true
+Privilege Escalation with Connection Variables
+
+You can also use connection variables to configure privilege escalation. These connection variables can be applied as inventory variables on groups or individual hosts.
+
+The following table compares playbook and configuration directives with connection variable names:
+
+Table 3.2. Privilege Escalation Directives and Connection Variables
+
+Configuration or Playbook Directive	Connection Variable
+become	
+ansible_become
+
+become_method	
+ansible_become_method
+
+become_user	
+ansible_become_user
+
+become_password	
+ansible_become_pass
+
+
+IMPORTANT
+Connection variables override the become settings in the configuration file, as well as in plays, tasks, blocks, and roles.
+
+Be cautious when using these variables to configure privilege escalation because of their high precedence compared to the configuration and playbook directives. Using the configuration or playbook directives will generally give you more flexibility and control of whether or not privilege escalation is used.
+
+The following example demonstrates using privilege escalation variables in a YAML inventory for a group:
+
+webservers:
+  hosts:
+    servera.lab.example.com:
+    serverb.lab.example.com:
+  vars:
+    ansible_become: true
+You can set connection variables for privilege escalation at host level. Doing this on a host per host basis is tedious, but can be helpful in case one host in a larger group needs specific connection options.
+
+The following example demonstrates configuring privilege escalation using connection variables at host level:
+
+webservers:
+  hosts:
+    servera.lab.example.com:
+      ansible_become: true
+    serverb.lab.example.com:
+You can also set connection variables in the playbook, for example on the play itself. Doing so will override the inventory variables (through normal variable precedence), as well as the setting of any become directives.
+
+---
+- name: Example play using connection variables
+  hosts: webservers
+  vars:
+    ansible_become: true
+  tasks:
+    - name: Play will use privilege escalation even if inventory says no
+      yum:
+        name: perl
+        state: installed
+Choosing Privilege Escalation Approaches
+As you can see, there are many ways to control privilege escalation. So, how should you choose which method to use? Consider the following competing needs when choosing how to control priviledge escalation:
+
+Keeping your playbook simple (a key principle of Ansible best practices)is the first consideration.
+
+Running tasks with least privilege when possible (to avoid inadvertent compromises and damage to managed hosts through playbook errors) is a second consideration.
+
+Many people who are new to Ansible run their playbooks with privilege escalation always turned on. This approach is simple, and in many cases the tasks that you are performing must be run as root. However, tasks that do not need to be run as root are nevertheless running with elevated privileges, which could increase risk.
+
+Some users connect directly to the root account to avoid privilege escalation. This is generally not a good practice, because anyone running the playbook must have root credentials on the managed hosts. This can also make it hard to evaluate which administrator performed which playbook run.
+
+Therefore, a good practice is to selectively control which plays or tasks need privilege escalation. For example, if the apache user can start the httpd server, there is no need to run the task as the root user.
+
+Ideally, you should configure privilege escalation in as simple a way as possible, and it should be clear to you whether or not it is in use for a task. For example, you could use become: true on a play to turn priviledge escalation on for a play, and then selectively disable tasks that do not need escalation with become: false on the task. Alternatively, you could group tasks that need privilege escalation into one play and tasks that do not into another play, if compatible with the workflow.
+
+Setting privilege escalation in the configuration file may be necessary if a playbook requires privilege escalation but you cannot edit it for some reason. Generally, if the playbook requires privilege escalation then it may make more sense for the playbook to indicate that requirement. The biggest challenge is when different hosts that use a playbook require different privilege escalation methods in order to function correctly. In that case, it can make sense to set inventory variables like ansible_become_method for those hosts or their group, while enabling whether privilege escalation is used through become in the playbook.
+
+REFERENCES
+Understanding Privilege Escalation — Ansible Documentation
+
+Blocks — Ansible Documentation
+
+
+
+
+Guided Exercise: Controlling Privilege Escalation
+In this exercise, you will configure a playbook to escalate privileges only for specific plays, roles, tasks, or blocks that might need them to operate correctly.
+
+Outcomes
+
+You should be able to select the appropriate escalation method and privilege isolation.
+
+Open a terminal on workstation as the student user and run the following command:
+
+[student@workstation ~]$ lab task-escalation start
+Clone the Git repository http://git.lab.example.com:8081/git/task-escalation.git in the /home/student/git-repos directory.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+Change to this directory:
+
+[student@workstation ~]$ cd git-repos/
+Clone the repository:
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/task-escalation.git
+Cloning into 'task-escalation'...
+remote: Enumerating objects: 56, done.
+remote: Counting objects: 100% (56/56), done.
+remote: Compressing objects: 100% (42/42), done.
+remote: Total 56 (delta 5), reused 0 (delta 0)
+Unpacking objects: 100% (56/56), done.
+[student@workstation git-repos]$ cd task-escalation
+Remove the global privilege escalation from the playbook configuration.
+
+Edit the ansible.cfg file.
+
+[student@workstation task-escalation]$ vi ansible.cfg
+Remove the privilege_escalation block. After completing these steps, the file should display as follows:
+
+[defaults]
+inventory=inventory.yml
+remote_user=devops
+Add the privilege escalation directives to the tasks.
+
+Edit the roles/firewall/tasks/main.yml file:
+
+[student@workstation task-escalation]$ vi roles/firewall/tasks/main.yml
+Add the become: true directive to the firewalld task. The resulting file should display as follows:
+
+---
+# tasks file for firewall
+
+- name: Ensure Firewall Sources Configuration
+  firewalld:
+    source: "{{ item.source if item.source is defined else omit }}"
+    zone: "{{ item.zone if item.zone is defined else omit }}"
+    permanent: true
+    state: "{{ item.state | default('enabled') }}"
+    service: "{{ item.service if item.service is defined else omit }}"
+    immediate: true
+    port: "{{ item.port if item.port is defined else omit }}"
+  loop: "{{ firewall_rules }}"
+  notify: reload firewalld
+  become: true
+Edit the roles/firewall/handlers/main.yml file:
+
+[student@workstation task-escalation]$ vi roles/firewall/handlers/main.yml
+Add the become: true directive to the firewalld restart task. The resulting file should display as follows:
+
+---
+# handlers file for firewall
+
+- name: reload firewalld
+  service:
+    name: firewalld
+    state: reloaded
+  become: true
+Edit the roles/haproxy/tasks/main.yml file:
+
+[student@workstation task-escalation]$ vi roles/haproxy/tasks/main.yml
+Surround the tasks in a block and add the become: true directive to the block. Remember to indent the tasks inside the block. The resulting file should display as follows:
+
+---
+# tasks file for haproxy
+
+- block:
+  - name: Ensure haproxy packages are present
+    yum:
+      name:
+        - haproxy
+        - socat
+      state: present
+
+  - name: Ensure haproxy is started and enabled
+    service:
+      name: haproxy
+      state: started
+      enabled: true
+
+  - name: Ensure haproxy configuration is set
+    template:
+      src: haproxy.cfg.j2
+      dest: /etc/haproxy/haproxy.cfg
+      #validate: haproxy -f %s -c -q
+    notify: reload haproxy
+  become: true
+Edit the roles/haproxy/handlers/main.yml file:
+
+[student@workstation task-escalation]$ vi roles/haproxy/handlers/main.yml
+Surround the handlers with a block and add the become: true directive to the block. Remember to indent the handlers inside the block. The resulting file should display as follows:
+
+---
+# handlers file for haproxy
+
+- block:
+  - name: restart haproxy
+    service:
+      name: haproxy
+      state: restarted
+
+  - name: reload haproxy
+    service:
+      name: haproxy
+      state: reloaded
+  become: true
+Edit the roles/apache/tasks/main.yml file:
+
+[student@workstation task-escalation]$ vi roles/apache/tasks/main.yml
+Surround the tasks with a block and add the become: true directive to the block. Remember to indent the task inside the block. The resulting file should display as follows:
+
+---
+# tasks file for apache
+
+- block:
+  - name: Ensure httpd packages are installed
+    yum:
+      name:
+        - httpd
+        - php
+        - git
+        - php-mysqlnd
+      state: present
+
+  - name: Ensure SELinux allows httpd connections to a remote database
+    seboolean:
+      name: httpd_can_network_connect_db
+      state: true
+      persistent: true
+
+  - name: Ensure httpd service is started and enabled
+    service:
+      name: httpd
+      state: started
+      enabled: true
+  become: true
+Edit the roles/webapp/tasks/main.yml file:
+
+[student@workstation task-escalation]$ vi roles/webapp/tasks/main.yml
+Add the become: true directive to the copy task. The resulting file should display as follows:
+
+---
+# tasks file for webapp
+
+- name: Ensure stub web content is deployed
+  copy:
+    content: "{{ webapp_message }}. (version {{ webapp_version}})\n"
+    dest: /var/www/html/index.html
+  become: true
+Run the playbook using the ansible-playbook command:
+
+[student@workstation task-escalation]$ ansible-playbook site.yml
+...output omitted...
+PLAY RECAP *****************************************************************...
+servera.lab.example.com    : ok=5    changed=4    unreachable=0    failed=0 ...
+serverb.lab.example.com    : ok=5    changed=3    unreachable=0    failed=0 ...
+serverc.lab.example.com    : ok=5    changed=3    unreachable=0    failed=0 ...
+Test that the playbook has run correctly:
+
+[student@workstation task-escalation]$ curl servera.lab.example.com
+Hello from serverb.lab.example.com. (version v1.0)
+Finish
+
+On workstation, run the lab task-escalation finish script to complete this lab.
+
+[student@workstation task-escalation]$ lab task-escalation finish 
+This concludes the guided exercise.

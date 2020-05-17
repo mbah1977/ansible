@@ -1,0 +1,507 @@
+Controlling Task Execution
+Objectives
+After completing this section, you should be able to configure tasks that can run before roles or after normal handlers, and notify multiple handlers at once.
+
+Controlling Order of Execution
+In a play, Ansible always runs the tasks from roles, called by roles, before the tasks that you define under the tasks section. The following playbook contains both a roles and a tasks section.
+
+---
+- name: Ensure Apache is deployed
+  hosts: www1.example.com
+  gather_facts: no
+
+  tasks:
+    - name: Open the firewall
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+
+  roles:
+    - role: apache
+When you run this playbook, Ansible executes the tasks from the role before the Open the firewall task, even though the tasks section is defined first:
+
+[user@demo ~]$ ansible-playbook deploy_apache.yml
+
+PLAY [Ensure Apache is deployed] *****************************************
+
+TASK [apache : Ensure httpd packages are installed] **********************
+changed: [www1.example.com]
+
+TASK [apache : Ensure httpd service is started and enabled] **************
+changed: [www1.example.com]
+
+TASK [Open the firewall] *************************************************
+changed: [www1.example.com]
+
+PLAY RECAP ***************************************************************
+www1.example.com    : ok=3    changed=3    unreachable=0  ...
+For readability, it is a good practice to write the tasks section after the roles section, so the order or the playbook matches the order of execution.
+
+NOTE
+This order comes from the fact that each play listed in the playbook is a YAML dictionary of key-value pairs. So, the order of the top-level directives (name, hosts, tasks, roles and so on) is actually arbitrary, but Ansible handles them in a standardized order when it parses and runs the play.
+
+It is a best practice to write your plays in a consistent order starting with the name of the play, but this is not actually required by Ansible. However, deviating from this convention will make it harder to read your playbook, and therefore is not recommended.
+
+Importing or Including Roles as a Task
+
+Recent versions of Ansible allow you to include or import roles as a task instead of using the roles section of the play. The advantage of this approach is that you can easily run a set of tasks, import or include a role, and then run more tasks. A potential disadvantage is that it may be less clear which roles your playbook is using without inspecting it closely.
+
+Use the include_role module to dynamically include a role, and use the import_role module to statically import a role.
+
+The following playbook demonstrates how a role can be included using a task with the include_role module.
+
+---
+- name: Executing a role as a task
+  hosts: remote.example.com
+
+  tasks:
+    - name: A normal task
+      debug:
+        msg: 'first task'
+
+    - name: A task to include role2 here
+      include_role:
+        name: role2
+
+    - name: Another normal task
+      debug:
+        msg: 'second task'
+With import_role, the ansible-playbook command starts by parsing and inserting the role in the play before starting the execution. Ansible detects and reports syntax errors immediately and does not start the playbook execution.
+
+With include_role, however, Ansible parses and inserts the role in the play when it reaches the include_role task, during the play execution. If Ansible detects syntax errors in the role, then execution of the playbook is aborted.
+
+However, the when directive behaves differently. With the include_role task, Ansible does not parse the role if the condition in the when directive is false.
+
+Defining Pre and Post Tasks
+
+You may want a play that runs some tasks, and the handlers they notify, before your roles. You may also want to run tasks in the play after your normal tasks and handlers run. There are two directives you can use instead of tasks to do this:
+
+pre_tasks is a tasks section that runs before the roles section.
+
+post_tasks is a tasks section that runs after the tasks section and any handlers notified by tasks.
+
+The following playbook provides an example with pre_tasks, roles, tasks, post_tasks, and handlers sections. It is unusual for a play to contain all of these sections.
+
+---
+- name: Deploying New Application Version
+  hosts: webservers
+
+  pre_tasks:
+    # Stop monitoring the web server to avoid sending false alarms
+    # while the service is updating.
+    - name: Disabling Nagios for this host
+      nagios:
+        action: disable_alerts
+        host: "{{ inventory_hostname }}"
+        services: http
+      delegate_to: nagios-srv
+
+  roles:
+    - role: deploy-content
+
+  tasks:
+    - name: Restarting memcached
+      service:
+        name: memcached
+        status: restarted
+      notify: Notifying the support team
+
+    # Confirm that the application is fully operational
+    # after the update.
+    - name: Validating the new deployment
+      uri:
+        url: "http://{{ inventory_hostname }}/healthz"
+        return_content: yes
+      register: result
+      failed_when: "'OK' not in result.content"
+
+  post_tasks:
+    - name: Enabling Nagios for this host
+      nagios:
+        action: enable_alerts
+        host: "{{ inventory_hostname }}"
+        services: http
+      delegate_to: nagios-srv
+
+  handlers:
+    # Send a message to the support team through Slack
+    # every time the memcached service is restarted.
+    - name: Notifying the support team
+      slack:
+        token: G922VJP25/D923DW937/3Ffe373sfhRE6y52Fg3rvf5GlK
+        msg: 'Memcached on {{ inventory_hostname }} restarted'
+      delegate_to: localhost
+      become: false
+Reviewing the Order of Execution
+
+Ansible runs the play sections in the following order:
+
+pre_tasks
+
+handlers notified in the pre_tasks section
+
+roles
+
+tasks
+
+handlers notified in the roles and tasks sections
+
+post_tasks
+
+handlers notified in the post_tasks section
+
+The order of these sections in a play does not modify the order of execution, as given above. For example, if you write the tasks section before the roles section, Ansible still executes the roles before the tasks in the tasks section. For readability, however, it is a good practice to organize your play in the order of execution: pre_tasks, roles, tasks, and post_tasks. Handlers are usually at the end.
+
+Ansible executes and flushes notified handlers at several points during a run: after the pre_tasks section, after the roles and tasks sections, and after the post_tasks section. This means that a handler can run more than once, at different times during the play execution, if notified in multiple sections.
+
+To immediately run any handlers that have been notified by a particular task in the play, add a task that uses the meta module with the flush_handlers parameter. This allows you to define specific points during task execution when all notified handlers are run.
+
+In the following example, the play executes the Restart api server handler, if notified, after deploying a new configuration file and before using the application API. Without this call to the meta module, the play only calls the handler after running all the tasks. If the handler has not run before the last task using the API is performed, then that task may fail because the configuration file was updated, but the application has not yet reread the new configuration.
+
+---
+- name: Updating the application configuration and cache
+  hosts: app_servers
+
+  tasks:
+    - name: Deploying the configuration file
+      template:
+        src: api-server.cfg.j2
+        dest: /etc/api-server.cfg
+      notify: Restart api server
+
+    - name: Running all notified handlers
+      meta: flush_handlers
+
+    - name: Asking the API server to rebuild its internal cache
+      uri:
+        url: "https://{{ inventory_hostname }}/rest/api/2/cache/"
+        method: POST
+        force_basic_auth: yes
+        user: admin
+        password: redhat
+        body_format: json
+        body:
+          type: data
+          delay: 0
+        status_code: 201
+
+  handlers:
+    - name: Restart api server
+      service:
+        name: api-server
+        state: restarted
+        enabled: yes
+Remember that in a play, handlers have global scope. A play can notify handlers defined in roles. One role can notify a handler defined by another role or by the play.
+
+Ansible always runs handlers that have been notified in the order they are listed in the handlers section of the play, and not in the order in which they were notified.
+
+Listening to Handlers
+In addition to being notified by tasks, a handler can also "subscribe" to a specific notification, and run when that notification is triggered. This allows multiple handlers to be triggered by one notification.
+
+By default, a handler executes when a notification string matches the handler name. However, as each handler must have a unique name, the only way to trigger multiple handlers at the same time is that each one subscribes to the same notification name.
+
+The following example shows a task that notifies My handlers when it changes, which is whenever it runs, because it has changed_when: true set. Any handler with the name My handlers, or that lists My handlers in a listen directive, will be notified.
+
+---
+- name: Testing the listen directive
+  hosts: localhost
+  gather_facts: no
+  become: no
+
+  tasks:
+    - debug:
+        msg: Trigerring the handlers
+      notify: My handlers
+      changed_when: true
+
+  handlers:
+    # Listening to the "My handlers" event
+    - name: Listening to a notification
+      debug:
+        msg: First handler was notified
+      listen: My handlers
+
+    # As an example, this handler is also triggered because
+    # its name matches the notification, but no two handlers
+    # can have the same name.
+    - name: My handlers
+      debug:
+        msg: Second handler was notified
+NOTE
+In the preceding playbook, it would be better if both handlers had unique names (not My handlers) and used listen: My handlers, because the playbook would be easier to read.
+
+The listen directive is particularly helpful when used with roles. Roles use notifications to trigger their handlers. A role can document that it will notify a certain handler when an event occurs. Other roles or a play might be able to use to use this notification to run additional handlers defined outside the role.
+
+For example, a role may notify one of its handlers when a service needs restarting. In your playbook, you can define a handler that listens to that notification and performs additional tasks when Ansible restarts the service, such as sending a message to a monitoring tool, or restarting a dependent service.
+
+For example, you can create a role that checks the validity of a given SSL certificate and notifies a handler that renews the certificate if expired. In a playbook, you can call this role to check your Apache HTTP Server certificate validity, and create a handlers that will listen for that notification to restart the httpd service if the role renews the certificate.
+
+Approaches to Handler Notification
+
+To summarize, a task can notify multiple handlers in at least two ways:
+
+It can notify a list of handlers individually by name.
+
+It can notify one name for which multiple handlers are configured to listen.
+
+Which approach is better? If the handlers are reused as a set by multiple tasks, then the easiest way to configure your playbook is to use the second approach with the listen directive. Then, you need only change the handlers to mark whether or not they are included in the set, and to ensure that they are listed in the correct order.
+
+This approach is useful when a task needs to notify a lot of handlers. Instead of notifying each handler by name, the task only sends one notification. Ansible triggers all the handlers listening to that notification. This way, you can add or remove handlers without updating the task.
+
+In the first approach, you must find and edit every affected task in order to add the handler to the list. You must also ensure that the handlers are listed in the correct order in the handlers section.
+
+NOTE
+It is an error to have a task send a notification with no handler matching that notification.
+
+[user@demo ~]$ cat no_handler_error.yml
+---
+- name: Testing notification with no handler
+  hosts: localhost
+  gather_facts: no
+  become: no
+
+  tasks:
+    - debug:
+        msg: Trigerring a non existent handler
+      changed_when: true
+      notify: Restart service
+
+[user@demo ~]$ ansible-playbook no_handler_error.yml
+
+PLAY [Testing notification with no handler] ******************************
+
+TASK [debug] *************************************************************
+ERROR! The requested handler 'Restart service' was not found in either the main handlers list nor in the listening handlers list
+Controlling Order of Host Execution
+Ansible determines which hosts to manage for a play based on the play's hosts directive. By default, Ansible 2.4 and later runs the play against hosts in the order in which they are listed in the inventory. You can change that order on a play-by-play basis by using the order directive.
+
+The following playbook alphabetically sorts the hosts in the web_servers group before running the task:
+
+---
+- name: Testing host order
+  hosts: web_servers
+  order: sorted
+
+  tasks:
+    - name: Creating a test file in /tmp
+      copy:
+        content: 'This is a sample file'
+        dest: /tmp/test.out
+The order directive accepts the following values:
+
+inventory
+The inventory order. This is the default value.
+
+reverse_inventory
+The reverse of the inventory order.
+
+sorted
+The hosts in alphabetical order. Numbers sort before letters.
+
+reverse_sorted
+The hosts in reverse alphabetical order.
+
+shuffle
+Random order every time you run the play.
+
+NOTE
+Because Ansible normally runs each task in parallel on several hosts, the output of the ansible-playbook command might not reflect the expected order: the output shows the task completion order rather than the execution order.
+
+For example, assume that the inventory is configured so that hosts are listed in alphabetical order, and plays are run on managed hosts in inventory order (the default behavior). You could still see output like this:
+
+...output omitted...
+TASK [Creating a test file in /tmp] *********************************
+changed: [www2.example.com]
+changed: [www3.example.com]
+changed: [www1.example.com]
+...output omitted...
+Notice that the task on www1.example.com completed last.
+
+REFERENCES
+Roles — Ansible Documentation
+
+Handlers: Running Operations On Change — Ansible Documentation
+
+Creating Reusable Playbooks — Ansible Documentation
+
+
+Guided Exercise: Controlling Task Execution
+In this exercise, you will use pre_tasks and post_tasks sections to control whether tasks run before or after roles, and listen directives to notify multiple handlers at the same time.
+
+Outcomes
+
+You should be able to:
+
+Control the execution order of tasks.
+
+Trigger handlers using the listen directive.
+
+Log in as the student user on workstation and run the lab task-execution start command.
+
+[student@workstation ~]$ lab task-execution start
+This script creates an Ansible project in ~/DO447/labs/task-execution/.
+
+From a terminal, change to the ~/DO447/labs/task-execution/ directory and review the deploy_haproxy.yml playbook.
+
+Change to the ~/DO447/labs/task-execution/ directory.
+
+[student@workstation ~]$ cd ~/DO447/labs/task-execution
+[student@workstation task-execution]$ 
+Review the contents of the deploy_haproxy.yml playbook.
+
+[student@workstation task-execution]$ cat deploy_haproxy.yml
+- name: Ensure HAProxy is deployed
+  hosts: lb_servers
+  force_handlers: True
+
+  roles:
+    # The "haproxy" role has a dependency on the "firewall" role.
+    # The "firewall" role requires a "firewall_rules" variable be defined.
+    - role: haproxy
+Notice that the playbook only calls one role: haproxy.
+
+Configure the playbook to add a message of the day (MOTD) on the HAProxy servers when a maintenance operation is in progress. This way, when a member of the support team logs in, the system notifies them of the maintenance window.
+
+To configure this message, update the deploy_haproxy.yml playbook to add a task that creates a message file in the /etc/motd.d/ directory of the load balancers. Because the task must run before the role, add it to the pre_tasks section. Use the copy module to create the maintenance file in the /etc/motd.d/ file, with the Maintenance in progress\n contents.
+
+Add a post_tasks section, and include a task to remove the message after the haproxy role completes.
+
+Edit the deploy_haproxy.yml playbook to add the pre_tasks section. For your convenience, you can copy and paste that section from the ~/DO447/solutions/task-execution/deploy_haproxy.yml file.
+
+- name: Ensure HAProxy is deployed
+  hosts: lb_servers
+  force_handlers: True
+
+  pre_tasks:
+    - name: Setting the maintenance message
+      copy:
+        dest: /etc/motd.d/maintenance
+        content: "Maintenance in progress\n"
+
+  roles:
+    # The "haproxy" role has a dependency on the "firewall" role.
+    # The "firewall" role requires a "firewall_rules" variable be defined.
+    - role: haproxy
+After the roles section, add the post_tasks section and a task to remove the message file. Use the file module to remove the file.
+
+- name: Ensure HAProxy is deployed
+  hosts: lb_servers
+  force_handlers: True
+
+  pre_tasks:
+    - name: Setting the maintenance message
+      copy:
+        dest: /etc/motd.d/maintenance
+        content: "Maintenance in progress\n"
+
+  roles:
+    # The "haproxy" role has a dependency on the "firewall" role.
+    # The "firewall" role requires a "firewall_rules" variable be defined.
+    - role: haproxy
+
+  post_tasks:
+    - name: Removing the maintenance message
+      file:
+        path: /etc/motd.d/maintenance
+        state: absent
+You could define the Removing the maintenance message task under a tasks section because Ansible also runs the tasks section after the roles. However, to mirror the pre_tasks section, it is better to define the task under the post_tasks section.
+
+The playbook should also notify your support team every time Ansible reloads the haproxy service. The support team uses the <student@workstation.lab.example.com> email address for this kind of notifications and also monitors the /var/log/messages syslog file on workstation. You must post the notification with both mechanisms.
+
+To do so, review the handlers that the haproxy role defines and identify the handler that reloads the haproxy service. Edit the deploy_haproxy.yml playbook to add two handlers that listen to the HAProxy handler: the first uses the mail module and the second uses the sysloger module.
+
+Review the handlers that the haproxy role defines.
+
+[student@workstation task-execution]$ cat roles/haproxy/handlers/main.yml
+---
+# handlers file for haproxy
+
+
+- name: restart haproxy
+  service:
+    name: haproxy
+    state: restarted
+
+- name: reload haproxy
+  service:
+    name: haproxy
+    state: reloaded
+Notice that the second handler reloads the haproxy service. Its name is reload haproxy.
+
+Edit the deploy_haproxy.yml playbook to add the two handlers at the end. For your convenience, you can copy and paste the handlers from the ~/DO447/solutions/task-execution/deploy_haproxy.yml file.
+
+...output omitted...
+  post_tasks:
+    - name: Removing the maintenance message
+      file:
+        path: /etc/motd.d/maintenance
+        state: absent
+
+  handlers:
+    - name: Sending an email to student
+      mail:
+        subject: "HAProxy reloaded on {{ inventory_hostname }}"
+        to: student@workstation.lab.example.com
+      delegate_to: localhost
+      become: false
+      listen: reload haproxy
+
+    - name: Logging a message to syslog
+      syslogger:
+        msg: "HAProxy reloaded on {{ inventory_hostname }}"
+      delegate_to: localhost
+      become: false
+      listen: reload haproxy
+Run the Ansible Playbook to verify your work and confirm that Ansible triggers your handlers. When done, change to your home directory.
+
+Run the deploy_haproxy.yml playbook.
+
+[student@workstation task-execution]$ ansible-playbook deploy_haproxy.yml
+...output omitted...
+TASK [Setting the maintenance message] ***********************************
+changed: [servera.lab.example.com]
+
+...output omitted...
+
+RUNNING HANDLER [haproxy : reload haproxy] *******************************
+changed: [servera.lab.example.com]
+
+RUNNING HANDLER [Sending an email to student] ****************************
+ok: [servera.lab.example.com]
+
+RUNNING HANDLER [Logging a message to syslog] ****************************
+changed: [servera.lab.example.com]
+
+TASK [Removing the maintenance message] **********************************
+changed: [servera.lab.example.com]
+
+PLAY RECAP ***************************************************************
+servera.lab.example.com    : ok=11   changed=9   unreachable=0  ...
+Use the mail command to confirm that Ansible has notified the student user of the haproxy service reload.
+
+[student@workstation task-execution]$ mail
+Heirloom Mail version 12.5 7/5/10.  Type ? for help.
+"/var/spool/mail/student": 1 message 1 new
+>N 1 root@workstation Thu May 2 "HAProxy reloaded on servera.lab.example.com"
+& q
+Held 1 message in /var/spool/mail/student
+Confirm that the /var/log/messages file contains the notification. Use the sudo command to access the /var/log/messages file. Use student for the password.
+
+[student@workstation task-execution]$ sudo grep \
+> "HAProxy reloaded"  /var/log/messages
+[sudo] password for student: student
+...output omitted...
+May  2 11:59:10 workstation ansible_syslogger[16547]: HAProxy reloaded on servera.lab.example.com
+Change to your home directory.
+
+[student@workstation task-execution]$ cd
+[student@workstation ~]$ 
+Finish
+
+On workstation, run the lab task-execution finish command to complete this exercise.
+
+[student@workstation ~]$ lab task-execution finish
+This concludes the guided exercise.
+
+Red Hat Training + Certification logo
