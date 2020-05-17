@@ -1,0 +1,742 @@
+Managing Ansible Project Materials Using Git
+Objectives
+After completing this section, you should be able to create and manage Ansible Playbooks in a Git repository, following recommended practices.
+
+Infrastructure as Code
+One key DevOps concept is the idea of infrastructure as code. Instead of managing your infrastructure manually, you define and build your systems by running your automation code. Red Hat Ansible Automation is a key tool that can help you implement this approach.
+
+If Ansible projects are the code which is used to define the infrastructure, then a version control system such as Git should be used to track and control changes to the code.
+
+Version control also allows you to implement a life cycle for the different stages of your infrastructure code, such as development, QA, and production. You can commit your changes to a branch and test those changes in noncritical development and QA environments. Once you are confident in the changes, you can merge them to the main production code and apply the changes to your production infrastructure.
+
+Introducing Git
+Git is a distributed version control system (DVCS) that allows developers to manage changes to files in a project in a collaborative manner. Each revision of a file is committed to the system. Old versions of files can be restored, and a log of who made the changes is maintained.
+
+Version control systems provide many benefits, including:
+
+The ability to review and restore old versions of files.
+
+The ability to compare two versions of the same file to identify changes.
+
+A record or log of who made what changes, and when those changes were made.
+
+Mechanisms for multiple users to collaboratively modify files, resolve conflicting changes, and merge the changes together.
+
+Git is a distributed version control system. Each developer can start by cloning an existing shared project from a remote repository. Cloning a project creates a complete copy of the original remote repository as a local repository. This is a local copy of the entire history of the files in the version control system, and not just the latest snapshot of the project files.
+
+The developer makes edits in a working tree, which is a checkout of a single snapshot of the project. A set of related changes are then staged and committed to the local repository. At this point, no changes have been made to the shared remote repository.
+
+When the developer is ready to share their work, they push changes to the remote repository. Alternatively, if the local repository is accessible from the network, the owner of the remote repository can pull the changes from the developer's local repository to the remote repository.
+
+Likewise, when a developer is ready to update their local repository with the latest changes to the remote repository, they can pull the changes, which fetches them from the remote repository and merges them into the local repository.
+
+To use Git effectively, a user must be aware of the three possible states of a file in the working tree: modified, staged, or committed.
+
+Modified: the copy of the file in the working tree has been edited and is different from the latest version in the repository.
+
+Staged: the modified file has been added to a list of changed files to commit as a set, but has not yet been committed.
+
+Committed: the modified file has been committed to the local repository.
+
+Once the file is committed to the local repository, the commit can be pushed to or pulled by a remote repository.
+
+
+Figure 1.1: The four areas where Git manages files
+NOTE
+The presentation in this section assumes that you are using Git from the command-line of a Bash shell. A number of programming editors and IDEs have integrated Git support, and while the configuration and UI details may differ, they simply provide a different front end to the same workflow.
+
+Describing Initial Git Configuration
+Since Git users frequently modify projects with multiple contributors, Git records the user's name and email address on each of their commits. These values can be defined at a project level, but global defaults can also be set for a user. The git config command controls these settings. Using this command with the --global option manages the default settings for all Git projects to which the user contributes by saving the settings in their ~/.gitconfig file.
+
+[user@demo ~]$ git config --global user.name 'Peter Shadowman'
+[user@demo ~]$ git config --global user.email peter@host.example.com
+If bash is the user's shell, another useful, optional setting is to configure your prompt to automatically modify itself to report the status of your working tree. The easiest way is to use the git-prompt.sh script shipped with the git package.
+
+To modify your shell prompt in this way, add the following lines to your ~/.bashrc file. If your current directory is in a Git working tree, the name of the current Git branch for the working tree is displayed in parentheses. If you have untracked, modified, or staged files that are not committed in your working tree, the prompt will indicate this:
+
+(branch *) means a tracked file is modified
+
+(branch +) means a tracked file is modified and staged with git add
+
+(branch %) means untracked files are in your tree
+
+Combinations of markers are possible, such as (branch *+)
+
+source /usr/share/git-core/contrib/completion/git-prompt.sh
+export GIT_PS1_SHOWDIRTYSTATE=true
+export GIT_PS1_SHOWUNTRACKEDFILES=true
+export PS1='[\u@\h \W$(declare -F __git_ps1 &>/dev/null && __git_ps1 " (%s)")]\$ '
+The Git Workflow
+When working on shared projects, the Git user clones an existing upstream repository with the git clone command. The path name or URL provided determines which repository is cloned into the current directory. A working tree is also created so that the directory of files is ready for revisions. Since the working tree is unmodified, it is initially in a clean state.
+
+For example, the following command clones the repository project.git at git.lab.example.com by connecting using the SSH protocol and authenticating as user git:
+
+[user@demo ~]$ git clone git@git.lab.example.com:project.git
+NOTE
+Another way to start the Git workflow is to create a new, private project with the git init command. When a project is started in this way, no remote repository is created.
+
+Use git init --bare to create a bare repository on a server. Bare repositories does not have a local working tree. Therefore, the bare repository cannot be used to apply file changes. Git servers usually contain bare repositories, as the working tree is not needed in the server. When developers create a local copy of the repository, they usually need a working tree to make local changes, so they create a non-bare clone. The server must also be set up to allow users to clone, pull from, and push to the repository using the HTTPS or SSH protocol.
+
+
+Figure 1.2: Git subcommands used to create a repository
+As a developer works, new files are created and existing files are modified in the working tree. This changes the working tree to a dirty state. The git status command displays detailed information about which files in the working tree are modified but unstaged, untracked (new), or staged for the next commit.
+
+The git add command stages files, preparing them to be committed. Only files that are staged to the staging area are saved to the repository on the next commit.
+
+If a user is working on two changes at the same time, the files can be organized into two commits for better tracking of changes. One set of changes is staged and committed, and then the rest of the changes are staged and committed.
+
+The git rm command removes a file from the working directory and also stages its removal from the repository on the next commit.
+
+The git reset command removes a file from the staging area that has been added for the next commit. This command has no effect on the file's contents in the working tree.
+
+The git commit command commits the staged files to the local Git repository. A log message must be provided that explains why the current set of staged files is being saved. Failure to provide a message will abort the commit. Log messages do not have to be long, but they should be meaningful so that they are useful.
+
+IMPORTANT
+The git commit command by itself does not automatically commit changed files in the working tree.
+
+The git commit -a command stages and commits modified files in one step. However, that command does not include any untracked (newly created) files in the directory. When you add a new file, you must explicitly git add that file to stage it the first time so that it is tracked for future git commit -a commands.
+
+NOTE
+Meaningful and concise commit messages are the key to maintaining a clear history for the Ansible Project. There are many approaches to a good commit message, but most of these approaches agree on the following three points:
+
+First line should be a short (usually less than 50 characters) summary of the reason for the commit.
+
+A blank line follows, and then the rest of the message must explain all the details and reasons for the commit.
+
+If available, add references to an issue or feature tracker related entries. These references expand the commit message with additional text, related people or history.
+
+
+Figure 1.3: Git subcommands that add/update local repository content
+The git push command uploads changes made to the local repository to the remote repository. One common way to coordinate work with Git is for all developers to push their work to the same, shared, remote repository.
+
+Before Git pushes can work, the default push method must be defined. The following command sets the default push method to the simple method. This is the safest option for beginners.
+
+[user@demo ~]$ git config --global push.default simple
+The git pull command fetches commits from the remote repository and adds them to the local repository. It also merges changes into the files into your working tree.
+
+This command should be run frequently to stay current with the changes that others are making to the project in the remote repository.
+
+NOTE
+An alternative approach to get commits from the remote repository is to use git fetch to download changes in the remote repository into your local repository, then to use git merge to merge the changes in the tracking branch to your current branch.
+
+Git branches are discussed later in this section.
+
+
+Figure 1.4: Git subcommands that interact with a remote repository
+Examining the Git Log
+
+Part of the point of a version control system is to track a history of commits. Each commit is identified by a commit hash. The git log command displays the commit log messages with the associated ID hashes for each commit. The git show commit-hash command shows what was in the change set for a particular commit hash. The entire hash does not need to be entered with the command, but only enough of it to uniquely identify a particular commit in the repository. These hashes can also be used to revert to earlier commits or otherwise explore the version control system's history.
+
+Table 1.1. Git Quick Reference
+
+Command	Description
+git clone URL	Clone an existing Git project from the remote repository at URL into the current directory.
+git status	Display the status of modified and staged files in the working tree.
+git add file	Stage a new or changed file for the next commit.
+git rm file	Stage removal of a file for the next commit.
+git reset	Unstage files that have been staged for the next commit.
+git commit	Commit the staged files to the local repository with a descriptive message.
+git push	Push changes in the local repository to the remote repository.
+git pull	Fetch updates from the remote repository to the local repository and merge them into the working tree.
+git revert commit_ref	Create a new commit, undoing the changes in the commit referenced. The commit hash that identifies the commit can be used, although there are other ways to reference a commit.
+
+IMPORTANT
+This is a highly simplified introduction to Git. It has made some assumptions and avoided discussion of the important topics of branches and merging. Some of these assumptions include:
+
+The local repository was cloned from a remote repository.
+
+Only one local branch is in use.
+
+The local branch is configured to fetch from and push to a branch on the original remote repository.
+
+Write access is provided to the remote repository, such that git push works.
+
+Links to more detailed information and tutorials on how to use Git are available in the References at the end of this section.
+
+Git Branches and References
+Changes in a Git repository bundle into commits. A commit contains all the information needed by Git to create and handle the whole history for the repository, including:
+
+A unique ID for the commit, in the format of a 40 hexadecimal character string. This ID is the SHA-1 hash of the contents of the commit.
+
+The list of repository files changed, and the exact changes to each of them. Changes may be line additions or subtractions, renaming, or deletion.
+
+The ID of the parent commit. That is, the ID for the commit defining the status of the repository before applying current commit changes.
+
+The author and the creator (or committer) for the commit.
+
+Lastly, but very important, a commit also includes a list of references. A reference is like a named pointer to the commit. Most common references are tags and branches.
+
+The git commit command generates a new commit with all changes added to the stage with the git add command. You can see a Git repository as a commit graph, and branches as references to commits.
+
+
+Figure 1.5: Sample Git Repository
+The preceding figure depicts a sample Git repository containing 11 commits. The most recent commits are to the right, the arrows point to the older commits. It has three branches (master, feature/1, and feature/2) and a single tag (tag/1.0).
+
+The HEAD reference is the current commit in the local working tree. If you make a change in your working tree, stage it with the git add command, and commit it with the git commit command, a new commit will be created with most recent commit as its parent, and HEAD will move to point at the new commit.
+
+Creating Branches
+
+Different branches in Git allow different work streams to evolve in parallel on the same Git repository. Commits for each work stream append only to that branch.
+
+Use the git branch command to create a new branch from the current HEAD commit. This command creates a reference for the new branch, but it does not set the current HEAD to this branch. Use the git checkout command to move the HEAD to the appropriate branch.
+
+In the preceding example, the most recent commit for the branch master (and HEAD at that time) was commit 5749661, which occurred at some point in the past. A user ran the git branch feature/1 command, creating a branch, feature/1. Then, the user ran git checkout feature/1 to indicate that future commits should be made to that branch. Finally, the user staged and committed two commits to the feature/1 branch, commits 60c6c2c and 8f7c801. After running these commands, the HEAD was at commit 8f7c801, and the new commits were added to the feature/1 branch.
+
+Next, the user wanted to add commits to the master branch. After moving HEAD to the latest commit on that branch, by running the git checkout master command, two new commits were made: 96e9ce7 and 44bd644. The HEAD pointed to 44bd644, and commits were added to the master branch.
+
+Merging Branches
+
+When work is complete on a branch, the branch can be merged with the original branch. This allows work in parallel on new features and bug fixes, while the main branch is free of incomplete or untested work.
+
+In the preceding example, it was determined that all changes from feature/2 should be merged into the master branch. That is, someone wanted the most recent commit for master to be the result of all the commits from both branches.
+
+This outcome was accomplished by first running the git checkout master command to make sure HEAD was on the most recent commit on the master branch, e8ce346. Then, the command git merge feature/2 was run. This command created a new commit, 5749661, that included all the commits from feature/2 and all the commits from master. HEAD was moved to the latest commit.
+
+Sometimes, changes on more than one branch can not merge automatically because each branch makes changes to the same parts of the same files. This situation is called a merge conflict and needs to be manually resolved by editing the affected files. Merge strategies and conflict resolution are out of scope for this course.
+
+Creating Branches from Old Commits
+
+Use the git checkout command to move HEAD to any commit. For example, the command git checkout 790dd94 moves HEAD to that commit. Then, a new branch starting with that commit can be created using the git branch and git checkout commands. For example, one might choose to branch from a specific commit to ignore other recent changes to a branch.
+
+You can create a branch and switch to it in a single step, by running the git checkout command with the -b option:
+
+[user@demo ~]$ git checkout -b feature/2
+Switched to a new branch 'feature/2'
+NOTE
+If there is a commit that you might need at some point in the future, then you can use git tag to put a memorable label on it (like tag/1.0 in the example) and then run the git checkout command on that tag to switch to the desired commit.
+
+Pushing Branches to Remote Repositories
+
+Initially, any branches that you create only exist in your local repository. If you want to share them with users of the original remote repository that you cloned, then you must push them to the repository as you would push a commit.
+
+The most common way to do this is to use the git push command with the --set-upstream (or -u) option to create a branch on the remote repository that will be tracked by your current local branch.
+
+For example, to push your new branch, feature/2, to your remote repository, run the following commands:
+
+[user@demo ~]$ git checkout feature/2
+Switched to branch 'feature/2'
+[user@demo ~]$ git push --set-upstream origin feature/2
+The remote origin repository normally refers to the Git repository that you originally cloned. This command indicates that you want to push the current branch to the repository, creating feature/2 and configuring Git so that the git push command on this branch pushes commits to the remote repository. Running the git pull command on this branch will pull and merge any commits from the remote repository into your local copy of the branch.
+
+Structuring Ansible Projects in Git
+Each Ansible project should have its own Git repository.
+
+The structure of the files in that repository should follow the recommended practices for Ansible documented at http://docs.ansible.com/ansible/playbooks_best_practices.html. For example, the directory structure might look something like this:
+
+library/             # for custom modules (optional)
+filter_plugins/      # for custom filter plugins (optional)
+
+site.yml             # MASTER PLAYBOOK includes other playbooks
+webservers.yml       # playbook for webserver tier
+dbservers.yml        # playbook for dbserver tier
+
+roles/               # directory for roles
+  webserver/            # a particular role
+    tasks/
+      main.yml            # tasks for the role, can include other files
+    defaults/
+      main.yml            # default low-priority variables for the role
+    templates/
+      httpd.conf.j2       # a Jinja2 template used by the role
+    files/
+      motd                # a file used by the role
+    handlers/
+      main.yml            # handlers used by the role
+    meta/
+      main.yml            # role information and dependencies
+  ...additional roles...
+Roles take some thought to manage well. If your roles are managed as part of the playbook, then keeping them with the playbook can make sense. However, most roles are meant to be shared by multiple projects, and if each project has its own copy of each role, then they could diverge from each other and some of the benefit of using roles will be lost.
+
+A role should have its own Git repository. Some people try to include role repositories in their project repositories by using an advanced feature of Git called submodules. Because submodules can be tricky to manage successfully, this is not a recommended approach.
+
+A better approach is to set up your project with an empty roles/ directory, and use ansible-galaxy to populate this directory with the latest version of roles from their Git repositories before you run the playbooks.
+
+Ensure that no subdirectories get committed to roles/ by putting a README file in the directory explaining what you are doing and committing a .gitignore file to the top of your project's Git repository to tell Git to ignore directories in roles/:
+
+roles/*/*
+REFERENCES
+gittutorial(7) and git(1) man pages
+
+Git
+
+Pro Git by Scott Chacon and Ben Straub (free book)
+
+Further information is available in the GitHub Getting Started Tutorial at http://try.github.io
+
+A useful hands-on tool for learning about branching and merging in Git is at http://learngitbranching.js.org
+
+Ansible User Guide: Best Practices
+
+How to Write a Git Commit Message
+
+
+
+Guided Exercise: Managing Ansible Project Materials Using Git
+In this exercise, you will clone an existing Git repository that contains an Ansible Playbook, make edits to files in that repository, commit the changes to your local repository, and push those changes to the original repository.
+
+Outcomes
+
+You should be able to use basic git commands to modify files stored in an existing Git repository.
+
+Log in as the student user on workstation and run the lab development-git start command. This setup script installs the package for Git and creates the Git repository needed for the exercise.
+
+[student@workstation ~]$ lab development-git start
+Perform basic configuration of Git by setting the following user name, email address, and default push method using the git config command:
+
+[student@workstation ~]$ git config --global user.name 'Daniel George'
+[student@workstation ~]$ git config --global user.email daniel@lab.example.com
+[student@workstation ~]$ git config --global push.default simple
+Check your configuration using the git config command. The output should resemble the following:
+
+[student@workstation ~]$ git config --global -l
+user.name=Daniel George
+user.email=daniel@lab.example.com
+credential.helper=store
+Create a new directory named git-repos for your Git repositories, and then change to that directory.
+
+[student@workstation ~]$ mkdir git-repos && cd git-repos
+Clone and examine the repository called my_webservers_DEV.
+
+Clone the repository using git clone. This creates a directory called my_webservers_DEV in your current directory. This new directory contains a playbook intended to setup an Apache HTTP server.
+
+[student@workstation git-repos]$ git clone \
+> http://git@git.lab.example.com:8081/git/my_webservers_DEV.git
+Cloning into 'my_webservers_DEV'...
+remote: Enumerating objects: 6, done.
+remote: Counting objects: 100% (6/6), done.
+remote: Compressing objects: 100% (6/6), done.
+remote: Total 6 (delta 0), reused 0 (delta 0)
+Unpacking objects: 100% (6/6), done.
+Change directory to the new directory. This is the root directory of the Git repository.
+
+[student@workstation git-repos]$ cd my_webservers_DEV
+Take a look at the files in that repository using the tree command. The apache-setup.yml file is the playbook. There are two Jinja2 templates that the playbook uses to build static files. The httpd.conf.j2 template is used to generate the Apache server configuration. The index.html.j2 template is used to generate a basic index page to be provided by the server.
+
+[student@workstation my_webservers_DEV]$ tree
+.
+├── apache-setup.yml
+└── templates
+    ├── httpd.conf.j2
+    └── index.html.j2
+
+1 directory, 3 files
+Create a new branch named development, and then switch to that branch.
+
+[student@workstation my_webservers_DEV]$ git branch development
+[student@workstation my_webservers_DEV]$ git checkout development
+Switched to branch 'development'
+Edit the index.html.j2 template so that it displays HELLO WORLD at the bottom of the page, and then verify your modification.
+
+Using a text editor, open the templates/index.html.j2 template file for editing. Append the string HELLO WORLD <br> to the end of the file. After completing these modifications, the index.html.j2 file should display as follows:
+
+{{ apache_test_message }} {{ ansible_distribution }} {{ ansible_distribution_version }} <br>
+Current Host: {{ ansible_hostname }} <br>
+Server list: <br>
+{% for host in groups['all'] %}
+{{ host }} <br>
+{% endfor %}
+HELLO WORLD <br>
+Save the changes made to the file and then exit the text editor.
+
+Use git status to check the status of your modifications. Git shows that you have unstaged changes.
+
+[student@workstation my_webservers_DEV]$ git status
+On branch development
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- &lt&;file>..." to discard changes in working directory)
+
+	modified:   templates/index.html.j2
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Add the template to the staging area and check the status of your modifications.
+
+Use the git add command to add the template to the staging area.
+
+[student@workstation my_webservers_DEV]$ git add templates/index.html.j2
+Use the git status command to check the status of your modifications. Git shows that you have modifications in the staging area that are ready to be committed.
+
+[student@workstation my_webservers_DEV]$ git status
+On branch development
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+	modified:   templates/index.html.j2
+Commit your changes and check the status of your modifications.
+
+Use the git commit command with the commit message My first commit:
+
+[student@workstation my_webservers_DEV]$ git commit -m "My first commit"
+[development 918ceb7] My first commit
+ 1 file changed, 1 insertion(+)
+Use the git status command to check the status of your modifications. Git shows that there are no more modifications to be staged or committed on the local repository.
+
+[student@workstation my_webservers_DEV]$ git status
+On branch development
+nothing to commit, working tree clean
+Push the changes to the remote repository using the git push command.
+
+[student@workstation my_webservers_DEV]$ git push \
+> --set-upstream origin development
+Enumerating objects: 7, done.
+Counting objects: 100% (7/7), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (4/4), 424 bytes | 424.00 KiB/s, done.
+Total 4 (delta 1), reused 0 (delta 0)
+remote:
+remote: To create a merge request for development, visit:
+remote:   http://git.lab.example.com:8081/git/my_webservers_DEV/merge_requests/new?merge_request%5Bsource_branch%5D=development
+remote:
+To http://git.lab.example.com:8081/git/my_webservers_DEV.git
+ * [new branch]      development -> development
+Branch 'development' set up to track remote branch 'development' from 'origin'.
+Change back to master branch to verify that the changes have been pushed to the remote repository.
+
+[student@workstation my_webservers_DEV]$ git checkout master
+Switched to branch 'master'
+Your branch is up to date with 'origin/master'.
+Verify that HELLO WORLD does not appear in the template.
+
+[student@workstation my_webservers_DEV]$ grep "HELLO WORLD" \
+> templates/index.html.j2
+Use the git merge command to merge the latest changes from the development branch.
+
+[student@workstation my_webservers_DEV]$ git merge development
+Updating 13a7afc..86e297e
+Fast-forward
+ templates/index.html.j2 | 1 +
+ 1 file changed, 1 insertion(+)
+Verify that the HELLO WORLD line is present in the index.html.j2 file.
+
+[student@workstation my_webservers_DEV]$ grep "HELLO WORLD" \
+> templates/index.html.j2
+HELLO WORLD <br>
+Push the new changes in the master branch to the remote repository.
+
+[student@workstation my_webservers_DEV]$ git push
+Total 0 (delta 0), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/my_webservers_DEV.git
+   13a7afc..86e297e  master -> master
+Revert the changes so the master branch returns to the initial status.
+
+Use the git revert command to create a new commit, undoing the latest commit (referred as HEAD).
+
+[student@workstation my_webservers_DEV]$ git revert --no-edit HEAD 
+[master dad1df1] Revert "My first commit"
+ Date: Wed Apr 24 19:48:37 2019 +0000
+ 1 file changed, 1 deletion(-)
+Review the updated file, which has returned to the previous status.
+
+[student@workstation my_webservers_DEV]$ grep "HELLO WORLD" \
+> templates/index.html.j2
+[student@workstation my_webservers_DEV]$ 
+Push the new commit, reverting the changes to the remote repository by using the git push command.
+
+[student@workstation my_webservers_DEV]$ git push
+Enumerating objects: 7, done.
+Counting objects: 100% (7/7), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (4/4), 432 bytes | 432.00 KiB/s, done.
+Total 4 (delta 1), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/my_webservers_DEV.git
+   d949e6d..dd89d85  master -> maste
+
+
+Lab: Developing with Recommended Practices
+Performance Checklist
+
+In this lab, you will update an existing Ansible project to implement better practices and commit changes to the remote project repository.
+
+Outcomes
+
+You should be able to:
+
+Implement style guidelines for task and variable names in roles and playbooks.
+
+Create roles with appropriate names.
+
+Commit changes to a Git repository.
+
+Log in as the student user on workstation and run the lab development-review start command. This script downloads files required for the lab.
+
+[student@workstation ~]$ lab development-review start
+Clone the Git repository http://git.lab.example.com:8081/git/development-review.git in the /home/student/git-repos directory.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist. Then, change to this directory and clone the repository:
+
+[student@workstation ~]$ mkdir -p git-repos; cd git-repos
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/development-review.git
+Cloning into 'development-review'...
+remote: Enumerating objects: 107, done.
+remote: Counting objects: 100% (107/107), done.
+remote: Compressing objects: 100% (88/88), done.
+remote: Total 107 (delta 31), reused 0 (delta 0)
+Receiving objects: 100% (107/107), 12.32 KiB | 3.08 MiB/s, done.
+Resolving deltas: 100% (31/31), done.
+[student@workstation git-repos]$ cd development-review
+Review the site.yml playbook as well as any other playbooks referenced in the site.yml playbook. Verify that the site.yml playbook executes without any errors.
+
+NOTE
+After executing the site.yml playbook, servera distributes requests to the back-end web servers:
+
+[student@workstation ~]$ curl servera
+This is serverb.lab.example.com. (version v1.0)
+[student@workstation ~]$ curl servera
+This is serverc.lab.example.com. (version v1.0)
+[student@workstation ~]$ curl servera
+This is serverb.lab.example.com. (version v1.0)
+[student@workstation ~]$ curl servera
+This is serverc.lab.example.com. (version v1.0)
+[student@workstation development-review]$ ansible-playbook site.yml
+
+PLAY [Ensure HAProxy is deployed] ********************************************
+
+...output omitted...
+
+PLAY [Ensure Apache is deployed] *********************************************
+
+...output omitted...
+
+PLAY [web_servers] ***********************************************************
+
+...output omitted...
+
+PLAY RECAP *******************************************************************
+servera.lab.example.com    : ok=6    ...output omitted...
+serverb.lab.example.com    : ok=6    ...output omitted...
+serverc.lab.example.com    : ok=6    ...output omitted...
+The deploy_apache.yml playbook uses the my_role role to deploy a web server. This role does not have a suitable name. Rename this role to apache, and update all project references to the new role name. When you have updated all project references to the new role name, the deploy_apache.yml playbook will execute without errors.
+
+Commit these changes to your local repository.
+
+NOTE
+Use the git rm command to remove the my_role files from the repository.
+
+Rename the roles/my_role subdirectory to roles/apache.
+
+[student@workstation development-review]$ cd roles
+[student@workstation roles]$ ls
+firewall  haproxy  my_role  webapp
+[student@workstation roles]$ mv -v my_role apache
+renamed 'my_role' -> 'apache'
+[student@workstation roles]$ cd ..
+[student@workstation development-review]$ 
+Edit the name of the role in the deploy_apache.yml playbook from my_role to apache. Save the file. The content of the deploy_apache.yml file displays as follows:
+
+- name: Ensure Apache is deployed
+  hosts: web_servers
+  force_handlers: True
+  gather_facts: no
+
+  roles:
+    # The "apache" role has a dependency
+    # on the "firewall" role. The
+    # "firewall" role requires a
+    # "firewall_rules" variable be defined.
+    - role: apache
+      firewall_rules:
+
+        # Allow http requests from the
+        # internal zone.
+        - zone: internal
+          service: http
+
+        # Add the load balancer IP to
+        # the internal zone.
+        - zone: internal
+          source: 172.25.250.10
+Execute the deploy_apache.yml playbook to test your changes.
+
+[student@workstation development-review]$ ansible-playbook deploy_apache.yml
+...output omitted...
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com    : ok=4    ...output omitted...
+serverc.lab.example.com    : ok=4    ...output omitted...
+Commit these changes to your local repository.
+
+[student@workstation development-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+  modified:   deploy_apache.yml
+  deleted:    roles/my_role/meta/main.yml
+  deleted:    roles/my_role/tasks/main.yml
+  deleted:    roles/my_role/vars/main.yml
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+
+  roles/apache/
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Use the git rm command to remove the my_role role from the repository:
+
+[student@workstation development-review]$ git rm roles/my_role/*
+rm 'roles/my_role/meta/main.yml'
+rm 'roles/my_role/tasks/main.yml'
+rm 'roles/my_role/vars/main.yml'
+Use the git add command to add the files for the new apache role:
+
+[student@workstation development-review]$ git add roles/apache
+Stage the changes to the deploy_apache.yml file:
+
+[student@workstation development-review]$ git add deploy_apache.yml
+Verify that correct set of files are staged to be committed:
+
+[student@workstation development-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+  modified:   deploy_apache.yml
+  renamed:    roles/my_role/meta/main.yml -> roles/apache/meta/main.yml
+  renamed:    roles/my_role/tasks/main.yml -> roles/apache/tasks/main.yml
+  renamed:    roles/my_role/vars/main.yml -> roles/apache/vars/main.yml
+Commit the staged changes:
+
+[student@workstation development-review]$ git commit \
+> -m "Renamed my_role role to apache."
+[master 69b6cc5] Renamed my_role role to apache.
+ 4 files changed, 2 insertions(+), 2 deletions(-)
+ rename roles/{my_role => apache}/meta/main.yml (100%)
+ rename roles/{my_role => apache}/tasks/main.yml (100%)
+ rename roles/{my_role => apache}/vars/main.yml (100%)
+Push the changes to the remote repository:
+
+[student@workstation development-review]$ git push
+...output omitted...
+To http://git.lab.example.com:8081/git/development-review.git
+   8c918b1..6db348e  master -> master
+The output of the deploy_webapp.yml playbook does not contain good summaries of the playbook's actions.
+
+Edit the deploy_webapp.yml playbook to add an appropriate name to the only play in the playbook.
+
+The output of each task for the webapp role indicates the Ansible module for the task. Add a descriptive task name to the only task in the in webapp role. Execute the deploy_webapp.yml playbook to test your changes.
+
+Commit these changes to your local repository.
+
+Edit the deploy_webapp.yml file, and add a name attribute to the play. You can use any value for the name, but it should describe the intent of the play:
+
+- name: Ensure the web application is deployed
+  hosts: web_servers
+  gather_facts: no
+  vars:
+    version: v1.0
+    message: "This is {{ inventory_hostname }}."
+
+  roles:
+    - role: webapp
+Edit the roles/webapp/tasks/main.yml file, and add a name attribute to the task. You can use any value for the name, but the name should describe the intent of the task:
+
+---
+# tasks file for webapp
+
+- name: Ensure placeholder content is deployed
+  copy:
+    content: "{{ message }} (version {{ version }})\n"
+    dest: /var/www/html/index.html
+With these changes, verify that the deploy_webapp.yml playbook executes without errors:
+
+[student@workstation development-review]$ ansible-playbook deploy_webapp.yml
+...output omitted...
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com    : ok=1    changed=0    unreachable=0    ...
+serverc.lab.example.com    : ok=1    changed=0    unreachable=0    ...
+Commit the changes:
+
+[student@workstation development-review]$ git status
+...output omitted...
+
+  modified:   deploy_webapp.yml
+  modified:   roles/webapp/tasks/main.yml
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[student@workstation development-review]$ git add deploy_webapp.yml
+[student@workstation development-review]$ git add roles/webapp/*
+[student@workstation development-review]$ git commit \
+> -m "Added names to webapp playbook and role."
+[master eb9dde9] Added names to webapp playbook and role.
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+[student@workstation development-review]$ git push
+...output omitted...
+To http://git.lab.example.com:8081/git/development-review.git
+   6db348e..a888c73  master -> master
+The webapp role contains two variables, message and version.
+
+Edit the variable names so that each variable is prefixed with webapp_. Update any reference to either of these variables in project files with the appropriate new variable name. When you have made all of the necessary updates, the deploy_webapp.yml playbook will execute without errors.
+
+Commit these changes to your local repository.
+
+Edit the roles/webapp/tasks/main.yml file. Add the webapp_ prefix to all role variable references. After you save your changes, the file displays as follows:
+
+---
+# tasks file for webapp
+
+- name: Ensure placeholder content is deployed
+  copy:
+    content: "{{ webapp_message }} (version {{ webapp_version }})\n"
+    dest: /var/www/html/index.html
+Change the variable names in the roles/webapp/defaults/main.yml file. After you save your changes, the file contains:
+
+webapp_version: v1.0
+webapp_message: "This is {{ inventory_hostname }}."
+The deploy_webapp.yml playbook uses the webapp role. Update the name of the variables in this playbook. After you save your changes, the deploy_webapp.yml file displays as follows:
+
+- name: Ensure web application is deployed
+  hosts: web_servers
+  gather_facts: no
+  vars:
+    webapp_version: v1.0
+    webapp_message: "This is {{ inventory_hostname }}."
+
+  roles:
+    - role: webapp
+Ensure that the deploy_webapp.yml playbook executes without errors.
+
+[student@workstation development-review]$ ansible-playbook deploy_webapp.yml
+...output omitted...
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com    : ok=4    ...output omitted...
+serverc.lab.example.com    : ok=4    ...output omitted...
+Commit the changes:
+
+[student@workstation development-review]$ git status
+...output omitted...
+
+  modified:   deploy_webapp.yml
+  modified:   roles/webapp/defaults/main.yml
+  modified:   roles/webapp/tasks/main.yml
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[student@workstation development-review]$ git add deploy_webapp.yml
+[student@workstation development-review]$ git add roles/webapp/*
+[student@workstation development-review]$ git commit \
+> -m "Updated webapp role variable names."
+[master 3938c0d] Updated webapp role variable names.
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+[student@workstation development-review]$ git push
+...output omitted...
+To http://git.lab.example.com:8081/git/development-review.git
+   a888c73..8e71ee5  master -> master
+Verify that the site.yml playbook executes with no errors, and then push all of the committed changes to the remote repository.
+
+Execute the site.yml playbook.
+
+[student@workstation development-review]$ ansible-playbook site.yml
+If there are errors, make any necessary edits to correct the errors. Commit and push these changes back to the repository.
+
+When you have made all the required changes and the site.yml playbook executes without errors, proceed to the next step.
+
+

@@ -1,0 +1,129 @@
+Table of Contents
+Course
+Lab Environment
+Preface A: Introduction
+Section A.1: Advanced Automation: Ansible Best Practices
+Section A.2: Orientation to the Classroom Environment
+Chapter 1: Developing with Recommended Practices
+Section 1.1: Implementing Recommended Practices
+Section 1.2: Guided Exercise: Implementing Recommended Practices
+Section 1.3: Managing Ansible Project Materials Using Git
+Section 1.4: Guided Exercise: Managing Ansible Project Materials Using Git
+Section 1.5: Lab: Developing with Recommended Practices
+Section 1.6: Summary
+Chapter 2: Managing Inventories
+Section 2.1: Writing YAML Inventory Files
+Section 2.2: Guided Exercise: Writing YAML Inventory Files
+Section 2.3: Managing Inventory Variables
+Section 2.4: Guided Exercise: Managing Inventory Variables
+Section 2.5: Lab: Managing Inventories
+Section 2.6: Summary
+Chapter 3: Managing Task Execution
+Section 3.1: Controlling Privilege Escalation
+Section 3.2: Guided Exercise: Controlling Privilege Escalation
+Section 3.3: Controlling Task Execution
+Section 3.4: Guided Exercise: Controlling Task Execution
+Section 3.5: Running Selected Tasks
+Section 3.6: Guided Exercise: Running Selected Tasks
+Section 3.7: Optimizing Execution for Speed
+Section 3.8: Guided Exercise: Optimizing Execution for Speed
+Section 3.9: Lab: Managing Task Execution
+Section 3.10: Summary
+Chapter 4: Transforming Data with Filters and Plugins
+Section 4.1: Processing Variables Using Filters
+Section 4.2: Guided Exercise: Processing Variables using Filters
+Section 4.3: Templating External Data using Lookups
+Section 4.4: Guided Exercise: Templating External Data using Lookups
+Section 4.5: Implementing Advanced Loops
+Section 4.6: Guided Exercise: Implementing Advanced Loops
+Section 4.7: Working with Network Addresses Using Filters
+Section 4.8: Guided Exercise: Working with Network Addresses Using Filters
+Section 4.9: Lab: Transforming Data with Filters and Plug-ins
+Section 4.10: Summary
+Chapter 5: Coordinating Rolling Updates
+Section 5.1: Delegating Tasks and Facts
+Section 5.2: Guided Exercise: Delegating Tasks and Facts
+Section 5.3: Managing Rolling Updates
+Section 5.4: Guided Exercise: Managing Rolling Updates
+Section 5.5: Lab: Coordinating Rolling Updates
+Section 5.6: Summary
+Chapter 6: Installing and Accessing Ansible Tower
+Section 6.1: Explaining the Red Hat Ansible Tower Architecture
+Section 6.2: Quiz: Explaining the Red Hat Ansible Tower Architecture
+Section 6.3: Installing Red Hat Ansible Tower
+Section 6.4: Guided Exercise: Installing Red Hat Ansible Tower
+Section 6.5: Navigating Red Hat Ansible Tower
+Section 6.6: Guided Exercise: Accessing Red Hat Ansible Tower
+Section 6.7: Quiz: Installing and Accessing Red Hat Ansible Tower
+Section 6.8: Summary
+Chapter 7: Managing Access with Users and Teams
+Section 7.1: Creating and Managing Ansible Tower Users
+Section 7.2: Guided Exercise: Creating and Managing Ansible Tower Users
+Section 7.3: Managing Users Efficiently with Teams
+Section 7.4: Guided Exercise: Managing Users Efficiently with Teams
+Section 7.5: Lab: Managing Access with Users and Teams
+Section 7.6: Summary
+Chapter 8: Managing Inventories and Credentials
+Section 8.1: Creating a Static Inventory
+Section 8.2: Guided Exercise: Creating a Static Inventory
+Section 8.3: Creating Machine Credentials for Access to Inventory Hosts
+Section 8.4: Guided Exercise: Creating Machine Credentials for Access to Inventory Hosts
+Section 8.5: Lab: Creating and Managing Inventories and Credentials
+Section 8.6: Summary
+Chapter 9: Managing Projects and Launching Ansible Jobs
+Section 9.1: Creating a Project for Ansible Playbooks
+Section 9.2: Guided Exercise: Creating a Project for Ansible Playbooks
+Section 9.3: Creating Job Templates and Launching Jobs
+Section 9.4: Guided Exercise: Creating Job Templates and Launching Jobs
+Section 9.5: Lab: Managing Projects and Launching Ansible Jobs
+Section 9.6: Summary
+Chapter 10: Constructing Advanced Job Workflows
+Section 10.1: Improving Performance with Fact Caching
+Section 10.2: Guided Exercise: Improving Performance with Fact Caching
+Section 10.3: Creating Job Template Surveys to Set Variables for Jobs
+Section 10.4: Guided Exercise: Creating Job Template Surveys to Set Variables for Jobs
+Section 10.5: Creating Workflow Job Templates and Launching Workflow Jobs
+Section 10.6: Guided Exercise: Creating Workflow Job Templates and Launching Workflow Jobs
+Section 10.7: Scheduling Jobs and Configuring Notifications
+Section 10.8: Guided Exercise: Scheduling Jobs and Configuring Notifications
+Section 10.9: Lab: Constructing Advanced Job Workflows
+Section 10.10: Summary
+Chapter 11: Communicating with APIs using Ansible
+Section 11.1: Launching Jobs with the Ansible Tower API
+Section 11.2: Guided Exercise: Launching Jobs with the Ansible Tower API
+Section 11.3: Interacting with APIs using Ansible Playbooks
+Section 11.4: Guided Exercise: Interacting with APIs using Ansible Playbooks
+Section 11.5: Lab: Communicating with APIs using Ansible
+Section 11.6: Summary
+Chapter 12: Managing Advanced Inventories
+Section 12.1: Importing External Static Inventories
+Section 12.2: Guided Exercise: Importing External Static Inventories
+Section 12.3: Creating and Updating Dynamic Inventories
+Section 12.4: Guided Exercise: Creating and Updating Dynamic Inventories
+Section 12.5: Filtering Hosts with Smart Inventories
+Section 12.6: Guided Exercise: Filtering Hosts with Smart Inventories
+Section 12.7: Lab: Managing Advanced Inventories
+Section 12.8: Summary
+Chapter 13: Creating a Simple CI/CD Pipeline with Ansible Tower
+Section 13.1: Creating a Simple CI/CD Pipeline with Ansible Tower
+Section 13.2: Guided Exercise: Integrating a GitLab CI/CD Pipeline with Ansible Tower
+Section 13.3: Summary
+Chapter 14: Performing Maintenance and Routine Administration of Ansible Tower
+Section 14.1: Performing Basic Troubleshooting of Ansible Tower
+Section 14.2: Guided Exercise: Performing Basic Troubleshooting of Ansible Tower
+Section 14.3: Configuring TLS/SSL for Ansible Tower
+Section 14.4: Guided Exercise: Configuring TLS/SSL for Ansible Tower
+Section 14.5: Backing Up and Restoring Ansible Tower
+Section 14.6: Guided Exercise: Backing Up and Restoring Ansible Tower
+Section 14.7: Quiz: Performing Maintenance and Routine Administration of Ansible Tower
+Section 14.8: Summary
+Chapter 15: Comprehensive Review
+Section 15.1: Comprehensive Review
+Section 15.2: Lab: Refactoring Inventories and Projects
+Section 15.3: Lab: Privilege Escalation, Lookups, and Rolling Updates
+Section 15.4: Lab: Restoring Ansible Tower from Backup
+Section 15.5: Lab: Adding Users and Teams
+Section 15.6: Lab: Creating a Custom Dynamic Inventory
+Section 15.7: Lab: Configuring Job Templates
+Section 15.8: Lab: Configuring Workflow Job Templates, Surveys, and Notifications
+Section 15.9: Lab: Testing the Prepared Environment

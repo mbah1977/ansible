@@ -1,0 +1,326 @@
+Chapter 1. Developing with Recommended Practices
+Implementing Recommended Practices
+Guided Exercise: Implementing Recommended Practices
+Managing Ansible Project Materials Using Git
+Guided Exercise: Managing Ansible Project Materials Using Git
+Lab: Developing with Recommended Practices
+Summary
+Abstract
+
+Goal	Demonstrate and implement recommended practices for effective and efficient Ansible automation.
+Objectives	
+Demonstrate and describe common recommended practices for developing and maintaining effective Ansible automation solutions.
+
+Create and manage Ansible Playbooks in a Git repository using recommended practices.
+
+Sections	
+Implementing Recommended Practices (and Guided Exercise)
+
+Managing Ansible Project Materials Using Git (and Guided Exercise)
+
+Lab	
+Developing with Recommended Practices
+
+Implementing Recommended Practices
+Objectives
+After completing this section, you should be able to demonstrate and describe commonly recommended practices for developing and maintaining effective Ansible automation solutions.
+
+Describing Ansible Effective Usage
+This course assumes that you have some experience using Ansible to automate Linux system administration tasks. Ansible is easy to learn and easy to start using. However, as you work with more advanced features and larger, more complex projects, it becomes more difficult to manage and maintain Ansible Playbooks, or to use them effectively.
+
+This course introduces a number of advanced features of Red Hat Ansible Automation. How to use Red Hat Ansible Automation effectively and efficiently is also discussed. Using Ansible effectively is not just about features or tools, but about practices and organization.
+
+The following three points summarize the effective use of Red Hat Ansible Automation; these points are based on similar statements by Jeff Geerling:
+
+Keep Things Simple
+
+Stay Organized
+
+Test Often
+
+Keeping Things Simple
+One of Ansible's strengths is its simplicity. If you keep your playbooks simple, they will be easier to use, modify, and understand.
+
+Keeping Your Playbooks Readable
+
+Keep your playbooks well commented and easy to read. Use vertical white space and comments liberally. Always give plays and tasks meaningful names that make clear what the play or task is doing. These practices help document the playbook and makes it easier to troubleshoot a failed playbook run.
+
+YAML is not a programming language. It is good at expressing a list of tasks or items, or a set of key-value pairs. If you are struggling to express some complex control structure or conditional in your Ansible Playbook, then consider approaching the problem in a different way. There are clever things you can do with templates and Jinja2 filters to process data in a variable, which might be a better approach to your problem.
+
+Use native YAML syntax, not the "folded" syntax. For example, the following example is not a recommended format:
+
+  - name: Postfix is installed and updated
+    yum: name=postfix state=latest
+    notify: restart_postfix
+
+  - name: Postfix is running
+    service: name=postfix state=started
+The following syntax is easier for most people to read:
+
+  - name: Postfix is installed and updated
+    yum:
+      name: postfix
+      state: latest
+    notify: update_postfix
+
+  - name: Postfix is running
+    service:
+      name: postfix
+      state: started
+Use Existing Modules
+
+When writing a new playbook, start with a basic playbook and, if possible, a static inventory. Use debug modules as stubs as you build your design. Once your playbook functions as expected, break up your playbook into smaller, logical components using imports and includes.
+
+Use special-purpose modules included with Ansible when you can, instead of command, shell, raw, or other similar modules. While there are circumstances where you need to use these general purpose modules, it will be a lot easier to make your playbook idempotent and simple to maintain if you use the modules designed for a specific task.
+
+Many modules have a default state or other variable that controls what they do. For example, the yum module currently assumes that the package you name should be present in most cases. However, you should explicitly specify what state you want. Doing so makes it easier to read the playbook, and protects you against changes in the module's default behavior in later versions of Ansible.
+
+Adhering to a Standard Style
+
+You should consider having a standard "style" that you, and your coworkers, follow when writing Ansible projects. How many spaces do you indent? How do you want vertical white space to be used? How should tasks, plays, roles, and variables be named? What should be commented on and how? There is more than one reasonable way to do this, but having a consistent standard can help improve maintainability and readability.
+
+Staying Organized
+Organization of your Ansible projects and how you run playbooks can help with maintainability, troubleshooting, and auditing.
+
+Following Conventions for Naming Variables
+
+Variable naming can be particularly important because Ansible has a fairly flat namespace. Use descriptive variables, such as apache_tls_port rather than a less descriptive variable such as p. In roles, it is a good practice to prefix role variables with the role name. For example, if your role is named myapp then your variable names could start with myapp_ to help namespace them from variables in other roles and the playbook.
+
+Variable names should clarify contents. A name like apache_max_keepalive clearly explains the meaning of the associated value (or values). Prefix roles and group variables with the name of the role or group to which the variable belongs. apache_port_number is more error-resistant than port_number.
+
+Standardizing the Project Structure
+
+Use a consistent pattern when structuring the files of your Ansible project on a file system. There are a number of useful patterns, but the following is a good example:
+
+.
+├── dbservers.yml
+├── inventories/
+│   ├── prod/
+│   │   ├── group_vars/
+│   │   ├── host_vars/
+│   │   └── inventory/
+│   └── stage/
+│       ├── group_vars/
+│       ├── host_vars/
+│       └── inventory/
+├── roles/
+│   └── std_server/
+├── site.yml
+├── storage.yml
+└── webservers.yml
+The file site.yml is the master playbook, which includes or imports playbooks that perform specific tasks: dbservers.yml, storage.yml, and webservers.yml. The roles are located in subdirectories in the roles directory, such as std_server. There are two static inventories in the inventories/prod and inventories/stage directories with separate inventory variable files, so that you can select different sets of servers by changing the inventory you use.
+
+One of the benefits of the playbook structure is that you can divide up your large playbook into smaller files to make it more readable, and those smaller sub-playbooks can contain plays for a specific purpose that you can run independently.
+
+Using Dynamic Inventories
+
+Use dynamic inventories whenever possible. Dynamic inventories allow central management of your hosts and groups from one central source of truth, and ensure that the inventory is automatically updated. Dynamic inventories are especially powerful in conjunction with cloud providers, containers, and virtual machine management systems. Those systems might already have inventory information in a form Ansible can consume.
+
+If you are unable to use dynamic inventories, then other tools can help you dynamically construct groups or other information. For example, you can use the group_by module to dynamically generate group membership based on a fact. That group membership is valid for the rest of the playbook.
+
+- name: Generate dynamic groups
+  hosts: all
+  tasks:
+    - name: Generate dynamic groups based on architecture
+      group_by:
+        key: arch_"{{ ansible_facts['architecture'] }}"
+
+- name: Configure x86_64 systems
+  hosts: arch_x86_64
+  tasks:
+    - name: First task for x86_64 configuration
+    ...output omitted...
+Taking Advantage of Groups
+
+Hosts can be a member of multiple groups. Consider dividing your hosts into different categories based on different characteristics:
+
+Geographical: Differentiate hosts from different regions, countries, continents, or data centers.
+
+Environmental: Differentiate hosts dedicated to different stages of the software life cycle, including development, staging, testing, or production.
+
+Sites or services: Group hosts that offer or link to a subset of functions, like a specific web site, an application, or a subset of features.
+
+IMPORTANT
+Remember that hosts will inherit variables from all groups of which they are members. If two groups have different settings for the same variable, and a host is a member of both, then the value that is used is the last one loaded.
+
+If there are differences in settings between two different groups that might be used at the same time, then take special care to determine how those variables should be set.
+
+Using Roles for Reusable Content
+
+Roles help you keep your playbooks simple and allow you to save work by reusing common code across projects. If you are writing your own roles, then keep them focused on a particular purpose or function similar to playbooks. Make roles generic and configurable through variables, so that you do not need to edit them when you use them with a different set of playbooks.
+
+Use the ansible-galaxy command to initialize your role's directory hierarchy and provide initial template files. This will also make it easier for you to share your role on the Ansible Galaxy web site, if you choose to do so.
+
+The roles provided by the redhat-system-roles package in Red Hat Enterprise Linux are officially supported (although some roles might be in Tech Preview). Review the roles provided to determine if they are useful for you.
+
+You can also look at the roles provided by the community through Ansible Galaxy. Be aware that these roles have varying levels of quality, so choose the ones you use carefully.
+
+Keep your roles in the roles subdirectory of your project. Use the ansible-galaxy command to automatically get roles from a separate Git repository, even if the roles are not from Ansible Galaxy but are stored in your own repository.
+
+Running Playbooks Centrally
+
+To control access to your systems and audit Ansible activity, consider using a dedicated control node from which all Ansible Playbooks are run.
+
+System administrators should still have their own accounts on the system, as well as credentials to connect to managed hosts and escalate privileges, if needed. When a system administrator leaves, their SSH key can be removed from managed hosts' authorized_keys file and their sudo command privileges revoked, without impacting other administrators.
+
+Consider using Red Hat Ansible Tower as this central host. Red Hat Ansible Tower is included with a new Red Hat Ansible Automation subscription, and provides features that make it easier to control access to credentials, control playbook execution, simplify automation for users who are not comfortable with the Linux command line, as well as audit and track playbook runs. Later in this course, you will learn about using Red Hat Ansible Tower. However, even if you do not use Red Hat Ansible Tower, using a central control node can be beneficial.
+
+Testing Often
+Test your playbooks and your tasks frequently during the development process, when the tasks run, and once the playbooks are in use.
+
+Testing the Results of Tasks
+
+Should you need to confirm that a task succeeded, verify the result of the task rather than trusting the return code of the module. There is more than one way to do verify a task, depending on the module involved.
+
+  - Start web server
+    service:
+      name: httpd
+      status: started
+
+  - name: Check web site from web server
+    uri:
+      url: http://{{ ansible_fqdn }}
+      return_content: yes
+    register: example_webpage
+    failed_when: example_webpage.status != 200
+Using Block/Rescue to Recover or Rollback
+
+The block directive is useful for grouping tasks; when used in conjunction with the rescue directive, it is helpful when recovering from errors or failures.
+
+  - block:
+      - name: Check web site from web server
+        uri:
+          url: http://{{ ansible_fqdn }}
+          return_content: yes
+        register: example_webpage
+        failed_when: example_webpage.status != 200
+    rescue:
+      - name: Restart web server
+        service:
+          name: httpd
+          status: restarted
+Develop Playbooks with Latest Ansible Version
+
+Even if you are not using the latest version of Ansible in production, you should routinely test your playbooks against the latest version of Ansible. This test will help you avoid issues as Ansible modules and features evolve.
+
+If your playbooks print warnings or deprecation messages when they run, then you should pay attention to them and make adjustments. Generally, if a feature in Ansible is being deprecated or is changing, the project provides deprecation notices four minor releases before the feature is removed or changed.
+
+To prepare for changes and future updates, read the Porting Guides at https://docs.ansible.com/ansible/latest/porting_guides/porting_guides.html.
+
+Using Test Tools
+
+A number of commands and tools are available to help you test your playbooks. Use the ansible-playbook --syntax-check command to check the syntax of your playbook without running it.
+
+Use the ansible-playbook --check command to run your playbook against the actual managed hosts in "check mode," to see what changes the playbook would make. This check does not guarantee perfect accuracy, since the playbook might need to actually run some tasks before subsequent tasks in the playbook will work correctly. You may have some tasks that are marked with the check_mode: no directive. Those tasks will run even in check mode.
+
+NOTE
+There are other useful tools that are not currently shipped in Red Hat Enterprise Linux 8; these tools are included in Fedora, or can be obtained from upstream sources. For example:
+
+The ansible-lint tool parses your playbook and looks for possible issues. Not all the issues it reports will necessarily break your playbook, but reported issues may indicate the presence of an error.
+
+The yamllint tool parses a YAML file and attempts to identify issues with the YAML syntax. This tool does not have direct knowledge of Ansible, but it can catch potential YAML syntax problems.
+
+
+Guided Exercise: Implementing Recommended Practices
+In this exercise, you will apply recommended practices to an already existing Ansible project.
+
+Outcomes
+
+You should be able to identify points of improvement on Ansible projects and implement recommended practices.
+
+Log in as the student user on workstation and run the lab development-practices start command.
+
+[student@workstation ~]$ lab development-practices start
+This script creates an Ansible Project in ~/DO447/labs/development-practices.
+
+Procedure 1.1. Steps
+
+Get familiar with the project and its current status. Start by changing to the project directory.
+
+[student@workstation ~]$ cd ~/DO447/labs/development-practices
+To avoid conflicts between the variables used by the haproxy role, which you maintain, and your playbooks, you must put the role's variables in their own namespace. You have decided that all variables internal to the role should start with the string haproxy_.
+
+Navigate through the folder structure and review the defined roles in the roles directory. Give role variables a name that references the role to which the variable belongs. Review the roles/haproxy/defaults/main.yml file and then add the haproxy_ prefix to all variable names. File contents should display as follows:
+
+# Log-level for HAProxy logs
+haproxy_log_level: info
+
+# Port exposed to clients
+haproxy_port: 80
+
+# Name for the default backend
+haproxy_backend_name: app
+
+# Port backend is exposed to
+haproxy_backend_port: 80
+...output omitted...
+# The default is no defined backend servers.
+haproxy_appservers: []
+...output omitted...
+# Socket used to communicate with haproxy service. DO NOT CHANGE
+haproxy_socket: /var/run/haproxy.sock
+The roles/haproxy/templates/haproxy.cfg.j2 template file references the variables defined in the roles/haproxy/defaults/main.yml file. Update the variable names in this template accordingly.
+
+...output omitted...
+global
+    #Send events/messages to rsyslog server.
+    log         127.0.0.1:514 local0 {{ haproxy_log_level }}
+...output omitted...
+  # turn on stats unix socket
+  #  required for the ansible haproxy module.
+  stats socket {{ haproxy_socket }} level admin
+...output omitted...
+
+frontend main
+    mode http
+    bind *:{{ haproxy_port }}
+    default_backend {{ haproxy_backend_name }}
+...output omitted...
+
+backend {{ haproxy_backend_name }}
+    balance roundrobin
+{% for server in haproxy_appservers %}
+    server {{ server.name }} {{ server.ip }}:{{ haproxy_backend_port }}
+{% endfor %}
+The haproxy role uses the haproxy_appservers variable to configure a pool of back end application servers. Your playbook must define this variable in order to use the role correctly because the default value of the haproxy_appservers variable is an empty list.
+
+In your project directory, the appservers.yml file has the correct settings for the haproxy_appservers variable. Correct the variable name and configure it as a group variable for the lbservers group.
+
+Create the group_vars folder in the project directory. Copy the appservers.yml file from the project directory to the group_vars/lb_servers.yml file.
+
+[student@workstation development-practices]$ mkdir group_vars
+[student@workstation development-practices]$ cp -v \
+> appservers.yml group_vars/lb_servers.yml
+'appservers.yml' -> 'group_vars/lb_servers.yml'
+Edit the group_vars/lb_servers.yml file and rename the appservers variable to haproxy_appservers. When you finish editing, the file displays as follows:
+
+haproxy_appservers:
+  - name: serverb.lab.example.com
+    ip: "172.25.250.11"
+  - name: serverc.lab.example.com
+    ip: "172.25.250.12"
+Configure web applications hosted in Europe to provide a different message than other locations by overriding a role default with a group variable.
+
+Add a new inventory group named region_eu to the end of the inventory file.
+
+[region_eu]
+serverc.lab.example.com
+Create a groups variable file named group_vars/region_eu.yml. Make sure the name of the file matches the inventory group created in the previous step. This file should only contain a single line that defines a webapp_message variable:
+
+webapp_message: "Hello from Europe. This is"
+Note that this variable applies only to hosts in the region_eu group. All other hosts use a default value for the webapp_message variable, which is defined in the roles/webapp/defaults/main.yml file.
+
+Test your changes to the Ansible project by running your site.yml playbook:
+
+[student@workstation development-practices]$ ansible-playbook site.yml
+Validate that serverb.lab.example.com responds with the default content, while serverc.lab.example.com responds with content defined in the region_eu group:
+
+[student@workstation development-practices]$ curl servera; curl servera
+This is serverb.lab.example.com. (version v1.0)
+Hello from Europe. This is serverc.lab.example.com. (version v1.0)
+The order of the output that you see might differ, since servera.lab.example.com redirects HTTP requests to serverb.lab.example.com and serverc.lab.example.com in a round-robin manner.
+
+Run the clean.yml Ansible Playbook to revert all changes made by the previous steps.
+
+[student@workstation development-practices]$ ansible-playbook clean.yml
+Finish
