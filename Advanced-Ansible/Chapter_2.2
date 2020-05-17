@@ -1,0 +1,302 @@
+Managing Inventory Variables
+Objectives
+After completing this section, you should be able to:
+
+Structure host and group variables using multiple files per host or group
+
+Override the host, port, or remote user Ansible uses for a specific host with special variables.
+
+Describing Variables Basic Principles
+Variables allow you to write your tasks, roles, and playbooks to be reusable and flexible. They allow you to specify differences in configuration between different systems. Set variables in many different places, including:
+
+In a role's defaults and vars directory.
+
+In the inventory file, either as a host variable or a group variable.
+
+In a variable file under the group_vars or host_vars subdirectories of the playbook or inventory.
+
+In a play, role, or task.
+
+As you define and manage variables in a project, plan to follow these principles:
+
+Keep It Simple
+Even though Ansible variables can be defined in many different ways, try to define variables using only a couple of different methods and in only a few places.
+
+Don't Repeat Yourself
+If a set of systems have a common configuration, organize them into a group and set inventory variables for them in a file in the group_vars directory. This way, you do not have to define the same settings on a host-by-host basis, and when you have to modify a variable for that group of systems you can do it by updating the variable file.
+
+Organize Variables in Small, Readable Files
+If you have a large project with many host groups and variables, split the variable definitions into multiple files. To make it easier to find particular variables, group related variables into a file and give the file a meaningful name.
+
+Remember that you can use subdirectories instead of files in host_vars and group_vars. So, for example, you could have a directory group_vars/webserver for group webserver, and that directory could contain a file named firewall.yml which contains only variables related to firewall configuration. That directory could also contain other group variable files related to other parts of the servers' configuration.
+
+Introducing Variable Merging and Precedence
+When you define the same variable in multiple ways, Ansible uses precedence rules to pick a value for the variable. After processing all the variable definitions, Ansible generates a set of merged variables for each host at the start of each task.
+
+When Ansible merges variables, if there are two definitions for the same variable in different places, it will use the value from the place that has the highest precedence.
+
+A list of the precedence order is available at https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html in the subsection "Variable precedence: Where should I put a variable?". The following discussion will break this down in a bit more detail, from lowest to highest precedence.
+
+Command-line Options
+
+Options that can be passed to ansible-playbook on the command line, other than -e for extra variables, have the lowest precedence. For example, you can set the remote user with the -u option to override the configuration file, but it can be overridden by setting ansible_user at a higher precedence.
+
+Role Defaults
+
+Default values set by a role in files in rolename/defaults/ have a very low priority so that they are easy to override. These are used so that the role's variable is defined with some reasonable value but can be configured to be something else, so role defaults are often used for user configuration of a role.
+
+Host and Group Variables
+
+You can set host-specific and group-specific variables in a number of places. You can set them relative to the location of your inventory. You can set them relative to the location of your playbook. Finally, you can set them by collecting host facts (or by reading facts from a cache).
+
+The exact precedence list for these variables is, from lowest to highest:
+
+Group variables set directly in an inventory file or by a dynamic inventory script.
+
+Group variables for all set in the inventory's group_vars/all file or subdirectory.
+
+Group variables for all set in the playbook's group_vars/all file or subdirectory.
+
+Group variables for other groups set in the inventory's group_vars subdirectory.
+
+Group variables for other groups set in the playbook's group_vars subdirectory.
+
+Host variables set directly in an inventory file or by a dynamic inventory script.
+
+Host variables set in the inventory's host_vars subdirectory.
+
+Host variables set in the playbook's host_vars subdirectory.
+
+Host facts and cached facts.
+
+The biggest source of confusion here is the distinction between the group_vars and host_vars subdirectories relative to the inventory and the ones relative to the playbook. One reason for this is that if you are using a static inventory file in the same directory as the playbook you are using, there is no difference.
+
+If you have group_vars and host_vars subdirectories in the same directory as your playbook, those group and host variables will be automatically included.
+
+If you are using a flat inventory file in some directory other than the one the playbook is in, then the group_vars and host_vars directories in the inventory file's directory will also be automatically included. The variables included from the playbook's directory will, however, override them if there is a conflict. For example, if you are using /etc/ansible/hosts as your inventory, then /etc/ansible/group_vars will be used as another group variable directory.
+
+If you are using an inventory directory that contains multiple inventory files, then the group_vars and host_vars subdirectories of your inventory directory will be included.
+
+As an example, consider the following tree structure:
+
+.
+├── ansible.cfg
+├── group_vars/
+│   └── all
+├── inventory/
+│   ├── group_vars/
+│   │   └── all
+│   ├── phoenix-dc
+│   └── singapore-dc
+└── playbook.yml
+The playbook.yml file is the playbook. The ansible.cfg file configures the inventory directory as the inventory, and phoenix-dc and singapore-dc are two INI-based static inventory files.
+
+The file inventory/group_vars/all loads group variables for group all based on the configuration of the inventory.
+
+The file group_vars/all loads group variables for group all based on the location of the playbook. In the case of a conflict, these settings override inventory/group_vars/all.
+
+NOTE
+The value of this distinction is that you can set default values for variables that are bundled up with the inventory files in some location that is shared by all your playbooks. But you can still override the settings for those inventory variables in individual playbook directories.
+
+While you can set host or group variables directly in inventory files (like phoenix-dc in the preceding example), it is generally not a good practice. It is a lot easier to find all the variable settings that apply to a host or group if they are grouped in a file or files that only contain settings for that host or group. If you have to also examine the inventory file or files, that can be a lot more time consuming and error prone, especially for a large inventory.
+
+Play Variables
+
+The next category of variables are those set in the playbook as part of a play, task, role parameter, or which are included or imported. These have higher precedence than host or group variables, role defaults, and command-line options other than -e.
+
+The precedence list for these variables is, from lowest to highest:
+
+Set by the vars section of a play.
+
+Set by prompting the user with a vars_prompt section in a play.
+
+Set from a list of external files by the vars_files section of a play.
+
+Set by a file in a role's rolename/vars/ subdirectory.
+
+Set for the current block with a vars section of that block.
+
+Set for the current task with a vars section of that task.
+
+Loaded dynamically with the include_vars module.
+
+Set for a specific host by using either the set_fact module or by using register to record the result of task execution on a host.
+
+Parameters set for a role in the playbook when loaded by the role section of a play or by using the include_role module.
+
+Set by a vars section on tasks included with the include_tasks module.
+
+It is important that you notice that the normal vars section on a play has the lowest precedence in this category. There are many ways to override those settings if necessary. Variables set here do override host-specific and group-specific settings in general.
+
+Using vars_prompt is probably not a best practice. It requires interaction while running ansible-playbook and is not compatible with Red Hat Ansible Tower.
+
+The vars_files directive can be very useful for organizing large lists of variables that are not host or group specific into separate files by function. It can also help you separate sensitive variables into a separate file encrypted by Ansible Vault from variables that are not sensitive and do not need to be encrypted.
+
+You can set variables that apply only to a specific block or task. These values override the play variables and inventory variables. You should probably use these rarely, since they can make the playbook more complex.
+
+- name: Task with a local variable definition
+  vars:
+    taskvariable: task
+  debug:
+    var: taskvariable
+Notice that variables loaded by include_vars have a high precedence, and can override variables set for roles and specific blocks and tasks. In many cases, you might want to use vars_files instead if you do not want to override those values with your external variable files.
+
+The set_fact module and the register directive both set host-specific information, either a fact or the results of task execution on that host. Note that set_fact sets a very high precedence value for that variable for the rest of the playbook run, but if you cache that fact it will be stored in the fact cache at normal fact precedence (lower than play variables).
+
+Extra Variables
+
+Extra variables set by using the -e option of the ansible-playbook command always have the highest precedence. This is useful so that you can override the global setting for a variable in your playbook from the command line without editing any of the Ansible project's files.
+
+Separating Variables from Inventory
+The inventory sources define the hosts and host groups used by Ansible, whether they are static files or a dynamic inventory script. If you are managing your inventory as static files, you can define variables in the inventory file or files, in the same files in which you define your host and host group lists. However, this is not the best practice. As your environment grows in both size and variety, the inventory file becomes large and difficult to read.
+
+In addition, you will probably want to migrate to dynamic inventory sources rather than static inventory files to make it easier to manage your inventory. But you might still want to have the ability to manage inventory variables statically, separately from or in addition to the output from the dynamic inventory script.
+
+A better approach is to move variable definitions from the inventory file into separate variable files, one for each host group. Each variable file is named after a host group, and contains variable definitions for the host group:
+
+[user@demo project]$ tree -F group_vars
+group_vars/
+├── db_servers.yml
+├── lb_servers.yml
+└── web_servers.yml
+This structure makes it easier to locate configuration variables for any of the host groups: db_servers, lb_servers, or web_servers. As long as each host group contains a small number of variable definitions, the above organizational structure is sufficient. But as playbook complexity increases, even these files can become long and difficult to understand.
+
+An even better approach for large, diverse environments is to create subdirectories for each host group under the group_vars directory. Ansible parses any YAML in these subdirectories, and associates the variables with a host group based on the parent directory:
+
+[user@demo project2]$ tree -F group_vars
+group_vars/
+├── db_servers/
+│   ├── 3.yml
+│   ├── a.yml
+│   └── myvars.yml
+├── lb_servers/
+│   ├── 2.yml
+│   ├── b.yml
+│   └── something.yml
+└── web_servers/
+    └── nothing.yml
+In preceding example, variables in the myvars.yml file are associated with the db_servers host group, because the file is contained in the group_vars/db_servers subdirectory. The file names in this example however, make it difficult to know where to find a particular variable.
+
+If you choose to use this organizational structure for variables, group variables with a common theme into the same file and use a file name to indicate that common theme. When a playbook uses roles, a common convention is to create variable files named after each role in playbook.
+
+A project organized according to this convention might look like this:
+
+[user@demo project3]$ tree -F group_vars
+group_vars/
+├── all/
+│   └── common.yml
+├── db_servers/
+│   ├── mysql.yml
+│   └── firewall.yml
+├── lb_servers/
+│   ├── firewall.yml
+│   ├── haproxy.yml
+│   └── ssl.yml
+└── web_servers/
+    ├── firewall.yml
+    ├── webapp.yml
+    └── apache.yml
+This organizational structure for a project allows you to quickly see the types of variables that are defined for each host group.
+
+All variables present in files in directories under the group_vars directory are merged together with the rest of the variables. Separating variables into files grouped by functionality makes the whole playbook project easier to understand and maintain.
+
+Special Inventory Variables
+There are a number of variables that you can use to change how Ansible will connect to a host listed in the inventory. Some of these are most useful as host-specific variables, but others might be relevant to all hosts in a group or in the inventory.
+
+ansible_connection
+The connection plugin used to access the managed host. By default, ssh is used for all hosts except localhost, which uses local.
+
+ansible_host
+The actual IP address or fully-qualified domain name to use when connecting to the managed host, instead of using the name from the inventory file (inventory_hostname). By default, this variable has the same value as the inventory host name.
+
+ansible_port
+The port Ansible uses to connect to the managed host. For the (default) SSH connection plugin, the value defaults to 22.
+
+ansible_user
+Ansible connects to the managed host as this user. Ansible's default behavior is to connect to the managed host using the same user name as the user running the Ansible Playbook on the control node.
+
+ansible_become_user
+Once Ansible has connected to the managed host, it will switch to this user using absible_become_method (which is sudo by default). You might need to provide authentication credentials in some way.
+
+ansible_python_interpreter
+The path to the Python executable that Ansible should use on the managed host. On Ansible 2.8 and later, this defaults to auto, which will automatically select a Python interpreter on the host running the playbook depending on what operating system it is running, so it is less necessary to use this setting compared to older versions of Ansible.
+
+Human Readable Inventory Host Names
+
+When Ansible executes a task on the remote host, the output contains the inventory host name. Because you can specify alternate connection properties using the special inventory variables above, inventory host names can be assigned arbitrary names. When you assign inventory hosts with meaningful names, you are better able to understand playbook output and diagnose an playbook errors.
+
+Consider a playbook that uses the following YAML inventory file:
+
+web_servers:
+  hosts:
+    server100.example.com:
+    server101.example.com:
+    server102.example.com:
+lb_servers:
+  hosts:
+    server103.example.com:
+With the above inventory file, any Ansible output references these names. Consider the following hypothetical output from a playbook that uses this inventory file:
+
+[user@demo project]$ ansible-playbook site.yml
+...output omitted...
+PLAY RECAP *******************************************************************
+server100.example.com  : ok=4    changed=0    unreachable=0    failed=0  ...
+server101.example.com  : ok=4    changed=0    unreachable=0    failed=0  ...
+server102.example.com  : ok=4    changed=0    unreachable=0    failed=0  ...
+server103.example.com  : ok=4    changed=0    unreachable=0    failed=1  ... 
+In the above output, you can not easily tell that the failed host is a load balancer.
+
+Alternatively, use an inventory file that contains descriptive names and defines the necessary special inventory variables:
+
+web_servers:
+  hosts:
+    webserver_1:
+      ansible_host: server100.example.com
+    webserver_2:
+      ansible_host: server101.example.com
+    webserver_3:
+      ansible_host: server102.example.com
+lb_servers:
+  hosts:
+    loadbalancer:
+      ansible_host: server103.example.com
+Now the output from the playbook provides a descriptive name in the PLAY RECAP:
+
+[user@demo project]$ ansible-playbook site.yml
+...output omitted...
+PLAY RECAP *******************************************************************
+loadbalancer    : ok=4    changed=0    unreachable=0    failed=1  ...
+webserver_1     : ok=4    changed=0    unreachable=0    failed=0  ...
+webserver_2     : ok=4    changed=0    unreachable=0    failed=0  ...
+webserver_3     : ok=4    changed=0    unreachable=0    failed=0  ...   
+There are a number of situations where you might want to use an arbitrary host name in your playbook that is mapped to a real IP address or host name with ansible_host. Some of them include:
+
+You might want Ansible to connect to that host using a specific IP address that is different from the one that resolves in DNS. For example, there might be a particular management address that is not public, or the machine might have multiple addresses in DNS but one is on the same network as the control node.
+
+You might be provisioning cloud systems that have arbitrary names, but you want to refer to those systems in your playbook with names that make sense based on the roles they play. If you are using a dynamic inventory, it might be that your dynamic inventory source assigns host variables automatically based on each system's intended role.
+
+You might be referring to the machine by a short name in the playbook, but you need to refer to it by a long fully-qualified domain name in the inventory to properly connect to it.
+
+Identifying the Current Host Using Variables
+When a play is running, there are a number of variables and facts that can be used to identify the name of the current managed host executing a task:
+
+inventory_hostname
+The name of the managed host currently being processed, taken from the inventory.
+
+ansible_host
+The actual IP address or host name that was used to connect to the managed host, as previously discussed.
+
+ansible_facts['hostname']
+The short (unqualified) host name collected as a fact from the managed host.
+
+ansible_facts['fqdn']
+The fully-qualified domain name (FQDN) collected as a fact from the managed host.
+
+One final variable that can be useful is ansible_play_hosts, which is a list of all the hosts that have not yet failed during the current play (and therefore will be used for the tasks remaining in the play).
+
+REFERENCES
+Variable Precedence - Ansible Documentation
+
+Working with Inventory - Ansible Documentation
+
+Special Variables - Ansible Documentation

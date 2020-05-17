@@ -1,0 +1,371 @@
+Chapter 2. Managing Inventories
+Writing YAML Inventory Files
+Guided Exercise: Writing YAML Inventory Files
+Managing Inventory Variables
+Guided Exercise: Managing Inventory Variables
+Lab: Managing Inventories
+Summary
+Abstract
+
+Goal	Manage inventories using advanced features of Ansible.
+Objectives	
+Write static inventory files in YAML format instead of the older INI-like format.
+
+Structure host and group variables using multiple files per host or group, and use special variables to override the host, port, or remote user Ansible uses for a specific host.
+
+Sections	
+Writing YAML Inventory Files (and Guided Exercise)
+
+Managing Inventory Variables (and Guided Exercise)
+
+Lab	
+Managing Inventories
+
+Writing YAML Inventory Files
+Objectives
+After completing this section, you should be able to write static inventory files in YAML format instead of the older INI-like format.
+
+Inventory Plugins
+Starting with Ansible 2.4, the different formats of inventory files that Ansible supports are implemented as plugins. Plugins are pieces of code that enhance Ansible's functionality. By implementing inventory support through plugins, Ansible can support new formats and methods of generating inventory data simply by providing a new plugin. Traditional INI-style static inventory files and dynamic inventory scripts are each implemented with a plugin.
+
+Most inventory plugins are disabled by default. You can enable specific plugins in your ansible.cfg configuration file, in the enable_plugins directive in the inventory section:
+
+[inventory]
+enable_plugins = host_list, script, auto, yaml, ini, toml
+The list in the preceding example is the default if you do not specify a enable_plugins directive. When Ansible parses inventory sources, it will try to use each plugin in the order in which it appears in the enable_plugins directive.
+
+The script plugin provides support for standard dynamic inventory scripts. The ini plugin provides support for standard INI-format static inventory files. The other plugins get inventory information from files in other formats or other sources. Details are available at https://docs.ansible.com/ansible/latest/plugins/inventory.html.
+
+Some inventory plugins that are shipped with Ansible provide standardized replacements for dynamic inventory scripts. For example, openstack can get information about VMs in a Red Hat OpenStack Platform environment, or aws_ec2 can get information about cloud instances from Amazon Web Services EC2.
+
+IMPORTANT
+When should you use dynamic inventory scripts, and when should you use inventory plugins?
+
+One advantage of using an included inventory plugin, if one is available for your use case, is that it is maintained along with the core Ansible code. You can write your own inventory plugin, but it must be implemented in Python like most plugins. Details are available at https://docs.ansible.com/ansible/latest/dev_guide/developing_inventory.html.
+
+You can also continue to use your own dynamic inventory scripts, which the plugin system will continue to support. These scripts only need to be executable files, so you can write them in whichever programming language you prefer.
+
+YAML Static Inventory Files
+You can use the yaml inventory plugin to write static inventory files in a YAML-based syntax instead of the INI-based syntax. This plugin is enabled by default. The YAML inventory plugin was created because it is easy for users to read, easy for software to parse, and allows you to use YAML for playbooks, variable files, and inventories.
+
+To review, here is an example of a INI static inventory file:
+
+[lb_servers]
+servera.lab.example.com
+
+[web_servers]
+serverb.lab.example.com
+serverc.lab.example.com
+
+[backend_server_pool]
+server[b:f].lab.example.com
+This static inventory has three groups:
+
+The lb_servers group includes the host servera.lab.example.com.
+
+The web_servers group includes the hosts serverb.lab.example.com and serverc.lab.example.com.
+
+The backend_server_pool group uses an alphabetical range to include five hosts, serverb, serverc, serverd, servere, and serverf in lab.example.com.
+
+And here is the same inventory in YAML format:
+
+lb_servers:
+  hosts:
+    servera.lab.example.com:
+web_servers:
+  hosts:
+    serverb.lab.example.com:
+    serverc.lab.example.com:
+backend_server_pool:
+  hosts:
+    server[b:f].lab.example.com:
+YAML inventories use blocks to organize related configuration items. Each block begins with the name of a group followed by a colon (:). Everything indented below the group name belongs to that group.
+
+If indented below a group name, then the keyword hosts starts a block of host names. All server names indented below hosts belong to this group. These servers themselves form their own groups, so they must end in a colon (:).
+
+You can also use the keyword children in a group block. This keyword starts a list of groups that are members of this group. Those member groups can have their own hosts and children blocks.
+
+One advantage that the YAML syntax has over the INI syntax is that it organizes both the lists of servers and the list of nested groups in the same place in the static inventory file.
+
+IMPORTANT
+The all group implicitly exists at the top level and includes the rest of the inventory as its children. You can explicitly list it in your YAML inventory file, but it is not required:
+
+all:
+  children:
+    lb_servers:
+      hosts:
+        servera.lab.example.com:
+    web_servers:
+      hosts:
+        serverb.lab.example.com:
+Some INI-based static inventories include hosts that are not a member of any group.
+
+notinagroup.lab.example.com
+
+[mailserver]
+mail.lab.example.com
+Ansible automatically puts any of these hosts in the special group ungrouped. You can accomplish the same thing in a YAML-based static inventory by explicitly assigning hosts to ungrouped:
+
+all:
+  children:
+    ungrouped:
+      notinagroup.lab.example.com:
+    mailserver:
+      mail.lab.example.com:
+Setting Inventory Variables
+
+You can set inventory variables directly in a YAML-based inventory file, just like you can in an INI-based inventory file.
+
+NOTE
+In many cases, it is a best practice to avoid storing variables in the static inventory file itself.
+
+Many experienced Ansible developers prefer to use the static inventory file to simply store information about which hosts are managed and to what groups they belong. The variables and their values are stored in the host_vars or group_vars files for the inventory.
+
+However, there might be circumstances where you want to keep variables like ansible_port or ansible_connection in the same file as the inventory itself, thus keeping this information in one place. If you set variables in too many different places, it can be harder to remember where a particular variable is being set.
+
+In a group block, you can use the vars keyword to set group variables directly in a YAML inventory file. For example, in an INI-based static inventory file, you could set the smtp_relay variable to the value smtp.lab.example.com for all hosts in group monitoring as follows:
+
+[monitoring]
+watcher.lab.example.com
+
+[monitoring:vars]
+smtp_relay: smtp.lab.example.com
+In a YAML-based static inventory file, you would set it like this:
+
+monitoring:
+  hosts:
+    watcher.lab.example.com:
+  vars:
+    smtp_relay: smtp.lab.example.com
+You can set host variables as items indented under the host in a YAML inventory file. For example, in an INI-based static inventory file, you could set the ansible_connection variable to local for the host localhost as follows:
+
+[workstations]
+workstation.lab.example.com
+localhost ansible_connection=local
+host.lab.example.com
+In a YAML-based static inventory file, you would set it like this:
+
+workstations:
+  hosts:
+    workstation.lab.example.com:
+    localhost:
+      ansible_connection: local
+    host.lab.example.com:
+Converting from INI to YAML
+You can use the ansible-inventory command to help convert an INI-based inventory into YAML format. However, this is not the tool's intended purpose. This tool is meant to display the entire configured inventory as Ansible sees it, and results can differ from those reported by the original inventory file. The ansible-inventory command parses and tests the format of the inventory files, but it does not attempt to validate whether a hostname in the inventory actually exists.
+
+NOTE
+Remember that a name in an inventory file is not necessarily a valid hostname, but is used by the playbook to refer to a specific managed host. That managed host's name could have an ansible_host host variable set that points to the real name or IP address that Ansible should use when connecting to the managed host, and the name in the inventory file can be a simplified alias for the purposes of the playbook.
+
+For example, assume that you have an initial INI-formatted static inventory, named origin_inventory, as follows:
+
+[lb_servers]
+servera.lab.example.com
+
+[web_servers]
+serverb.lab.example.com
+serverc.lab.example.com
+
+[web_servers:vars]
+alternate_server=serverd.lab.example.com
+
+[backend_server_pool]
+server[b:f].lab.example.com
+You could use the following ansible-inventory to produce YAML output. In this example, the command has been wrapped across two lines. If typing the command as on a single line, ignore the \ at the end of the first line and the > prompt at the start of the second line.
+
+[user@demo ~]$ ansible-inventory --yaml -i origin_inventory --list \
+> --output destination_inventory.yml
+all:
+  children:
+    backend_server_pool:
+      hosts:
+        serverb.lab.example.com:
+          alternate_server: serverd.lab.example.com
+        serverc.lab.example.com:
+          alternate_server: serverd.lab.example.com
+        serverd.lab.example.com: {}
+        servere.lab.example.com: {}
+        serverf.lab.example.com: {}
+    lb_servers:
+      hosts:
+        servera.lab.example.com: {}
+    ungrouped: {}
+    web_servers:
+      hosts:
+        serverb.lab.example.com: {}
+        serverc.lab.example.com: {}
+If you look closely at this output, you may notice something strange. The alternate_server group variable for web_servers is being reported as host variables for the two members of that group. In addition, since the group backend_server_pool is the first appearance of those two hosts, the value for that variable is being reported there instead of with the definition of those hosts in group web_servers.
+
+The converted inventories will result in the same output. Remember that even though the group variable is being set based on membership in web_servers, it remains set for hosts in that group even when a play selects that host based on membership in a different group.
+
+IMPORTANT
+If a host has one of its variables set based on membership in a group, and if that variable is not overridden, then it will be valid even if the host is selected for a play based on membership in a different group.
+
+The problem with this behavior is that this is not how the original inventory worked, which may cause confusion. To fix this discrepancy, you must edit the resulting YAML. In this case, you will edit the destination_inventory.yml to copy the alternate_server variables from one of the servers, b or c, delete both definitions, and then create a vars section under the web_servers. In this new section, copy the definition of the variable alternate_server from the servers. You must also change the servers that were originally defined by a range in backend_server_pool to use a range again instead of being listed individually.
+
+The result should look like this:
+
+all:
+  children:
+    backend_server_pool:
+      hosts:
+        server[b:f].lab.example.com:
+    lb_servers:
+      hosts:
+        servera.lab.example.com: {}
+    ungrouped: {}
+    web_servers:
+      hosts:
+        serverb.lab.example.com: {}
+        serverc.lab.example.com: {}
+      vars:
+        alternate_server: serverd.lab.example.com
+When converting very big inventory files, using the ansible-inventory command can save a lot of time, but you must use it with caution. It works better if your original static inventory file does not directly declare inventory variables, but gets them from external files in host_vars and group_vars.
+
+NOTE
+Some of the group or host lines in the YAML output of ansible-inventory end with {}. That indicates that the group does not have any members or group variables, or that the host has no host variables. These braces do not need to be included if you are writing in YAML format by hand.
+
+YAML Troubleshooting Tips
+If you have trouble with static inventory files in YAML format, there are a few things that you should keep in mind about YAML syntax.
+
+Protect a Colon Followed by a Space
+
+Remember that in an unquoted string, a colon followed by a space will cause an error. YAML will interpret this as starting a new element in a dictionary.
+
+Here are several examples of this and how to address them:
+
+title: Ansible: Best Practices # the second colon produces an error
+fine: Not:a:problem  # No space after the colon means no special treatment
+simple: 'Quoting the value with the : character solves the problem'
+double: "Double quotes also work with the : but permit escaped characters \n"
+Protect a Variable that Starts a Value
+
+Ansible does variable replacement with {{ variable }}, but anything beginning with { in YAML is interpreted as the start of a dictionary. Thus, you must enclose the variable placeholder with double quotes: foo: "{{ variable }} rest of the value".
+
+In general, when using any of the reserved characters [] {} > | * & ! % # ` @ ,, you should use double quotes "" around the value.
+
+Know the Difference Between a String and a Boolean or Float
+
+Booleans and floating point numbers used as a value for a variable should not be quoted. Values that are quoted are treated as a string.
+
+For example, a Boolean and a string:
+
+active: yes # Boolean value
+default_answer: "yes" # string containing yes
+A floating point value and a string:
+
+temperature: 36.5 # Floating point value
+version: "2.0"    # String containing a dot
+REFERENCES
+Ansible YAML Syntax
+
+
+Guided Exercise: Writing YAML Inventory Files
+In this exercise, you will convert a Red Hat Ansible inventory file from the INI format to the YAML format.
+
+Outcomes
+
+You should be able to replace an Ansible inventory file in the INI format with its YAML equivalent.
+
+Open a terminal on workstation as the student user and run the following command:
+
+[student@workstation ~]$ lab inventory-yaml start
+An inventory file in INI format has been provided for you in the /home/student/DO447/labs/inventory-yaml directory. Change to that directory, copy the file, and use a text editor to manually convert it to YAML format.
+
+Change to the /home/student/DO447/labs/inventory-yaml directory.
+
+[student@workstation ~]$ cd /home/student/DO447/labs/inventory-yaml
+Copy the existing static inventory file to inventory.yml.
+
+[student@workstation inventory-yaml]$ cp inventory inventory.yml
+Modify the new inventory file inventory.yml to adapt to the YAML syntax
+
+Convert the groups to YAML format.
+
+The name of each group should not be surrounded by square brackets ([]), but should end with a colon (:).
+
+Beneath the group name, add a line indented by two spaces relative to the group name, hosts:, to start the block of hosts that are members of the group.
+
+Next, the hosts in the group should each have their own line, indented by four spaces relative to the group name, and each hostname should end in a colon.
+
+The exact number of spaces does not matter as long as indentation is consistent and the hostnames are indented more than hosts:, which is indented more than the group name.
+
+For example, the following group:
+
+[active_web_servers]
+server[b:c].lab.example.com
+Would become:
+
+active_web_servers:
+  hosts:
+    server[b:c].lab.example.com:
+Repeat the operation for the groups all_servers, inactive_web_servers, and region_eu.
+
+Convert the definition of the child groups of web_servers. The child groups are listed in the original file under the [web_servers:children] section.
+
+Beneath the group name, add a line indented by two spaces relative to the group name, children:, to start the block of groups that are members of this group.
+
+Next, the child groups that are part of this group should each have their own line, indented by four spaces relative to the group name, and each group name should end in a colon.
+
+For example, the following section:
+
+[web_servers:children]
+active_web_servers
+inactive_web_servers
+Would become:
+
+web_servers:
+  children:
+    active_web_servers:
+    inactive_web_servers:
+Finally, convert the all_servers:children group to YAML by putting the child groups in the children section.
+
+[all_servers:children]
+web_servers
+Becomes:
+
+all_servers:
+  hosts:
+    servera.lab.example.com:
+  children:
+      web_servers:
+The inventory.yml file should look like this after the conversion:
+
+active_web_servers:
+  hosts:
+    server[b:c].lab.example.com:
+
+inactive_web_servers:
+  hosts:
+    server[d:f].lab.example.com:
+
+region_eu:
+  hosts:
+    serverc.lab.example.com:
+    serverf.lab.example.com:
+
+web_servers:
+  children:
+    active_web_servers:
+    inactive_web_servers:
+
+all_servers:
+  hosts:
+    servera.lab.example.com:
+  children:
+    web_servers:
+To test the inventory, use the ansible command to ping all the servers:
+
+[student@workstation inventory-yaml]$ ansible -i inventory.yml all_servers -m ping
+...output omitted...
+serverf.lab.example.com | SUCCESS => {
+    "ansible_facts": {
+        "discovered_interpreter_python": "/usr/libexec/platform-python"
+    },
+    "changed": false,
+    "ping": "pong"
+}
+Return to the user's home.
+
+[student@workstation inventory-yaml]$ cd
+Finish
