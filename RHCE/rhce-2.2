@@ -1,0 +1,287 @@
+Managing Files Using Command-Line Tools
+Work from the command line to create, move, and delete files and directories.
+
+Objectives
+After completing this section, students should be able to create, copy, link, move, and remove files and subdirectories in various directories.
+
+Command-line file management
+File management involves creating, deleting, copying, and moving files. Additionally, directories can be created, deleted, copied, and moved to help organize files logically. When working at the command line, file management requires awareness of the current working directory to choose either absolute or relative path syntax as most efficient for the immediate task.
+
+Table 2.2. File management commands
+
+Activity	Single source (note)	Multiple source (note)
+Copy file	cp file1 file2	cp file1 file2 file3 dir (4)
+Move file	mv file1 file2 (1)	mv file1 file2 file3 dir (4)
+Remove file	rm file1	rm -f file1 file2 file3 (5)
+Create directory	mkdir dir	mkdir -p par1/par2/dir (6)
+Copy directory	cp -r dir1 dir2 (2)	cp -r dir1 dir2 dir3 dir4 (4)
+Move directory	mv dir1 dir2 (3)	mv dir1 dir2 dir3 dir4 (4)
+Remove directory	rm -r dir1 (2)	rm -rf dir1 dir2 dir3 (5)
+Note:	
+(1)The result is a rename.
+(2)The "recursive" option is required to process a source directory.
+(3)If dir2 exists, the result is a move. If dir2 doesn't exist, the result is a rename.
+(4)The last argument must be a directory.
+(5)Use caution with "force" option; you will not be prompted to confirm your action.
+(6)Use caution with "create parent" option; typing errors are not caught.
+
+Create directories
+
+The mkdir command creates one or more directories or subdirectories, generating errors if the file name already exists or when attempting to create a directory in a parent directory that doesn't exist. The -p parent option creates missing parent directories for the requested destination. Be cautious when using mkdir -p, since accidental spelling mistakes create unintended directories without generating error messages.
+
+In the following example, a user attempts to use mkdir to create a subdirectory named Watched in the existing Videos directory, but mistypes the directory name.
+
+[student@desktopX ~]$ mkdir Video/Watched
+mkdir: cannot create directory `Video/Watched': No such file or directory
+The mkdir failed because Videos was misspelled and the directory Video does not exist. If the user had used mkdir with the -p option, there would be no error and the user would end up with two directories, Videos and Video, and the Watched subdirectory would be created in the wrong place.
+
+[student@desktopX ~]$ mkdir Videos/Watched
+[student@desktopX ~]$ cd Documents
+[student@desktopX Documents]$ mkdir ProjectX ProjectY
+[student@desktopX Documents]$ mkdir -p Thesis/Chapter1 Thesis/Chapter2 Thesis/Chapter3
+[student@desktopX Documents]$ cd
+[student@desktopX ~]$ ls -R Videos Documents
+Documents:
+ProjectX  ProjectY  Thesis  thesis_chapter1.odf  thesis_chapter2.odf
+
+Documents/ProjectX:
+
+Documents/ProjectY:
+
+Documents/Thesis:
+Chapter1  Chapter2  Chapter3
+
+Documents/Thesis/Chapter1:
+
+Documents/Thesis/Chapter2:
+
+Documents/Thesis/Chapter3:
+
+Videos:
+blockbuster1.ogg  blockbuster2.ogg  Watched
+
+Videos/Watched:
+
+[student@desktopX ~]$
+The last mkdir created three ChapterN subdirectories with one command. The -p parent option created the missing parent directory Thesis.
+
+Copy files
+
+The cp command copies one or more files to become new, independent files. Syntax allows copying an existing file to a new file in the current or another directory, or copying multiple files into another directory. In any destination, new file names must be unique. If the new file name is not unique, the copy command will overwrite the existing file.
+
+[student@desktopX ~]$ cd Videos
+[student@desktopX Videos]$ cp blockbuster1.ogg blockbuster3.ogg
+[student@desktopX Videos]$ ls -l
+total 0
+-rw-rw-r--. 1 student student    0 Feb  8 16:23 blockbuster1.ogg
+-rw-rw-r--. 1 student student    0 Feb  8 16:24 blockbuster2.ogg
+-rw-rw-r--. 1 student student    0 Feb  8 19:02 blockbuster3.ogg
+drwxrwxr-x. 2 student student 4096 Feb  8 23:35 Watched
+[student@desktopX Videos]$
+When copying multiple files with one command, the last argument must be a directory. Copied files retain their original names in the new directory. Conflicting file names that exist at a destination may be overwritten. To protect users from accidentally overwriting directories with contents, multiple file cp commands ignore directories specified as a source. Copying non-empty directories, with contents, requires the -r recursive option.
+
+[student@desktopX Videos]$ cd ../Documents
+[student@desktopX Documents]$ cp thesis_chapter1.odf thesis_chapter2.odf Thesis ProjectX
+cp: omitting directory `Thesis'
+[student@desktopX Documents]$ cp -r Thesis ProjectX
+[student@desktopX Documents]$ cp thesis_chapter2.odf Thesis/Chapter2/
+[student@desktopX Documents]$ ls -R
+.:
+ProjectX  ProjectY  Thesis  thesis_chapter1.odf  thesis_chapter2.odf
+
+./ProjectX:
+Thesis  thesis_chapter1.odf  thesis_chapter2.odf
+
+./ProjectX/Thesis:
+
+./ProjectY:
+
+./Thesis:
+Chapter1  Chapter2  Chapter3
+
+./Thesis/Chapter1:
+
+./Thesis/Chapter2:
+thesis_chapter2.odf
+
+./Thesis/Chapter3:
+[student@desktopX Documents]$
+In the first cp command, Thesis failed to copy, but thesis_chapter1.odf and thesis_chapter2.odf succeeded. Using the -r recursive option, copying Thesis succeeded.
+
+Move files
+
+The mv command renames files in the same directory, or relocates files to a new directory. File contents remain unchanged. Files moved to a different file system require creating a new file by copying the source file, then deleting the source file. Although normally transparent to the user, large files may take noticeably longer to move.
+
+[student@desktopX Videos]$ cd ../Documents
+[student@desktopX Documents]$ ls -l
+total 0
+-rw-rw-r--. 1 student student    0 Feb  8 16:24 thesis_chapter1.odf
+-rw-rw-r--. 1 student student    0 Feb  8 16:24 thesis_chapter2.odf
+[student@desktopX Documents]$ mv thesis_chapter2.odf thesis_chapter2_reviewed.odf
+[student@desktopX Documents]$ mv thesis_chapter1.odf Thesis/Chapter1
+[student@desktopX Documents]$ ls -lR
+.:
+total 16
+drwxrwxr-x. 2 student student 4096 Feb 11 11:58 ProjectX
+drwxrwxr-x. 2 student student 4096 Feb 11 11:55 ProjectY
+drwxrwxr-x. 5 student student 4096 Feb 11 11:56 Thesis
+-rw-rw-r--. 1 student student    0 Feb 11 11:54 thesis_chapter2_reviewed.odf
+
+./ProjectX:
+total 0
+-rw-rw-r--. 1 student student 0 Feb 11 11:58 thesis_chapter1.odf
+-rw-rw-r--. 1 student student 0 Feb 11 11:58 thesis_chapter2.odf
+
+./ProjectX/Thesis:
+total 0
+
+./ProjectY:
+total 0
+
+./Thesis:
+total 12
+drwxrwxr-x. 2 student student 4096 Feb 11 11:59 Chapter1
+drwxrwxr-x. 2 student student 4096 Feb 11 11:56 Chapter2
+drwxrwxr-x. 2 student student 4096 Feb 11 11:56 Chapter3
+
+./Thesis/Chapter1:
+total 0
+-rw-rw-r--. 1 student student 0 Feb 11 11:54 thesis_chapter1.odf
+
+./Thesis/Chapter2:
+total 0
+-rw-rw-r--. 1 student student 0 Feb 11 11:54 thesis_chapter2.odf
+
+./Thesis/Chapter3:
+total 0
+[student@desktopX Documents]$
+The first mv command is an example of renaming a file. The second causes the file to be relocated to another directory.
+
+Remove files and directories
+
+Default syntax for rm deletes files, but not directories. Deleting a directory, and potentially many subdirectories and files below it, requires the -r recursive option. There is no command-line undelete feature, nor a trash bin from which to restore.
+
+[student@desktopX Documents]$ pwd
+/home/student/Documents
+[student@desktopX Documents]$ rm thesis_chapter2_reviewed.odf
+[student@desktopX Documents]$ rm Thesis/Chapter1
+rm: cannot remove `Thesis/Chapter1': Is a directory
+[student@desktopX Documents]$ rm -r Thesis/Chapter1
+[student@desktopX Documents]$ ls -l Thesis
+total 8
+drwxrwxr-x. 2 student student 4096 Feb 11 12:47 Chapter2
+drwxrwxr-x. 2 student student 4096 Feb 11 12:48 Chapter3
+[student@desktopX Documents]$ rm -ri Thesis
+rm: descend into directory `Thesis'? y
+rm: descend into directory `Thesis/Chapter2'? y
+rm: remove regular empty file `Thesis/Chapter2/thesis_chapter2.odf'? y
+rm: remove directory `Thesis/Chapter2'? y
+rm: remove directory `Thesis/Chapter3'? y
+rm: remove directory `Thesis'? y
+[student@desktopX Documents]$
+After rm failed to delete the Chapter1 directory, the -r recursive option succeeded. The last rm command parsed into each subdirectory first, individually deleting contained files before removing each now-empty directory. Using -i will interactively prompt for each deletion. This is essentially the opposite of -f which will force the deletion without prompting the user.
+
+The rmdir command deletes directories only if empty. Removed directories cannot be undeleted.
+
+[student@desktopX Documents]$ pwd
+/home/student/Documents
+[student@desktopX Documents]$ rmdir  ProjectY
+[student@desktopX Documents]$ rmdir  ProjectX
+rmdir: failed to remove `ProjectX': Directory not empty
+[student@desktopX Documents]$ rm -r ProjectX
+[student@desktopX Documents]$ ls -lR
+.:
+total 0
+[student@desktopX Documents]$
+The rmdir command failed to delete non-empty ProjectX, but rm -r succeeded.
+
+REFERENCES
+cp(1), mkdir(1), mv(1), rm(1), and rmdir(1) man pages
+
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy
+Red Hat Training Policies
+Terms of Use
+All policies and guidelines
+
+
+Guided Exercise: Practice: Command-Line File Management
+In this lab, you will practice efficient techniques for creating and organizing files using directories, file copies, and links.
+
+Outcomes:
+
+Students will practice creating, rearranging, and deleting files.
+
+Log into your student account on serverX. Begin in your home directory.
+
+In your home directory, create sets of empty practice files to use for the remainder of this lab. If the intended command is not immediately recognized, students are expected to use the guided solution to see and practice how the task is accomplished. Use the shell tab completion to locate and complete path names more easily.
+
+Create six files with names of the form songX.mp3.
+
+Create six files with names of the form snapX.jpg.
+
+Create six files with names of the form filmX.avi.
+
+In each set, replace X with the numbers 1 through 6.
+
+[student@serverX ~]$ touch song1.mp3 song2.mp3 song3.mp3 song4.mp3 song5.mp3 song6.mp3
+[student@serverX ~]$ touch snap1.jpg snap2.jpg snap3.jpg snap4.jpg snap5.jpg snap6.jpg
+[student@serverX ~]$ touch film1.avi film2.avi film3.avi film4.avi film5.avi film6.avi
+[student@serverX ~]$ ls -l
+From your home directory, move the song files into your Music subdirectory, the snapshot files into your Pictures subdirectory, and the movie files into your Videos subdirectory.
+
+When distributing files from one location to many locations, first change to the directory containing the source files. Use the simplest path syntax, absolute or relative, to reach the destination for each file management task.
+
+[student@serverX ~]$ mv song1.mp3 song2.mp3 song3.mp3 song4.mp3 song5.mp3 song6.mp3 Music
+[student@serverX ~]$ mv snap1.jpg snap2.jpg snap3.jpg snap4.jpg snap5.jpg snap6.jpg Pictures
+[student@serverX ~]$ mv film1.avi film2.avi film3.avi film4.avi film5.avi film6.avi Videos
+[student@serverX ~]$ ls -l Music Pictures Videos
+In your home directory, create three subdirectories for organizing your files into projects. Call these directories friends, family, and work. Create all three with one command.
+
+You will use these directories to rearrange your files into projects.
+
+[student@serverX ~]$ mkdir friends family work
+[student@serverX ~]$ ls -l
+You will collect some of the new files into the project directories for family and friends. Use as many commands as needed. You do not have to use only one command as in the example. For each project, first change to the project directory, then copy the source files into this directory. You are making copies, since you will keep the originals after giving these projects to family and friends.
+
+Copy files (all types) containing numbers 1 and 2 to the friends folder.
+
+Copy files (all types) containing numbers 3 and 4 to the family folder.
+
+When collecting files from multiple locations into one location, change to the directory that will contain the destination files. Use the simplest path syntax, absolute or relative, to reach the source for each file management task.
+
+[student@serverX ~]$ cd friends
+[student@serverX friends]$ cp ~/Music/song1.mp3 ~/Music/song2.mp3 ~/Pictures/snap1.jpg ~/Pictures/snap2.jpg ~/Videos/film1.avi ~/Videos/film2.avi .
+[student@serverX friends]$ ls -l
+[student@serverX friends]$ cd ../family
+[student@serverX family]$ cp ~/Music/song3.mp3 ~/Music/song4.mp3 ~/Pictures/snap3.jpg ~/Pictures/snap4.jpg ~/Videos/film3.avi ~/Videos/film4.avi .
+[student@serverX family]$ ls -l
+For your work project, you will create additional copies.
+
+[student@serverX family]$ cd ../work
+[student@serverX work]$ cp ~/Music/song5.mp3 ~/Music/song6.mp3 ~/Pictures/snap5.jpg ~/Pictures/snap6.jpg ~/Videos/film5.avi ~/Videos/film6.avi .
+[student@serverX work]$ ls -l
+Your projects are now done. Time to clean up the projects.
+
+Change to your home directory. Attempt to delete both the family and friends projects with a single rmdir command.
+
+[student@serverX work]$ cd
+[student@serverX ~]$ rmdir family friends
+rmdir: failed to remove `family': Directory not empty
+rmdir: failed to remove `friends': Directory not empty
+Using the rmdir command should fail since both directories are non-empty.
+
+Use another command that will succeed in deleting both the family and friends folders.
+
+[student@serverX ~]$ rm -r family friends
+[student@serverX ~]$ ls -l
+Delete all the files in the work project, but do not delete the work directory.
+
+[student@serverX ~]$ cd work
+[student@serverX work]$ rm song5.mp3 song6.mp3 snap5.jpg snap6.jpg film5.avi film6.avi
+[student@serverX work]$ ls -l
+Finally, from your home directory, use the rmdir command to delete the work directory. The command should succeed now that it is empty.
+
+[student@serverX work]$ cd
+[student@serverX ~]$ rmdir work
+[student@serverX ~]$ ls -l

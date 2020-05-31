@@ -1,0 +1,93 @@
+Making Links Between Files
+Handling links to existing files can save space on the file system.
+
+Objectives
+After completing this section, students should be able to use hard links and soft links to make multiple names point to the same file.
+
+Managing links between files
+Creating hard links
+
+A hard link is a new directory entry with a reference to an existing file on the file system. Every file in a file system has one hard link by default. To save space, instead of copying, a new hard link can be created to reference the same file. A new hard link either needs to have a different file name, if it is created in the same directory as the existing hard link, or it needs to reside in a different directory. All hard links pointing to the same file have the same permissions, link count, user/group ownerships, time stamps, and file content. Hard links pointing to the same file content need to be on the same file system.
+
+The ls -l shows the hard link count after the permissions and before the owner of a file.
+
+[root@serverX ~]# echo "Hello World" > newfile.txt
+[root@serverX ~]# ls -l newfile.txt
+-rw-r--r--. 1 root root 0 Mar 11 19:19 newfile.txt
+The command ln creates new hard links to existing files. The command expects an existing file as the first argument, followed by one or more additional hard links. The hard links can reside anywhere as long as they are on the same file system as the existing file. After a new hard link is created, there is no way to tell which of the existing hard links is the original one.
+
+Create a hard link newfile-link2.txt for the existing file newfile.txt in the /tmp directory.
+
+[root@serverX ~]# ln newfile.txt /tmp/newfile-hlink2.txt
+[root@serverX ~]# ls -l newfile.txt /tmp/newfile-hlink2.txt
+-rw-rw-r--. 2 root root 12 Mar 11 19:19 newfile.txt
+-rw-rw-r--. 2 root root 12 Mar 11 19:19 newfile-hlink2.txt
+Even if the original file gets deleted, the content of the file is still available as long as at least one hard link exists.
+
+[root@serverX ~]# rm -f newfile.txt
+[root@serverX ~]# ls -l /tmp/newfile-link2.txt
+-rw-rw-r--. 1 root root 12 Mar 11 19:19 /tmp/newfile-link2.txt
+[root@serverX ~]# cat /tmp/newfile-link2.txt
+Hello World
+IMPORTANT
+All hard links referencing the same file have the same permissions, link count, user/group ownerships, time stamps, and file content. If any of that information is changed on one hard link, all other hard links pointing at the same file will show the new information as well.
+
+Creating soft links
+
+The ln -s command creates a soft link, which is also called a "symbolic link". A soft link is not a regular file, but a special type of file that points to an existing file or directory. Unlike hard links, soft links can point to a directory, and the target to which a soft link points can be on a different file system.
+
+[root@serverX ~]# ln -s /root/newfile-link2.txt /tmp/newfile-symlink.txt
+[root@serverX ~]# ls -l newfile-link2.txt /tmp/newfile-symlink.txt
+lrwxrwxrwx. 1 root root 11 Mar 11 20:59 /tmp/newfile-symlink.txt -> /root/newfile-link2.txt
+-rw-rw-r--. 1 root root 12 Mar 11 19:19 newfile-link2.txt
+When the original file gets deleted, the soft link is still pointing to the file but the target is gone. A soft link pointing to a missing file is called a "dangling soft link."
+
+[root@serverX ~]# rm -f newfile-link2.txt
+[root@serverX ~]# ls -l /tmp/newfile-symlink.txt
+lrwxrwxrwx. 1 root root 11 Mar 11 20:59 /tmp/newfile-symlink.txt -> newfile-link2.txt
+[root@serverX ~]# cat /tmp/newfile-symlink.txt
+cat: /tmp/newfile-symlink.txt: No such file or directory
+A soft link can point to a directory. The soft link then acts like a directory. Changing to the soft link directory with cd works as expected.
+
+Create a soft link /root/configfiles pointing to the /etc directory.
+
+[root@serverX ~]# ln -s /etc /root/configfiles
+[root@serverX ~]# cd /root/configfiles
+[root@serverX configfiles]# pwd
+/root/configfiles
+REFERENCES
+ln(1) man page
+
+
+
+
+Guided Exercise: Practice: Making Links Between Files
+In this lab, you will create hard and soft links.
+
+Outcomes:
+
+The user creates a hard link and a soft link.
+
+Create an additional hard link /root/qmp-manual.txt for the existing file /usr/share/doc/qemu-kvm/qmp-commands.txt on serverX.
+
+Create the hard link /root/qmp-manual.txt. Link it to the file /usr/share/doc/qemu-kvm/qmp-commands.txt.
+
+[root@serverX ~]# ln /usr/share/doc/qemu-kvm/qmp-commands.txt /root/qmp-manual.txt
+Verify the link count on the newly created link /root/qmp-manual.txt.
+
+[root@serverX ~]# ls -l /root/qmp-manual.txt
+-rw-r--r--. 2 root root 63889 Nov 11 02:58 /root/qmp-manual.txt
+Verify the link count on the original file /usr/share/doc/qemu-kvm/qmp-commands.txt.
+
+[root@serverX ~]# ls -l /usr/share/doc/qemu-kvm/qmp-commands.txt
+-rw-r--r--. 2 root root 63889 Nov 11 02:58 /usr/share/doc/qemu-kvm/qmp-commands.txt
+Create the soft link /root/tempdir pointing to the directory /tmp on serverX.
+
+Create the soft link /root/tempdir. Link it to /tmp.
+
+[root@serverX ~]# ln -s /tmp /root/tempdir
+Verify the newly created link with ls -l.
+
+[root@serverX ~]# ls -l /root
+lrwxrwxrwx. 1 root root 4 Mar 13 08:42 tempdir -> /tmp
+
