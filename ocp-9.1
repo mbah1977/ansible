@@ -1,0 +1,322 @@
+
+Chapter 9. Managing a Cluster with the Web Console
+Performing Cluster Administration
+Guided Exercise: Performing Cluster Administration
+Managing Workloads
+Guided Exercise: Managing Workloads
+Examining Cluster Metrics
+Guided Exercise: Examining Cluster Metrics
+Lab: Managing the Cluster with the Web Console
+Summary
+Abstract
+
+Goal	Manage a Red Hat OpenShift cluster using the web console.
+Objectives	
+Perform cluster administration with the web console.
+
+Manage cluster workloads with the web console.
+
+Examine the metrics page and dashboard within the web console.
+
+Sections	
+Performing Cluster Administration (and Guided Exercise)
+
+Managing Workloads (and Guided Exercise)
+
+Examining Cluster Metrics (and Guided Exercise)
+
+Lab	
+Managing a Cluster with the Web Console
+
+Performing Cluster Administration
+Objectives
+After completing this section, you should be able to perform cluster administration with the web console.
+
+Describing the Web Console
+The Red Hat OpenShift web console provides a graphical user interface to perform administrative, management, and troubleshooting tasks. It supports both Administrator and Developer perspectives. This course explores the Administrator perspective.
+
+The following list outlines some of the most important parts of the web console, grouped by the main navigation menu items.
+
+Home
+The dashboard provides a quick overview of the cluster, including health metrics, resource counts, and a streaming list of events, such as machine updates or pod failures.
+
+You can navigate to Home → Search page to find or create resources of any type. This is also a useful starting point to navigate to resources that do not have dedicated navigation in the menu, such as Groups.
+
+The Home → Events page displays a filterable stream of events that occur in the cluster and is a good starting point for troubleshooting.
+
+Operators
+Explore and install operators curated by Red Hat using OperatorHub, then navigate to the Installed Operators page to managed the operators.
+
+Workloads, Networking, and Storage
+Manage common resources such as deployments, services, and persistent volumes. Of particular interest for troubleshooting is the ability to view pod logs and connect to a terminal.
+
+Builds
+Manage build configurations, builds, and image streams.
+
+Monitoring
+View alerts and perform ad hoc Prometheus queries.
+
+Compute
+View and manage compute resources such as nodes, machines, and machine autoscalers.
+
+Administration
+View and manage a wide variety of settings that are of particular interest to cluster administrators, such as cluster updates, cluster operators, CRDs, role bindings, and resource quotas.
+
+Accessing the OpenShift Web Console
+The OpenShift web console runs as pods in the openshift-console project and is managed by an operator running in the openshift-console-operator project. You can discover the URL by listing the route.
+
+[student@workstation ~]$ oc get routes -n openshift-console
+NAME       HOST/PORT                                             ...  PORT   ...
+console    console-openshift-console.apps.cluster.example.com    ...  https  ...
+downloads  downloads-openshift-console.apps.cluster.example.com  ...  http   ...
+In non-production systems, self-signed certificates are commonly used for the HTTPS endpoint. Web browsers will warn you about the certificate, and you will need to add a security exception when navigating to the web console for the first time.
+
+Finding Resources
+The web UI provides multiple ways to locate resources. Many common resources, such as Deployments and Services, are available in the main menu on the left. You can use the Home → Search page to find other resource types. This page provides a complete menu of resource types and a label selector field.
+
+Use the name filter to quickly locate resources on pages with long lists such as the Projects page.
+
+
+It may be useful to filter pods by state to identify potential issues or problematic deployments.
+
+
+The details page of a resource displays common useful information. The contents of this page vary for different types. For example, the Pod Details page displays metrics and status information and the Secret Details page allows you to reveal or copy data stored in the secret.
+
+Detail pages provide a YAML editor to view and modify the resource specification from the web console. Some resource types, such as secrets and role bindings, provide more advanced UIs tailored to the resource type.
+
+Creating Users and Groups
+The secrets editor and similar tools can make it quicker and easier to manage users and groups than using the oc command.
+
+As discussed in Chapter 3, Configuring Authentication, OpenShift supports a variety of identity providers (IdPs), including LDAP and OpenID Connect. This course discusses HTPasswd, which is a simple identity provider that uses a flat file stored as a secret.
+
+After using a terminal to generate the HTPasswd entry, switch to the web console to append the entry to the secret. In the web UI, locate the secret in the openshift-config project and then click Actions → Edit Secret. The Edit Key/Value Secret tool handles the base64 encryption for you.
+
+Groups do not have a specialized page in the web console, nor do they have a menu option to navigate directly to them. The easiest way to create a group is to select Group from the resource type list on the Search page and then click Create Group to use the YAML editor.
+
+
+Figure 9.3: Creating a group from the Search page.
+Creating a Project
+The web UI features a variety of pages and forms for configuring projects.
+
+Navigate to the Home → Projects page to display the full list of projects. Click Create Project and complete the form to create a new project.
+
+After you have created your new project, you can navigate to the Role Bindings tab on the project details page.
+
+Red Hat recommends that administrators responsible for multitenant clusters configure Resource Quotas and Limit Ranges, which enforce total project limits and container limits, respectively. Navigate to either Administration → Resource Quotas or Administration → Limit Ranges to access the appropriate YAML editor, where you can configure these limits.
+
+Discussing Limitations
+The OpenShift web console is a powerful tool for graphically administrating OpenShift clusters, however some administrative tasks are not currently available in the web console. For example, viewing node logs and executing node debug sessions requires the oc command-line tool.
+
+ 
+REFERENCES
+For more information, refer to the Red Hat OpenShift Container Platform 4.2 Web Console guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/web_console/index
+
+Red Hat Training + Certification logo
+
+
+
+Guided Exercise: Performing Cluster Administration
+In this exercise, you will perform cluster administration with the web console.
+
+Outcomes
+
+You should be able to use the OpenShift web console to:
+
+Find resources associated with an operator.
+
+Review a pod's status, YAML definition, and logs.
+
+View and edit cluster configuration resources.
+
+Create a new project and configure its resource quotas, limit ranges, and role-based access control (RBAC).
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+This command ensures that the cluster API is reachable and creates the resources required for this exercise.
+
+[student@workstation ~]$ lab console-admin start
+As the admin user, locate and navigate to the OpenShift web console.
+
+Source the classroom variables file.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+List the routes in the openshift-console namespace. Identify the console host and port.
+
+[student@workstation ~]$ oc get routes -n openshift-console
+NAME       HOST/PORT                                             ...  PORT   ...
+console    console-openshift-console.apps.cluster.example.com    ...  https  ...
+downloads  downloads-openshift-console.apps.cluster.example.com  ...  http   ...
+Echo the value of ${RHT_OCP4_USER_PASSWD} to retrieve the admin password.
+
+[student@workstation ~]$ echo ${RHT_OCP4_USER_PASSWD}
+...output omitted...
+Open a web browser and navigate to the console-openshift-console.apps.cluster.example.com console route URL discovered in a previous step.
+
+Click Advanced to reveal the untrusted certificate message, and then click Add Exception. In the Add Security Exception dialog box, click Confirm Security Exception.
+
+You need to do this twice to skip the warnings about the self-signed SSL certificate for both the console-openshift-console and oauth-openshift subdomains.
+
+Click localusers and log in as the admin user with the password from the ${RHT_OCP4_USER_PASSWD} variable.
+
+Review the openshift-console-operator and openshift-console pod logs.
+
+In the Red Hat OpenShift Container Platform web UI, click Home → Projects to display the Projects page.
+
+Type console in the Filter by name field and then click the openshift-console-operator link.
+
+
+Click Workloads and then click 1 of 1 pods to navigate to the console-operator replica set. Click the pod name marked by the P icon to navigate to the console-operator pod.
+
+
+Review the pod details Overview page and notice the pod metrics, running status, and volumes. Click YAML to navigate to the pod resource editor.
+
+Click View Schema to see resource documentation.
+
+Click Logs to view the console operator logs.
+
+Open the Project list and type openshift-console to switch to the openshift-console project.
+
+
+Click the first pod in the table and then click Logs to view the console pod logs.
+
+Review the Console, Image, and OAuth cluster settings.
+
+Click Administration → Cluster Settings to view the Cluster Settings page. Notice that information about the cluster's update channel and current version are listed at the top and a section for the cluster's update history is listed further below.
+
+Click Global Configuration to navigate to the list of cluster configuration resources.
+
+Click Console and then click YAML to review the Console resource.
+
+Return to the Cluster Settings Global Configuration page. Click Image and then click YAML. Notice the internalRegistryHostname is configured to use the internal image registry.
+
+Return to the Cluster Settings Global Configuration page and click OAuth. The OAuth overview page has a special section for listing and adding identity providers. Navigate to the YAML page to view additional configuration details.
+
+Review the admin, edit, and view cluster roles.
+
+Click Administration → Roles to view the Roles page.
+
+Click admin next to the CR icon. Review the Rules table which describes the allowed actions for various resources.
+
+
+Return to the Cluster Roles page and click the cluster role named edit to view the edit cluster role details.
+
+Return to the Cluster Roles page and type view in the Filter by name field. Click the cluster role named view to navigate to the view cluster role details. Notice that this role only allows get, list, and watch actions on the listed resources.
+
+Add a tester user entry to the localusers secret.
+
+In the OpenShift Container Platform web UI, click Workloads → Secrets and then select openshift-config from the Project filter list to display the secrets for the openshift-config project.
+
+Use the filter or scroll to the bottom of the page to locate and then click the localusers link.
+
+Click Actions → Edit Secret at the upper right of the page to navigate to the Edit Key/Value Secret tool.
+
+Use the workstation terminal to generate an htpasswd entry using the ${RHT_OCP4_USER_PASSWD} password.
+
+[student@workstation ~]$ htpasswd -n -b tester ${RHT_OCP4_USER_PASSWD}
+tester:$apr1$oQ3BtWOp.HtW97.$wVbJBofBNsNd4sd
+Append the terminal output from the htpasswd command to the htpasswd value in the OpenShift web console's secrets editor, and then click Save.
+
+admin:$apr1$Au9.fFr$0k5wvUBd3eeBt0baa77.dae
+leader:$apr1$/abo4Hybn7a.tG5ZoOBn.QWefXckiy1
+developer:$apr1$RjqTY4cv$xql3.BQfg42moSxwnTNkh.
+tester:$apr1$oQ3BtWOp.HtW97.$wVbJBofBNsNd4sd
+Create and configure a new project named console-apps.
+
+Click Home → Projects to view the Projects page, and then click Create Project.
+
+Type console-apps in the Name field, and then provide an optional Display Name and Description. Click Create.
+
+
+Click Administration → Resource Quotas and then click Create Resource Quota. Modify the YAML document as follows:
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota
+  namespace: console-apps
+spec:
+  hard:
+    pods: '10'
+    requests.cpu: '2'
+    requests.memory: 8Gi
+    limits.cpu: '4'
+    limits.memory: 12Gi
+Click Create.
+
+Click Administration → Limit Ranges and then click Create Limit Range. Modify the YAML document to specify default memory and CPU container limits and requests:
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: limit-range
+  namespace: console-apps
+spec:
+  limits:
+    - default:
+        cpu: 500m
+        memory: 5Gi
+      defaultRequest:
+        cpu: 10m
+        memory: 100Mi
+      type: Container
+Click Home → Search and then select Group from the Select Resource list.
+
+Click Create Group and use the editor to define a Group resource as follows:
+
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: project-team
+users:
+  - developer
+  - tester
+Click Create to create the new project-team group.
+
+Click Home → Projects and then click console-apps to navigate back to the project. Click Role Bindings.
+
+Click Create Binding and fill out the form as follows to create a role binding for the project-team group.
+
+Table 9.1. Team Role Binding Form
+
+Field	Value
+Binding Type	Namespace Role Binding (RoleBinding)
+Name	team
+Namespace	console-apps
+Role Name	edit
+Subject	Group
+Subject Name	project-team
+
+Click Create to create the namespaced RoleBinding.
+
+Return to the Role Bindings page and click Create Binding to create a role binding for the leader user. Fill out the form as follows:
+
+Table 9.2. Leader Role Binding Form
+
+Field	Value
+Binding Type	Namespace Role Binding (RoleBinding)
+Name	leader
+Namespace	console-apps
+Role Name	admin
+Subject	User
+Subject Name	leader
+
+Click Create to create the namespaced RoleBinding.
+
+Click admin → Log out and then log back in as the developer user. The password is the same as the admin password that you retrieved in the initial steps.
+
+Ensure that the developer account can only see the console-apps project.
+
+NOTE
+Previous projects from guided exercises that were not deleted upon completion may also display in the list.
+
+You will continue to use the new console-apps project in the next section, so you do not need to delete it.
+
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.

@@ -1,0 +1,299 @@
+Managing Workloads
+Objectives
+After completing this section, you should be able to manage cluster workloads with the web console.
+
+Exploring Workload Resources
+Workload resources such as Pods, Deployments, Stateful Sets, and Config Maps are listed under the Workloads menu. Click a resource type to see a list of resources, and then click the name of the resource to navigate to the details page for that resource.
+
+For example, to navigate to the OpenShift DNS operator pod, click Workloads → Pods, select opeshift-dns-operator from the Project list at the top of the page, and click the name of the pod listed in the table.
+
+
+There are often multiple ways to navigate to common resources. Throughout the web UI, associated resources will often link to each other. The deployment details page displays a list of pods. Click any pod name in that list to display the pod details page for that pod.
+
+Managing Workloads
+The web console provides specialized editor pages for many workload resources. Use the Actions menu on the resource's details page to navigate to the specialized editor pages.
+
+
+Figure 9.10: Using the Actions menu to modify a deployment.
+Some useful action pages are described below:
+
+All resources feature Edit Labels and Edit Annotations editors.
+
+Click Actions → Add Storage to add a Persistent Volume Claim (PVC) to a deployment.
+
+To edit the replica count, navigate to the Deployment Details page and click Actions → Edit Count.
+
+To modify the update strategy for a deployment, such as changing rolling update parameters, navigate to the Deployment Details page and click Actions → Edit Update Strategy. To modify the update strategy for a deployment configuration, navigate to the Deployment Config Details page and click Actions → Edit Deployment Config.
+
+Navigate to the Secret Details page and click Actions → Edit Secrets to display the Edit Key/Value Secret tool which automatically uses Base64 to encode and decode values.
+
+You can also use the embedded YAML editor to create or modify workload resources. Drag and drop a JSON or YAML file into the browser-based editor to update the resource from a file without using the oc command.
+
+
+Figure 9.11: Editing a resource using the embedded YAML editor.
+Along with the ability to edit resources in a dedicated page or the embedded YAML editor, you can perform many other common operations directly from the OpenShift web console.
+
+For example, to delete a resource, navigate to the resource's details page and click Actions → Delete Resource Type.
+
+There is often more than one way to perform a particular task. For example, to manually scale a deployment you can navigate to the Deployment Details page and then click Actions → Edit Count, or you can click the arrows next to the pod count without leaving the page.
+
+Deploying Applications
+You can create deployments and deployment configurations from the Workloads → Deployments and Workloads → DeploymentConfigs pages, respectively. Each of these sections provides a YAML editor with a prepopulated specification to define your YAML resource.
+
+The Builds section contains tools for:
+
+Creating build configurations for Source-to-Image (S2I), Dockerfile, or custom builds.
+
+Listing and inspecting builds.
+
+Managing image streams.
+
+After you initiate a deployment or build, use the resource's details and events pages to verify success, or start investigating the cause of a deployment failure.
+
+Installing and Using Operators
+Explore community and partner operators on the OpenShift web console's Operators → OperatorHub page. Over 150 operators are available for installation from the web UI. This includes community operators, which Red Hat does not support.
+
+Operators add features and services to your cluster along with automation traditionally performed by human operators, such as deployment coordination or automatic backups. Operators cover a broad range of categories including:
+
+Traditional databases such as PostgreSQL and MySQL.
+
+Popular big data frameworks such as Apache Spark.
+
+Kafka-based streaming platforms such as Red Hat AMQ streams.
+
+The Knative serverless framework OpenShift Serverless Operator.
+
+Click the operator listing to view details about the operator, such as its version and where to find documentation. After you have selected the operator to install, click Install.
+
+Before installing an operator, complete the Create Operator Subscription form to select the target namespace and operator update strategy. You can install operators to target all or only specific namespaces. Be aware, however, that not all operators support all installation target options.
+
+After you have installed an operator, it appears on the Operators → Installed Operators page. If it is installed for a specific namespace, make sure you select the correct project using the project filter at the top of the page.
+
+
+The operator details page lists the APIs provided by the operator and allows you to create instances of those resources. For example, from the etcd operator page you can create instances of an etcd cluster, backup request, or restore request.
+
+
+Guided Exercise: Managing Workloads
+In this exercise, you will manage cluster workloads with the web console.
+
+Outcomes
+
+You should be able to use the OpenShift web console to:
+
+Install an operator from OperatorHub.
+
+Use a custom resource to create a database.
+
+Deploy and troubleshoot an application that uses the operator-managed resources.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+This command ensures that the cluster API is reachable and creates the resources required for this activity.
+
+[student@workstation ~]$ lab console-workloads start
+As the admin user, locate and navigate to the OpenShift web console.
+
+Source the classroom variables file.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+List the routes in the openshift-console namespace. Identify the console host and port.
+
+[student@workstation ~]$ oc get routes -n openshift-console
+NAME       HOST/PORT                                             ...  PORT   ...
+console    console-openshift-console.apps.cluster.example.com    ...  https  ...
+downloads  downloads-openshift-console.apps.cluster.example.com  ...  http   ...
+Echo the value of ${RHT_OCP4_USER_PASSWD} to retrieve the admin password.
+
+[student@workstation ~]$ echo ${RHT_OCP4_USER_PASSWD}
+...output omitted...
+Open a web browser and navigate to the console route URL discovered in a previous step.
+
+Click Advanced to reveal the untrusted certificate message, and then click Add Exception. In the Add Security Exception dialog box, click Confirm Security Exception.
+
+You will need to do this twice to skip the warnings about the self-signed SSL certificate for both the console-openshift-console and oauth-openshift subdomains.
+
+Click localusers and log in as the admin user with the password from the ${RHT_OCP4_USER_PASSWD} variable.
+
+Inspect the openshift-console-operator and openshift-console deployments, replica sets, and pods.
+
+Click Workloads → Deployments and select all projects from the project list at the top. Type console in the Filter by name field.
+
+Notice that OpenShift has a deployment named console-operator with a single pod in the openshift-console-operator namespace, which operates a deployment named console in the openshift-console namespace.
+
+
+Click Workloads → Replica Sets and type console in the Filter by name field.
+
+Deployments declare a ReplicaSet to ensure that a specified number of pods are always running.
+
+In the status column, click 2 of 2 pods to display the console ReplicaSet pod list.
+
+Install the community PostgreSQL operator provided by Dev4Devs.com from the OperatorHub page.
+
+Click Operators → OperatorHub and then click Database to display the list of database operators available from OperatorHub.
+
+Type postgres in the Filter by keyword field, and then click PostgreSQL Operator by Dev4Ddevs.com. Click Continue to view the community operator page, and then click Install.
+
+
+Select the console-apps namespace and then click Subscribe to install the operator for use in the console-apps project. Leave the other form fields unchanged.
+
+Log out as the admin user and log in as the developer user.
+
+Click admin → Log out.
+
+Log in as the developer user. The password is the same as the admin password that you retrieved in the initial steps.
+
+Provision a PostgreSQL database using the installed operator and Database Custom Resource Definition (CRD).
+
+On the Projects page, click the console-apps link to see the resources associated with the console-apps project.
+
+Click Operators → Installed Operators, and then click the PostgreSQL Operator by Dev4Devs.com link to display the Operator Details page.
+
+NOTE
+If the Installed Operators list does not load, make sure that the console-apps project is selected at the top of the page.
+
+
+Click the Database Database tab and then click Create Database.
+
+Update the Database YAML to specify the PostgreSQL image provided by Red Hat. Do not change the other default values.
+
+apiVersion: postgresql.dev4devs.com/v1alpha1
+kind: Database
+metadata:
+  name: database
+  namespace: console-apps
+spec:
+  databaseCpu: 30m
+  databaseCpuLimit: 60m
+  databaseMemoryLimit: 512Mi
+  databaseMemoryRequest: 128Mi
+  databaseName: example
+  databaseNameKeyEnvVar: POSTGRESQL_DATABASE
+  databasePassword: postgres
+  databasePasswordKeyEnvVar: POSTGRESQL_PASSWORD
+  databaseStorageRequest: 1Gi
+  databaseUser: postgres
+  databaseUserKeyEnvVar: POSTGRESQL_USER
+  image: registry.redhat.io/rhscl/postgresql-96-rhel7:1-51
+  size: 1
+Click Create to add the Database resource. The PostgreSQL operator will read the specification and automatically create the workload, network, and storage for the new database.
+
+Review the resources created by the operator.
+
+Click Workloads → Deployments and inspect the list of deployments. You will notice a database deployment and a postgresql-operator deployment.
+
+Click the database deployment, and then click the Pods tab to see the pod deployed by the database deployment. Click the pod name to display the Pod Details page.
+
+Click Networking → Services and then click the database service name to see the details of the service created by the PostgreSQL operator.
+
+Click Storage → Persistent Volume Claims and then click the database PVC to see the details of the Persistent Volume Claim created by the PostgreSQL operator.
+
+Create a deployment, service, and route for a simple web application. The application will display a list of books stored in the database.
+
+Click Workloads → Deployments and then click Create Deployment to display the web console YAML editor. Update the YAML as follows and then click Create.
+
+NOTE
+You can copy the YAML from the ~/DO280/labs/console-workloads/deployment.yaml file on workstation.
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: books
+  namespace: console-apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: books
+  template:
+    metadata:
+      labels:
+        app: books
+    spec:
+      containers:
+        - name: books
+          image: 'quay.io/redhattraining/books:v0.9'
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          env:
+            - name: DB_HOST
+              value: database.console-apps.svc.cluster.local
+            - name: DB_PORT
+              value: '5432'
+            - name: DB_USER
+              value: postgres
+            - name: DB_PASSWORD
+              value: postgres
+            - name: DB_NAME
+              value: postgres
+IMPORTANT
+Do not expect the pods to run successfully after completing this step. You will troubleshoot the deployment issue later in this exercise.
+
+Click Networking → Services and then click Create Service to display the web console YAML editor. Update the YAML as follows and then click Create.
+
+NOTE
+You can copy the YAML from the ~/DO280/labs/console-workloads/service.yaml file on workstation.
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: books
+  namespace: console-apps
+spec:
+  selector:
+    app: books
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+Click Networking → Routes and then click Create Route. Complete the page as follows, leaving the other fields unchanged, and then click Create.
+
+Table 9.3. Create Route Form
+
+Field	Value
+Name	books
+Service	books
+Target Port	8080 → 8080 (TCP)
+
+Troubleshoot and fix the deployment issue.
+
+Click Home → Events and notice the error events. Messages such as Failed to pull image "quay.io/redhattraining/books:v0.9" and Error: ImagePullBackOff indicate an issue with the image name or image tag.
+
+
+Click Workloads → Deployments and then click the books deployment. Scroll to the bottom of the page to inspect the Conditions table. Notice that the Available condition type displays a False status.
+
+
+Click the Pods tab at the top of the Deployment Details screen and locate the pod status. It displays ImagePullBackOff.
+
+Click the YAML tab at the top of the Deployment Details page to navigate to the YAML editor and fix the issue. Update the spec image value to 'quay.io/redhattraining/books:v1.4' and then click Save.
+
+NOTE
+When OpenShift updates a deployment resource while you are attempting to update it, the YAML editor will not allow you to save your changes without fetching the latest version first. If this happens, click Reload, perform the edit again, and then click Save.
+
+Click the Overview tab at the top of the Deployment Details page and wait until the donut indicates that one pod is running.
+
+Click Networking → Routes and then click the link in the Location column. Firefox will open a new tab rendering a list of books that were fetched from the database.
+
+You will continue to use the new console-apps project and books deployment in the next section, so you do not need to delete them.
+
+Finish
+
+On the workstation machine, use the lab command to complete this exercise.
+
+[student@workstation ~]$ lab console-workloads finish
+IMPORTANT
+Do not delete the console-apps project or any of the work you performed in this section. It will be used in the next section.
+
+This concludes the section.
+
+

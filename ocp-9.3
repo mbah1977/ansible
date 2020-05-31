@@ -1,0 +1,136 @@
+Examining Cluster Metrics
+Objectives
+After completing this section, you should be able to examine the metrics page and dashboard within the web console.
+
+Viewing Cluster Metrics
+The OpenShift web console incorporates useful graphs to visualize cluster and resource analytics. The Home → Dashboard page, which displays a collection of cluster-wide metrics, provides a high-level view of the overall health of the cluster.
+
+The dashboard includes the following metrics:
+
+Current cluster capacity based on CPU, memory, storage, and network usage.
+
+A time-series graph of total CPU, memory, and disk utilization.
+
+A list of top consuming nodes and pods by CPU, memory, or storage.
+
+
+The Top Consumers page can be useful for identifying problematic pods or nodes. For example, a pod with an unexpected memory leak may appear on the top of the list.
+
+Viewing Project Metrics
+The Project Details page displays metrics that provide an overview of the resources used within the scope of a specific project. The Resource Usage page displays CPU and memory usage along with a top ten list of memory usage by pod.
+
+
+All metrics are pulled from Prometheus. Click any graph to navigate to the Prometheus UI, view the executed query, and inspect the data further.
+
+If a resource quota is created for the project, the current project request and limits appear on the Project Details page.
+
+Viewing Resource Metrics
+When troubleshooting, it is often useful to view metrics at a smaller granularity than the entire cluster or whole project. The Pod Details page displays time-series graphs of the CPU, memory, and file system usage for a specific pod.
+
+A sudden change in these critical metrics, such as a CPU spike caused by high load, will be visible on this page.
+
+
+Figure 9.20: Time-series graphs showing various metrics for a pod.
+Performing Prometheus Queries in the Web Console
+The Prometheus UI is a feature-rich tool for visualizing metrics and configuring alerts. The OpenShift web console provides an interface for executing Prometheus queries directly from the web console.
+
+To perform a query, navigate to the Monitoring → Metrics page, enter a Prometheus Query Language expression in the text field, and click Run Queries. The results of the query display as a time-series graph.
+
+
+Figure 9.21: Using a Prometheus query to display a time-series graph.
+NOTE
+The Prometheus Query Language is not discussed in detail in this course. See the references below for a link to the official documentation.
+
+ 
+REFERENCES
+For more information, refer to the Red Hat OpenShift Container Platform 4.2 Monitoring guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/monitoring/index
+
+Querying Prometheus
+
+
+Guided Exercise: Examining Cluster Metrics
+In this exercise, you will examine the metrics page and dashboard within the web console.
+
+Outcomes
+
+You should be able to use the Red Hat OpenShift web console to:
+
+View cluster, project, pod, and node metrics.
+
+Identify a pod consuming large amounts of memory or CPU.
+
+On the workstation machine, use the lab command to prepare your system for this exercise.
+
+This command ensures that the cluster API is reachable and creates the resources required for this exercise.
+
+[student@workstation ~]$ lab console-metrics start
+Open a web browser and navigate to the OpenShift web console. Log in as the admin localuser.
+
+NOTE
+Locating and accessing the OpenShift web console is discussed in detail in the section called “Guided Exercise: Performing Cluster Administration”.
+
+In this guided exercise, you will see how changes in load are displayed in the web console. Start by observing baseline healthy metrics on the Dashboard, Pod Details, and Project Details pages.
+
+Click Home → Dashboards to display the Dashboards Overview page. Notice the Cluster Capacity page, which displays the total available CPU, memory, storage, and network across the entire cluster. Scroll down to the Cluster Utilization section, which displays a time-series historical graph of the cluster's CPU, memory, and disk usage.
+
+In the Top Consumers pane select By Memory from the metrics list at the top. The pane will refresh its list of top consumers and display the pods consuming the most memory in the cluster.
+
+Click the top pod in the Pods by Memory consumption list to display the Pod Details page. Notice the Memory Usage, CPU Usage, and Filesystem time-series historical graphs at the top of the page.
+
+Click Home → Projects and then click console-apps to display the console-apps Project Details page.
+
+Notice the quota resource quota section, which displays the current CPU and memory usage compared to the allotted quota. The workloads are running safely within their limits.
+
+Scroll down to the Resource Usage section, which displays the metrics for the workloads running in the console-apps project.
+
+
+Figure 9.22: Time-series graphs showing CPU and memory usage for the selected project.
+Find and review the baseline health metrics of a compute node.
+
+Click Compute → Nodes, then click any of the nodes in the list.
+
+On the Node Overview page, notice the time-series graphs that display the metrics for the individual node that you selected.
+
+
+Figure 9.23: Time-series graphs showing various metrics for a node.
+On workstation, execute the load.sh script to generate load on the example books deployment. The application intentionally contains a memory leak that consumes multiple megabytes of RAM with every request to its /leak path.
+
+In a terminal on the workstation machine, run the following command.
+
+[student@workstation ~]$ ~/DO280/labs/console-metrics/load.sh
+In the OpenShift web console, observe the change in metrics and identify the problematic pod. The data displayed in the web console automatically refreshes, so there is no need to reload the page.
+
+Click Home → Projects and then click console-apps to display the console-apps Project Details page. Watch the Memory Usage time-series graph and the Memory Usage by Pod (Top 10) monitor for changes.
+
+The memory leak may take a minute or two before it is significant enough to be visible.
+
+
+Figure 9.24: Resource usage graphs indicating a possible memory leak.
+Click Home → Dashboards to display the Dashboards Overview page. The memory consumed by the load test may be too small to notice across a large cluster, but the Top Consumers section provides a convenient list of pods using the most CPU or memory. Locate the Top Consumers section and select By Memory to display the Pods by Memory consumption list.
+
+The books pod appears at the top of the list. If its not on the list, you may need to wait a minute longer for the load script to complete.
+
+Click the books pod link in the Top Consumers section to navigate to the Pod Details page. Notice the climbing memory leak visible in the Memory Usage time-series graph.
+
+
+Click Monitoring → Alerting to display the web console Alerting page. Observe the increased CPU alert caused by the high traffic load and low CPU limit.
+
+
+Click Monitoring → Metrics to display the web console Metrics page. Type the following Prometheus query in the expression input field:
+
+avg(container_memory_working_set_bytes{namespace='console-apps'}) BY (pod)
+Click Run Queries to view the results in the OpenShift web console.
+
+
+Delete the console-apps project and stop the load test.
+
+Click Home → Projects and then click Delete Project in the menu at the end of the console-apps row.
+
+
+In the Delete Project dialog box, type console-apps and then click Delete.
+
+If load.sh is still running on the workstation terminal, press Ctrl+C in the terminal to stop the load test.
+
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
