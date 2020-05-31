@@ -1,0 +1,262 @@
+Automatically Scaling an OpenShift Cluster
+Objectives
+After completing this section, you should be able to define parameters to control the size of a cluster automatically.
+
+Automatically Scaling a Cluster
+As discussed in the section the section called “Manually Scaling an OpenShift Cluster”, the Machine API provides several resources for managing the workloads of your cluster. You can scale your cluster resources in two ways: manually and automatically.
+
+Manual scaling requires updating the number of replicas in a machine set. Automatic scaling of a cluster involves using two custom resources: MachineAutoscaler and ClusterAutoscaler.
+
+A MachineAutoscaler resource automatically scales the number of replicas in a machine set, depending on the load. This API resource interacts with the machine sets and instructs them to add more worker nodes to the cluster. The resource supports the definition of lower and upper boundaries. The ClusterAutoscaler enforces limits for the whole cluster, such as the total number of nodes. For example, MaxNodesTotal sets the maximum number of cores in the whole cluster, and MaxMemoryTotal sets the maximum memory in the whole cluster.
+
+Each OpenShift cluster can only have one ClusterAutoscaler resource. The ClusterAutoscaler resource operates at a higher level and defines the maximum number of nodes and other resources, such as cores, memory, and Graphical Processing Units (GPUs). This prevents the MachineAutoscaler resources from scaling out in an uncontrolled manner.
+
+NOTE
+You must define a ClusterAutoscaler resource for your cluster, otherwise, automatic scaling does not work.
+
+The following excerpt describes a ClusterAutoscaler resource:
+
+apiVersion: "autoscaling.openshift.io/v1"
+kind: "ClusterAutoscaler"
+metadata:
+  name: "default"
+spec:
+  podPriorityThreshold: -10
+  resourceLimits:
+    maxNodesTotal: 6
+scaleDown:
+    enabled: true
+    delayAfterAdd: 3m
+    unneededTime: 3m
+Use a MachineAutoscaler resource to scale the number of machines defined by a MachineSet resource. Scaling only works if you defined a ClusterAutoscaler, and adding a new machine does not exceed any of the values defined by the ClusterAutoscaler resource. For example, adding one m4.xlarge machine from AWS adds one node, 4 CPU cores, and 16 GB of memory. On its own, a MachineAutoscaler does not scale the cluster in or out unless cluster autoscaling is allowed.
+
+The following diagram shows how the MachineAutoscaler resource interacts with machine sets, which scale worker nodes in and out.
+
+If the MachineAutoscaler resource must scale, then it checks to see if a ClusterAutoscaler resource exists. If it does not, then no scaling occurs.
+
+If a ClusterAutoscaler resource does exist, then the MachineAutoscaler resource evaluates whether adding the new machine violates any of the limits defined in the ClusterAutoscaler.
+
+Provided the request does not exceeds the limits, a new machine is created.
+
+When the new machine is ready, OpenShift schedules pods to it as a new node.
+
+Properties such as minReplicas and maxReplicas define the lower and upper boundaries of automatic scaling.
+
+
+Figure 7.2: Dynamic scaling with full-stack automation
+NOTE
+There is a one to one mapping between a MachineAutoscaler and a MachineSet resource. This mapping allows each MachineAutoscaler resource to manage its own machine set.
+
+NOTE
+In a default full-stack automation deployment, each MachineSet resource maps to an availability zone, but this design is arbitrary. For example, you can use a MachineSet resource to separate workers based on their disk speeds.
+
+Implementing Automatic Scaling
+For successful automatic scaling, the following are required:
+
+A cluster deployed in full-stack automation, because automatic scaling must interact with a cloud service when adding or removing workers.
+
+A ClusterAutoscaler resource, if the infrastructure supports it. Additionally, the ClusterAutoscaler resource might limit the maximum number of nodes, and define a minimum and maximum values for cores, memory, and GPUs. The enabled: true entry in the scaleDown section of the ClusterAutoscaler resource authorizes the cluster to automatically scale in the number of machines when they are not used.
+
+At least one MachineAutoscaler resource. Each MachineAutoscaler resource defines a minimum and a maximum number of replicas for a specific machine set.
+
+apiVersion: "autoscaling.openshift.io/v1beta1"
+kind: "MachineAutoscaler"
+metadata:
+  name: "scale-automatic"
+  namespace: "openshift-machine-api"
+spec:
+  minReplicas: 1
+  maxReplicas: 2
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1 kind: MachineSet
+    name: MACHINE-SET-NAME
+After creating these resources, if the cluster cannot manage a load, then the automatic addition of worker nodes is triggered.
+
+The ClusterAutoscaler resource scales out the number of workers when pods fail to schedule on any of the current nodes due to insufficient resources, or when another node is necessary to meet deployment needs.
+
+IMPORTANT
+OpenShift does not increase the cluster resources beyond the limits that you specify in the ClusterAutoscaler resource.
+
+ 
+REFERENCES
+For more information on the cluster automatic scaler, refer to the Applying Autoscaling to an OpenShift Container Platform Cluster chapter in the Red Hat OpenShift Container Platform 4.2 Official Machine Management Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/machine_management/index#applying-autoscaling
+
+Scaling an OpenShift 4 Cluster
+
+
+
+Guided Exercise: Automatically Scaling an OpenShift Cluster
+In this exercise, you will automatically scale a machine set to increase its computing capacity based on current loads.
+
+Outcomes
+
+You should be able to use the OpenShift command-line interface to:
+
+Create a ClusterAutoscaler resource.
+
+Create a MachineAutoscaler resource.
+
+On the workstation machine, use the lab command to prepare your system for this exercise.
+
+The command ensures that the cluster API is reachable and creates the files needed for this exercise.
+
+[student@workstation ~]$ lab scale-automatic start
+As the admin user, create a ClusterAutoscaler resource that allows your cluster to scale out to six nodes. Your cluster should also be able to scale in.
+
+Source the classroom variables file.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Modify the sample cluster autoscaler resource file at /home/student/DO280/labs/scale-automatic/clusterautoscaler.yaml.
+
+[student@workstation ~]$ vim ~/DO280/labs/scale-automatic/clusterautoscaler.yaml
+Ensure the file matches the highlighted lines before saving the file.
+
+apiVersion: "autoscaling.openshift.io/v1"
+kind: "ClusterAutoscaler"
+metadata:
+  name: "default"
+spec:
+  podPriorityThreshold: -10
+  resourceLimits:
+    maxNodesTotal: 6
+  scaleDown:
+    enabled: true
+    delayAfterAdd: 3m
+    unneededTime: 3m
+Use the modified resource file to create the cluster autoscaler.
+
+[student@workstation ~]$ oc create --save-config \
+>    -f ~/DO280/labs/scale-automatic/clusterautoscaler.yaml
+clusterautoscaler.autoscaling.openshift.io/default created
+Create a MachineAutoscaler resource for the first machine set in the openshift-machine-api namespace, so that the machine set can scale out to three nodes.
+
+Identify the machine sets available in your environment. The machine autoscaler must use the name of an existing machine set.
+
+[student@workstation ~]$ oc get machinesets -n openshift-machine-api
+NAME                          DESIRED   CURRENT   READY   AVAILABLE   ...
+ocp-qz7hf-worker-us-west-1b   2         2         2       2           ...
+Modify the sample machine autoscaler resource file at /home/student/DO280/labs/scale-automatic/machineautoscaler.yaml.
+
+[student@workstation ~]$ vim ~/DO280/labs/scale-automatic/machineautoscaler.yaml
+Increase maxReplicas to a value of 3. Replace the highlighted instance of MACHINE-SET-NAME with the name of the first machine set identified in the preceding step.
+
+apiVersion: "autoscaling.openshift.io/v1beta1"
+kind: "MachineAutoscaler"
+metadata:
+  name: "scale-automatic"
+  namespace: "openshift-machine-api"
+spec:
+  minReplicas: 1
+  maxReplicas: 3
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: MACHINE-SET-NAME
+Use the modified resource file to create the machine autoscaler.
+
+[student@workstation ~]$ oc create --save-config \
+>    -f ~/DO280/labs/scale-automatic/machineautoscaler.yaml \
+>    -n openshift-machine-api
+machineautoscaler.autoscaling.openshift.io/scale-automatic created
+As the developer user, create the scale-automatic project, and then create a new deployment in the project.
+
+Log in to your OpenShift cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Create the scale-automatic project.
+
+[student@workstation ~]$ oc new-project scale-automatic
+Now using project "scale-automatic" on server
+   "https://api.cluster.domain.example.com:6443".
+Create the loadtest deployment, service, and route using the resource file located at /home/student/DO280/labs/scale-automatic/loadtest.yaml.
+
+[student@workstation ~]$ oc create --save-config \
+>    -f ~/DO280/labs/scale-automatic/loadtest.yaml
+deployment.apps/loadtest created
+service/loadtest created
+route.route.openshift.io/loadtest created
+NOTE
+The loadtest deployment requests 1500 millicores of CPU per container so that only one pod can fit on each worker node.
+
+Switch back to the admin user, and then trigger the machine autoscaler by manually scaling the loadtest deployment.
+
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Scale the loadtest deployment to three replica pods in the scale-automatic project.
+
+[student@workstation ~]$ oc scale --replicas 3 deployment/loadtest \
+>    -n scale-automatic
+deployment.extensions/loadtest scaled
+Use the watch command to continuously monitor the output of oc get pods -o wide in the scale-automatic namespace. One or two application pods might be running, but at least one application pod is pending because the cluster does not have enough resources to schedule it. Leave the watch command running in the terminal window.
+
+[student@workstation ~]$ watch oc get pods -o wide -n scale-automatic
+Every 2.0s: oc get pods -o wide -n scale-automatic                         ...
+
+NAME                      ... STATUS  ... NODE
+loadtest-6b9c55876f-6xd9f ... Pending ... <node>                           ...
+loadtest-6b9c55876f-spvd8 ... Running ... node1.us-west-1.compute.internal ...
+loadtest-6b9c55876f-wt6jz ... Running ... node2.us-west-1.compute.internal ...
+NOTE
+Although it can take five minutes or more to create the new node, the new machine is created almost immediately. Run the oc get machines -n openshift-machine-api command to verify that you see a total of six machines. If not, confirm that you correctly configured the ClusterAutoscaler and MachineAutoscaler resources.
+
+In a new terminal window, use the watch command to continuously monitor the output of oc get nodes -l node-role.kubernetes.io/worker. Press Ctrl+c to exit the watch command; after the three worker nodes have a status of Ready, close the terminal window.
+
+[student@workstation ~]$ watch oc get nodes -l node-role.kubernetes.io/worker
+Every 2.0s: oc get nodes -l node-role.kubernetes.io/worker                 ...
+
+NAME                               STATUS   ROLES    ...
+node1.us-west-1.compute.internal   Ready    worker   ...
+node3.us-west-1.compute.internal   Ready    worker   ...
+node2.us-west-1.compute.internal   Ready    worker   ...
+When the new worker node is ready, the pending pod will move to a status of ContainerCreating and then to a status of Running. If additional application pods are pending, they will remain pending as the cluster has reached its maximum defined node limit. The initial terminal window should still be running the watch command to display the output of oc get pods -o wide -n scale-automatic. Verify that the previously pending application pod has a status of Running, and then press Ctrl+c to exit the watch command.
+
+Every 2.0s: oc get pods -o wide -n scale-automatic                         ...
+
+NAME                      ... STATUS  ... NODE
+loadtest-6b9c55876f-6xd9f ... Running ... node3.us-west-1.compute.internal ...
+loadtest-6b9c55876f-spvd8 ... Running ... node1.us-west-1.compute.internal ...
+loadtest-6b9c55876f-wt6jz ... Running ... node2.us-west-1.compute.internal ...
+Clean up the lab environment by deleting the scale-automatic project, the cluster autoscaler, and the machine autoscaler. Scale the machine set back down to two machines.
+
+Delete the scale-automatic project.
+
+[student@workstation ~]$ oc delete project scale-automatic
+project.project.openshift.io "scale-automatic" deleted
+Delete the default cluster autoscaler.
+
+[student@workstation ~]$ oc delete clusterautoscaler default
+clusterautoscaler.autoscaling.openshift.io "default" deleted
+Delete the scale-automatic machine autoscaler in the openshift-machine-api namespace.
+
+[student@workstation ~]$ oc delete machineautoscaler scale-automatic \
+>    -n openshift-machine-api
+machineautoscaler.autoscaling.openshift.io "scale-automatic" deleted
+Identify the machine set in the openshift-machine-api namespace that has three machines.
+
+[student@workstation ~]$ oc get machinesets -n openshift-machine-api
+NAME                          DESIRED   CURRENT   READY   AVAILABLE   ...
+ocp-qz7hf-worker-us-west-1b   3         3         3       3           ...
+Manually scale the machine set back to two machines.
+
+[student@workstation ~]$ oc scale machineset ocp-qz7hf-worker-us-west-1b \
+>    --replicas 2 -n openshift-machine-api
+machineset.machine.openshift.io/ocp-qz7hf-worker-us-west-1b scaled
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab scale-automatic finish
+This concludes the guided exercise.
+
+

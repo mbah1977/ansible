@@ -1,0 +1,386 @@
+Chapter 7. Scaling an OpenShift Cluster
+Manually Scaling an OpenShift Cluster
+Guided Exercise: Manually Scaling an OpenShift Cluster
+Automatically Scaling an OpenShift Cluster
+Guided Exercise: Automatically Scaling an OpenShift Cluster
+Summary
+Abstract
+
+Goal	Control the size of an OpenShift cluster.
+Objectives	
+Issue commands to control the number of workers in a cluster.
+
+Define parameters to automatically control the size of a cluster.
+
+Sections	
+Manually Scaling an OpenShift Cluster (and Guided Exercise)
+
+Automatically Scaling an OpenShift Cluster (and Guided Exercise)
+
+Manually Scaling an OpenShift Cluster
+Objectives
+After completing this section, you should be able to issue commands to control the number of workers in a cluster.
+
+Introducing the Machine API
+OpenShift Container Platform can scale the cluster in and out by adding or removing workers through the Machine API. The scaling capabilities allow the cluster to provide enough computing power for your applications. The process can be either manual or automatic, depending on your needs.
+
+The following diagram shows the Machine API (running as an operator) and the API resources that it manages. The operator provides a variety of controllers that interact with the cluster resources, such as the MachineSet controller, which describes a group of worker nodes.
+
+NOTE
+The API resources for automatic scaling (ClusterAutoscaler and MachineAutoscaler) are not managed by the Machine API operator. The Cluster Autoscaler operator manages these two resources.
+
+
+Figure 7.1: The Machine API operator
+The Machine API provides the following custom resources:
+
+Machines are the fundamental compute unit in a cluster. Each Machine resource correlates to a physical or virtual node.
+
+The following example shows the various values for a worker node. Notice the placement, the AMI, and the block storage configuration.
+
+apiVersion: machine.openshift.io/v1beta1
+kind: Machine
+metadata:
+  generateName: ocp-demo-xxyy-worker-us-west-2b-
+  name: ocp-demo-xxyy-worker-us-west-2b-rcm72
+  uid: 9e4e1744-0d42-11ea-9a46-025ef26e9de6
+  ...
+  labels:
+    machine.openshift.io/cluster-api-machine-type: worker
+    ...
+    machine.openshift.io/instance-type: m4.xlarge
+    machine.openshift.io/region: us-west-2
+    machine.openshift.io/zone: us-west-2b
+spec:
+  providerID: 'aws:///us-west-2b/i-0c537ed8c82ea894d'
+  providerSpec:
+    value:
+    ...
+      placement:
+        availabilityZone: us-west-2b
+        region: us-west-2
+      credentialsSecret:
+        name: aws-cloud-credentials
+      instanceType: m4.xlarge
+      blockDevices:
+        - ebs:
+            iops: 0
+            volumeSize: 120
+            volumeType: gp2
+      securityGroups:
+        - filters:
+            - name: 'tag:Name'
+              values:
+                - ocp-demo-xxyy-worker-sg
+      deviceIndex: 0
+      ami:
+        id: ami-08e10b201e19fd5e7
+MachineSets describe a group of hosts. MachineSets are to machines what ReplicaSets are to pods. You can scale in and out the number of replicas (machines) specified by this resource.
+
+In a default installation, each worker has its own machine set, excluding the master nodes. By default, OpenShift creates one machine set per availability zone when the cluster is running in AWS. Use a machine set to customize your cluster topology, for example, if you need to define a set per region.
+
+NOTE
+Like ReplicaSets, MachineSets use labels to determine their members.
+
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: ocp-demo-xxyy-worker-us-west-2b
+...
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: ocp-demo-rnh2q
+      machine.openshift.io/cluster-api-machineset: ocp-demo-xxyy-worker-us-west-2b
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        machine.openshift.io/cluster-api-cluster: ocp-demo-xxyy
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: ocp-demo-xxyy-worker-us-west-2b
+    spec:
+      metadata:
+        creationTimestamp: null
+      providerSpec:
+      ...
+          placement:
+            availabilityZone: us-west-2b
+            region: us-west-2
+          credentialsSecret:
+            name: aws-cloud-credentials
+          instanceType: m4.xlarge
+          metadata:
+            creationTimestamp: null
+          publicIp: null
+ ...
+MachineAutoscaler and ClusterAutoscaler are used to automatically scale resources in a cloud deployment. Automatic scaling also ensures that if a worker node becomes unresponsive, then pods are quickly evacuated to another worker node for improved availability. Scaling is useful when the cluster is under stress, or for workloads whose computing requirements change.
+
+This resource allows you to scale a variety of components, such as nodes, cores, and memory.
+
+NOTE
+See About the Cluster Autoscaler link in the references section for more information on how to use these resources.
+
+NOTE
+The next section discusses the Cluster Autoscaler resource.
+
+apiVersion: "autoscaling.openshift.io/v1"
+kind: "ClusterAutoscaler"
+metadata:
+  name: "default"
+spec:
+  resourceLimits:
+    maxNodesTotal: 20
+  scaleDown:
+    enabled: true
+    delayAfterAdd: 10s
+    delayAfterDelete: 10s
+    delayAfterFailure: 10s
+MachineHealthCheck verifies the health of a machine (such as a worker node) and takes action if the resource is unhealthy.
+
+NOTE
+In OpenShift Container Platform version 4.2, MachineHealthChecks is a technology preview feature.
+
+Manually Scaling Worker Nodes
+As mentioned, scaling a cluster can be done in two ways: manually and automatically. The availability of automatic scaling depends on the provider and is supported by the Full-Stack Automation mode (IPI). Reasons to scale a cluster include minimizing resources congestion and better management of resources, such as dedicating a set of nodes to a particular workload.
+
+Like deployments and deployment configurations, you change the number of instances by adjusting the replicas specified by the MachineSet resource.
+
+[user@demo ~]$ oc scale --replicas=2 \
+>    machineset MACHINE-SET -n openshift-machine-api
+If the number of workers in the availability zone does not match the replica count, OpenShift spawns news workers until the number of worker matches the replica count.
+
+NOTE
+Aside from scaling, changes to a machine set do not affect existing machines. New machines inherit changes made to a machine set, such as new or updated labels.
+
+Scaling down is straightforward. Scaling down the machine set instructs the scheduler to evacuate the pods running on machines in the machine set.
+
+Scaling down only works if the remaining nodes have enough capacity to run the pods. If there are not enough resources, the controller refuses to scale in.
+
+ 
+REFERENCES
+About the Cluster Autoscaler
+
+Scaling an OpenShift 4 Cluster
+
+Guided Exercise: Manually Scaling an OpenShift Cluster
+In this exercise, you manually scale a machine set to increase the computing capacity of the cluster and to ensure that new nodes are created with a specific label.
+
+Outcomes
+
+You should be able to use the OpenShift command-line interface to:
+
+Label an existing worker node.
+
+Configure a machine set to add a node label to a new worker node.
+
+Manually scale the replica count for a machine set.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+The command ensures that the cluster API is reachable.
+
+[student@workstation ~]$ lab scale-manual start
+As the admin user, modify a machine set to use the env=prod node label.
+
+Source the classroom variables file.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Identify the available machine sets in your cluster.
+
+[student@workstation ~]$ oc get machinesets -n openshift-machine-api
+NAME                          DESIRED   CURRENT   READY   AVAILABLE   ...
+ocp-qz7hf-worker-us-west-1b   2         2         2       2           ...
+Edit the first machine set listed so that new machines created from it (and the new worker node associated with the new machine) will have the env=prod label.
+
+[student@workstation ~]$ oc edit machineset ocp-qz7hf-worker-us-west-1b \
+>    -n openshift-machine-api
+Add the highlighted lines below to the machine set configuration. Ensure that the file has the correct indentation, using spaces instead of tabs, before saving your changes.
+
+...output omitted...
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: ocp-qz7hf
+      machine.openshift.io/cluster-api-machineset: ocp-qz7hf-worker-us-west-1b
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        machine.openshift.io/cluster-api-cluster: ocp-qz7hf
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: ocp-qz7hf-worker-us-west-1b
+    spec:
+      metadata:
+        creationTimestamp: null
+        labels:
+          env: prod
+...output omitted...
+IMPORTANT
+In a real-world scenario, you would add the env=prod node label to more than one machine set. Adding the node label to only one machine set effectively limits pod deployments to one availability zone.
+
+Scale the modified machine set so that it has three replica machines. Ensure existing nodes associated with the modified machine set have the env=prod label.
+
+Scale the machine set modified in the previous step so that it contains three machines.
+
+[student@workstation ~]$ oc scale machineset ocp-qz7hf-worker-us-west-1b \
+>    --replicas 3 -n openshift-machine-api
+machineset.machine.openshift.io/ocp-qz7hf-worker-us-west-1b scaled
+NOTE
+It can take 5 minutes or more before the new node created from the new machine has a status of running. You can safely continue with the lab.
+
+Identify the machines and nodes associated with the machine set that you modified in the previous step. The name of each machine includes the name of the machine set from which it was generated. The new machine does not initially have a node associated with it.
+
+[student@workstation ~]$ oc get machines -n openshift-machine-api -o wide \
+>    -l machine.openshift.io/cluster-api-machine-role=worker
+NAME                               ...  NODE                              ...
+ocp-qz7hf-worker-us-west-1b-5x98x  ...                                    ...
+ocp-qz7hf-worker-us-west-1b-rvx6w  ...  node1.us-west-1.compute.internal  ...
+ocp-qz7hf-worker-us-west-1b-v4n4n  ...  node2.us-west-1.compute.internal  ...
+Add the env=prod label to the first node associated with the older machines. Remember that machine names include the name of the machine set from which they were generated. The node associated with the new machine already has the env=prod label.
+
+[student@workstation ~]$ oc label node node1.us-west-1.compute.internal env=prod
+node/node.us-west-1.compute.internal labeled
+Verify that the env=prod label is set correctly. The new node might not yet exist.
+
+[student@workstation ~]$ oc get nodes -l node-role.kubernetes.io/worker -L env
+NAME                              STATUS  ROLES   ...  ENV
+node1.us-west-1.compute.internal  Ready   worker  ...  prod
+node2.us-west-1.compute.internal  Ready   worker  ...
+Create a project named scale-manual that deploys pods to nodes labeled with env=prod. Allow the developer user to create new applications within this new project.
+
+Create the scale-manual project using env=prod as a node selector.
+
+[student@workstation ~]$ oc adm new-project scale-manual --node-selector env=prod
+Created project scale-manual
+Assign the edit role to the developer user on the scale-manual project.
+
+[student@workstation ~]$ oc adm policy add-role-to-user edit developer \
+>    -n scale-manual
+clusterrole.rbac.authorization.k8s.io/edit added: "developer"
+As the developer user, deploy a new application in the scale-manual project and then scale the deployment to six pods.
+
+Log in to your OpenShift cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Ensure that you are using the scale-manual project.
+
+[student@workstation ~]$ oc project scale-manual
+Now using project "scale-manual" on server
+   "https://api.cluster.domain.example.com:6443".
+Create a new deployment named manual using the container image located at quay.io/redhattraining/hello-world-nginx:v1.0.
+
+[student@workstation ~]$ oc create deployment manual \
+>    --image quay.io/redhattraining/hello-world-nginx:v1.0
+deployment.apps/manual created
+Scale the deployment so that it has 6 application pods.
+
+[student@workstation ~]$ oc scale --replicas 6 deployment/manual
+deployment.extensions/manual scaled
+Verify that the application pods are placed on two nodes. You might need to run the oc get command multiple times before all of the application pods are running.
+
+[student@workstation ~]$ oc get pods -o wide
+NAME                    ...  STATUS   ...  NODE                              ...
+manual-9d86c4687-895mm  ...  Running  ...  node3.us-west-1.compute.internal  ...
+manual-9d86c4687-pd5sc  ...  Running  ...  node3.us-west-1.compute.internal  ...
+manual-9d86c4687-rhwmj  ...  Running  ...  node3.us-west-1.compute.internal  ...
+manual-9d86c4687-wqpn7  ...  Running  ...  node3.us-west-1.compute.internal  ...
+manual-9d86c4687-x5h5f  ...  Running  ...  node1.us-west-1.compute.internal  ...
+manual-9d86c4687-zrlr9  ...  Running  ...  node3.us-west-1.compute.internal  ...
+NOTE
+The default scheduler might not distribute the pods evenly. Because the new node likely has more free resources available, it might have more application pods scheduled.
+
+As the admin user, verify that the new node automatically received the env=prod label and that it has application pods running.
+
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Verify that the newly added worker node has the env=prod label.
+
+[student@workstation ~]$ oc get nodes -l node-role.kubernetes.io/worker -L env
+NAME                               STATUS   ROLES    ...   ENV
+node1.us-west-1.compute.internal   Ready    worker   ...   prod
+node3.us-west-1.compute.internal   Ready    worker   ...   prod
+node2.us-west-1.compute.internal   Ready    worker   ...
+Use the oc describe command to view details about the new worker node. Based on the output of the previous command, use the node with the smallest value for age. The age of the new node displays a unit of minutes (m), as compared to the other nodes that display age with a unit of days (d) or hours (h).
+
+[student@workstation ~]$ oc describe node node3.us-west-1.compute.internal
+...output omitted...
+Capacity:
+ attachable-volumes-aws-ebs:  39
+ cpu:                         4
+ hugepages-1Gi:               0
+ hugepages-2Mi:               0
+ memory:                      16419376Ki
+ pods:                        250
+...output omitted...
+Non-terminated Pods:                      (14 in total)
+  Namespace                               Name
+  ---------                               ----
+  openshift-cluster-node-tuning-operator  tuned-2cmnx
+  openshift-dns                           dns-default-8bxsm
+  openshift-image-registry                node-ca-s86rf
+  openshift-machine-config-operator       machine-config-daemon-dj2vg
+  openshift-marketplace                   certified-operators-7494d79f45-xsc9h
+  openshift-monitoring                    node-exporter-cmd76
+  openshift-multus                        multus-rlh22
+  openshift-sdn                           ovs-gc5jm
+  openshift-sdn                           sdn-w9pv8
+  scale-manual                            manual-9d86c4687-895mm
+  scale-manual                            manual-9d86c4687-pd5sc
+  scale-manual                            manual-9d86c4687-rhwmj
+  scale-manual                            manual-9d86c4687-wqpn7
+  scale-manual                            manual-9d86c4687-zrlr9
+...output omitted...
+The new worker node increased cluster capacity by 4 CPUs and about 16GB of memory. In addition to application pods from the manual deployment, various daemon sets have also placed pods on the new worker node.
+
+Clean up the resources used in this exercise.
+
+Delete the scale-manual project.
+
+[student@workstation ~]$ oc delete project scale-manual
+project.project.openshift.io "scale-manual" deleted
+Use the oc get command to identify the machine set with three worker nodes, and then use the oc scale command to scale it back down to two worker nodes.
+
+[student@workstation ~]$ oc get machinesets -n openshift-machine-api
+NAME                          DESIRED   CURRENT   READY   AVAILABLE  ...
+ocp-qz7hf-worker-us-west-1b   3         3         3       3          ...
+[student@workstation ~]$ oc scale machineset ocp-qz7hf-worker-us-west-1b \
+>    --replicas 2 -n openshift-machine-api
+machineset.machine.openshift.io/ocp-qz7hf-worker-us-west-1b scaled
+Remove the env=prod node label from the modified machine set.
+
+[student@workstation ~]$ oc edit machineset ocp-qz7hf-worker-us-west-1b \
+>    -n openshift-machine-api
+Remove the lines in bold, and then save your changes.
+
+...output omitted...
+    spec:
+      metadata:
+        creationTimestamp: null
+        labels:
+          env: prod
+...output omitted...
+Remove the env label from any worker node where it is set.
+
+[student@workstation ~]$ oc label nodes -l env env-
+node/node1.us-west-1.compute.internal labeled
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab scale-manual finish
+This concludes the guided exercise.

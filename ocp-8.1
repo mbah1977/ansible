@@ -1,0 +1,228 @@
+
+Chapter 8. Performing Cluster Updates
+Describing the Cluster Update Process
+Quiz: Describing the Cluster Update Process
+Summary
+Abstract
+
+Goal	Describe how to perform a cluster update.
+Objectives	
+Describe the cluster update process.
+
+Sections	
+Describing the Cluster Update Process (and Quiz)
+
+Describing the Cluster Update Process
+Objectives
+After completing this section, you should be able to describe the cluster update process.
+
+Introducing Cluster Updates
+Red Hat OpenShift Container Platform 4 adds many new features by using Red Hat Enterprise Linux CoreOS. Red Hat released a new software distribution system that provides the best upgrade path to update your cluster and the underlying operating system. This new distribution system is one of the significant benefits of OpenShift 4 architectural changes, enabling clusters to upgrade Over-the-Air (OTA).
+
+This software distribution system for OTA manages the controller manifests, cluster roles, and any other resources necessary to update a cluster to a particular version.
+
+This feature ensures that a cluster runs the latest available version seamlessly. OTA also enables a cluster to use new features as they become available, including the latest bug fixes and security patches. OTA substantially decreases downtime due to upgrades.
+
+Red Hat hosts and manages this service at https://cloud.redhat.com, and hosts cluster images at https://quay.io.
+
+IMPORTANT
+As of OpenShift 4.2, the OTA system requires a persistent connection to the Internet. It is not possible to deploy this feature on-premise.
+
+For more information on how to update disconnected clusters, consult the Update guide and the Installation configuration chapter listed in the references section.
+
+OTA enables faster updates by allowing the skipping of intermediary versions. For example, you can update from 4.2.1 to 4.2.3, thus bypassing 4.2.2.
+
+You use a single interface (https://cloud.redhat.com) to manage the life cycle of all your OpenShift clusters.
+
+
+Figure 8.1: Managing clusters at cloud.redhat.com
+The service defines upgrade paths that correspond to cluster eligibility for certain updates.
+
+Update paths belong to upgrade channels. A channel can be visualized as a representation of the upgrade path. The channel controls the frequency and stability of updates. The OTA policy engine represents channels as a series of pointers to particular versions within the upgrade path.
+
+A channel name consists of three parts: the tier (release candidate, fast, and stable), the major version (4), and the minor version (.2). Example channel names include: candidate-4.2, fast-4.2, and stable-4.2. Each channel delivers patches, also called z-stream updates, for a given cluster version.
+
+Minor versions support the z-stream channel, such as 4.2.2, or 4.2.3. For instance, the fast-4.2 channel can deliver 4.2.1 and 4.2.2 updates but not 4.3.1.
+
+The following diagram shows two theoretical update graphs for alpha and beta channels.
+
+
+Figure 8.2: Update graphs for alpha and beta channels
+The beta channel offers updates up to version 1.1.1 of the software from the 1.0.0 version, however, minor updates that are more recent are not available in this channel (such as 1.2.0). You can think of this channel as a production channel, wherein cluster versions more recent than 1.1.1 have not been tested for production yet.
+
+The alpha channel offers several update paths, from 1.0.0 to 1.3.0, but also from 1.0.0 to 1.1.1 or 1.1.0. This release candidate channel allows the cluster to install the latest available updates (1.3.0), but also any intermediary version if needed.
+
+The following describes how these upgrade paths would apply to Red Hat OpenShift Container Platform version 4.2
+
+The beta channel would correspond to the stable-4.2 channel. You would be able to upgrade your cluster to 4.2.1 and 4.2.2; however, should an issue be discovered in the 4.2.3 release, you would not be able to upgrade to this channel. Later, if a patch gets available in the 4.2.4 release, you would be able to update your cluster to that version.
+
+This channel is suited for production environment as the releases in that channel are tested by Red Hat SREs and support services.
+
+The alpha channels would correspond to the candidate-4.2 channel. This channel allows you to install the latest features of OpenShift. With this channel, you can upgrade to all z-stream releases, such as 4.2.1, 4.2.2, 4.2.3, and so on.
+
+You use this channel to have access to the latest features of the product as they get released. This channel is suited for development and pre-production environments.
+
+
+Figure 8.3: Update graphs for stable and candidate channels
+The stable and fast channels are classified as General Availability (GA), whereas the candidate channel (release candidate channel) is not supported by Red Hat.
+
+To ensure the stability of the cluster and proper level of support, you cannot switch from a stable channel or fast channel to the candidate channel. However, you can switch from a stable channel to a fast one, and vice versa.
+
+Describing the Fast Channel
+The fast channel delivers updates as soon as they are available. This channel is best suited for pre-production and QA environments.
+
+NOTE
+Customers can help to improve OpenShift by joining the Red Hat connected customers program. If you join this program, then your cluster is registered to the fast channel.
+
+Discussing the Stable Channel
+The stable channel contains delayed updates.
+
+Red Hat support and site reliability engineering (SRE) teams monitor operational clusters with new fast updates. If operational clusters pass additional testing and validation, updates in the fast channel are enabled in the stable channel.
+
+If Red Hat observes operational issues from a fast channel update, then that update is skipped in the stable channel. The stable channel delay provides time to observe unforeseen problems in actual OpenShift clusters that testing did not reveal.
+
+The stable channel is better suited for production environments.
+
+NOTE
+The release of updates for patch and CVE fixes ranges from several hours to a day. This delay provides time to assess any operational impacts to OpenShift clusters.
+
+The stable channel delivers only minor updates for a given cluster version; for instance, the stable-4.2 channel delivers 4.2.1 and 4.2.2 updates, but not 4.3.1.
+
+To ensure the stability of your applications, configure a development cluster to use the fast channel, and a production cluster to use the stable channel. This can help you troubleshoot issues early.
+
+Describing OTA
+OTA follows a client-server approach. Red Hat hosts the cluster images and the update infrastructure. One feature of OTA is the generation of all possible update paths for your cluster. OTA gathers information about the cluster and your entitlement to determine the available upgrade paths.
+
+You are notified via the web console when a new update is available.
+
+The following diagram describes the updates architecture: Red Hat hosts both the cluster images and a "watcher", which automatically detects new images that are pushed to Quay. The Cluster Version Operator (CVO) receives its update status from that watcher. The CVO starts by updating the cluster components via their operators, and then updates any extra components that the Operator Lifecycle Manager (OLM) manages.
+
+
+Figure 8.4: OpenShift Container Platform Updates Architecture
+Telemetry allows Red Hat to determine the update path.
+
+The cluster uses Prometheus-based telemetry to report on the state of each cluster operator. The data is anonymized and sent back to Red Hat servers that advise cluster administrators about potential new releases.
+
+NOTE
+Red Hat values customer privacy. For a complete list of the data that Telemeter gathers, consult the Telemeter — Sample Metrics document listed in the references section.
+
+In the future, Red Hat intends to extend the list of updated operators that are included in the upgrade path to include independent software vendors (ISV) operators.
+
+
+Figure 8.5: Managing cluster updates using telemetry
+Discussing the Update Process
+Machine Config Operator
+The Machine Config Operator applies the desired machine state to each of the nodes. This component also handles the rolling upgrade of nodes in the cluster, and uses CoreOS Ignition as the configuration format.
+
+Operator Lifecycle Manager (OLM)
+The Operator Lifecycle Manager (OLM) orchestrates updates to any operators running in the cluster.
+
+Updating the Cluster
+You can update the cluster via the web console, or from the command-line. Updating via the web console is easier than using the command-line. The cluster administration page displays when a new update is available. From this page, click Update now to being the process.
+
+
+Figure 8.6: Updating the cluster using the web console
+IMPORTANT
+Red Hat does not support reverting your cluster to a previous version, or rollback. Red Hat only supports upgrading to a newer version.
+
+The update process also updates the underlying operating system when there are updates available. It uses the rpm-ostree technology for managing transactional upgrades. Updates are delivered via container images and are part of the OpenShift update process. When the update deploys, the nodes pull the new image, extract it, write the packages to the disk, and then modify the bootloader to boot into the new version. The machine reboots and implements a rolling update to ensure that the cluster capacity is minimally impacted.
+
+The following steps describe the procedure for updating a cluster as a cluster administrator using the command-line interface.
+
+Retrieve the cluster version.
+
+[user@demo ~]$ oc get clusterversion
+NAME      VERSION   AVAILABLE   PROGRESSING   SINCE ...
+version   4.2.2     True        False         47d   ...
+Review the current update channel information and confirm the channel. If you are running the cluster in production, then ensure that the channel reads stable.
+
+[user@demo ~]$ oc get clusterversion \
+>    -o json|jq ".items[0].spec"
+{
+  "channel": "stable-4.2",
+  "clusterID": "6ffeac7d-51a8-47e7-9a18-dba9fd46e26c",
+  "upstream": "https://api.openshift.com/api/upgrades_info/v1/graph"
+}
+View the available updates and note the version number of the update that you want to apply.
+
+[user@demo ~]$ oc adm upgrade
+Cluster version is 4.2.2
+
+Updates:
+
+VERSION IMAGE
+4.2.4   quay.io/openshift-release-dev/ocp-release@sha256:...
+4.2.7   quay.io/openshift-release-dev/ocp-release@sha256:...
+4.2.8   quay.io/openshift-release-dev/ocp-release@sha256:...
+4.2.9   quay.io/openshift-release-dev/ocp-release@sha256:...
+4.2.10  quay.io/openshift-release-dev/ocp-release@sha256:...
+4.2.12  quay.io/openshift-release-dev/ocp-release@sha256:...
+4.2.13  quay.io/openshift-release-dev/ocp-release@sha256:...
+Run the following command to install the latest available update for your cluster.
+
+[user@demo ~]$ oc adm upgrade --to-latest=true
+Run the following command to install a specific version. VERSION corresponds to one of the available versions that the oc adm upgrade command returns.
+
+[user@demo ~]$ oc adm upgrade --to=VERSION
+The previous command initializes the update process. Run the following command to review the status of the Cluster Version Operator (CVO). The version key now matches the version that you have selected.
+
+[user@demo ~]$ oc get clusterversion \
+>    -o json|jq ".items[0].spec"
+{
+  "channel": "stable-4.2",
+  "clusterID": "990f7ab8-109b-4c95-8480-2bd1deec55ff",
+  "desiredUpdate": {
+    "force": false,
+    "image": "quay.io/openshift-release-dev/ocp-release@sha256:...
+    "version": "4.2.13"
+  },
+  "upstream": "https://api.openshift.com/api/upgrades_info/v1/graph"
+}
+The following command allows you to review the cluster version status history to monitor the status of the update. It might take some time for all the objects to finish updating.
+
+The history contains a list of the most recent versions applied to the cluster. This value is updated when the CVO applies an update. The list is ordered by date, where the newest update is first in the list.
+
+Updates in the history have a state of Completed if the rollout completed. Otherwise, the update has a state of Partial if the update failed or did not complete.
+
+[user@demo ~]$ oc get clusterversion \
+>    -o json|jq ".items[0].status.history"
+[
+  {
+    "completionTime": "2019-11-22T16:22:43Z",
+    "image": "quay.io/openshift-release-dev/ocp-release@sha256:...
+    "startedTime": "2019-11-22T16:08:10Z",
+    "state": "Completed",
+    "verified": false,
+    "version": "4.2.13"
+  }
+]
+IMPORTANT
+If an upgrade fails, the operator stops and reports the status of the failing component. Rolling your cluster back to a previous version is not supported. If your upgrade fails, contact Red Hat support.
+
+After the update completes, you can confirm that the cluster version has updated to the new version.
+
+[user@demo ~]$ oc get clusterversion
+NAME      VERSION   AVAILABLE   PROGRESSING   SINCE   ...
+version   4.2.13     True        False         1d     ...
+ 
+REFERENCES
+For more information on Red Hat Enterprise Linux CoreOS (RHCOS), consult the Red Hat Enterprise Linux CoreOS (RHCOS) chapter at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/architecture/index#architecture-rhcos
+
+For more information about installing Red Hat OpenShift Container Platform in a disconnected environment, refer to the Installation configuration chapter in the Red Hat OpenShift Container Platform Installation guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/installing/index#installation-configuration
+
+For more information about updating clusters in disconnected environments, refer to the Red Hat OpenShift Container Platform Update guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/updating_clusters/index
+
+OpenShift Container Platform (OCP) 4 upgrade paths
+
+OpenShift 4.2 Upgrades phased roll out
+
+Telemeter — Sample Metrics
+
+Cincinnati update algorithm
+
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy
+Red Hat Training Policies
+Terms of Use
+All policies and guidelines
+
