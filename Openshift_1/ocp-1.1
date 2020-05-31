@@ -1,0 +1,96 @@
+Describing OpenShift Container Platform Features
+Objectives
+After completing this section, you should be able to describe the typical usage of the product and its features.
+
+Introducing OpenShift Container Platform
+Container orchestration is a fundamental enabler of digital transformation initiatives. However, as monolithic applications transition to containerized services, it can be tedious to manage these applications with legacy infrastructure. Red Hat OpenShift Container Platform (RHOCP) allows developers and IT organizations to better manage application life cycles.
+
+RHOCP is based on the Kubernetes open source project and extends the platform with features that bring a robust, flexible, and scalable container platform to customer data centers, enabling developers to run their workload in a high availability environment.
+
+A container orchestrator, such as OpenShift Container Platform, manages a cluster of servers that runs multiple containerized applications. The Red Hat OpenShift product family includes a set of solutions to improve the delivery of business applications in a variety of environments:
+
+Red Hat OpenShift Container Platform
+Provides an enterprise-ready Kubernetes environment for building, deploying, and managing container-based applications in any public or private data center, including bare metal servers. RHOCP is compatible with multiple cloud and virtualization providers, isolating application developers and administrators from differences between these providers. You decide when to update to newer releases and which additional components to enable.
+
+Red Hat OpenShift Dedicated
+Provides a managed OpenShift environment in a public cloud, such as Amazon Web Services (AWS) or Google Cloud Platform (GCP). This product provides all the features that RHOCP provides, however, Red Hat manages the cluster for you. You retain some control of decisions such as when to update to a newer release of OpenShift or to install add-on services.
+
+Red Hat OpenShift Online
+Provides a hosted, public container orchestration platform that offers an application development, build, deployment, and hosting solution in a cloud environment. The solution is shared across multiple customers, and Red Hat manages the cluster life cycle, which includes applying updates or integrating new features.
+
+Red Hat Code Ready Containers
+Provides a minimal installation of OpenShift that you can run on a laptop for local development and experimentation.
+
+Some cloud providers also provide offerings based on RHOCP, which add tight integration with other services from their platforms and which are supported by the provider in a partnership with Red Hat. One example is Microsoft Azure Red Hat OpenShift.
+
+The following figure describes the services and features of OpenShift:
+
+
+Figure 1.3: OpenShift services and features
+The Red Hat OpenShift product family integrates many components:
+
+The Red Hat Enterprise Linux CoreOS container-optimized, immutable operating system.
+
+The CRI-O engine, a small footprint, Open Container Initiative (OCI)-compliant container runtime engine with a reduced attack surface.
+
+Kubernetes, an open source container orchestration platform.
+
+A self-service web console.
+
+A number of preinstalled application services, such as an internal container image registry and monitoring framework.
+
+Certified container images for multiple programming language runtimes, databases, and other software packages.
+
+Introducing OpenShift Features
+OpenShift offers many features to automate, scale, and maintain your applications. All of these features are enabled by Kubernetes and most of them require additional components that you need to add and configure on a build-your-own (BYO) Kubernetes setup.
+
+High Availability
+Kubernetes has been designed with high availability in mind, for both internal components and user applications. A highly available etcd cluster stores the state of the OpenShift cluster and its applications.
+
+Resources stored in etcd, such as deployment configurations, provide automatic restarting of containers to ensure that your application is always running and that faulty containers are terminated. This applies not only to your applications, but also to containerized services that make up the cluster, such as the web console and the internal image registry.
+
+Lightweight Operating System
+RHOCP runs on Red Hat Enterprise Linux CoreOS, Red Hat's lightweight operating system that focuses on agility, portability, and security.
+
+Red Hat Enterprise Linux CoreOS (RHEL CoreOS) is an immutable operating system that is optimized for running containerized applications. The entire operating system is updated as a single image, instead of on a package-by-package basis, and both user applications and system components such as network services run as containers.
+
+RHOCP controls updates to RHEL CoreOS and its configurations, and so managing an OpenShift cluster includes managing the operating system on cluster nodes, freeing system administrators from these tasks and reducing the risk of human error.
+
+Load Balancing
+Clusters provide three types of load balancers: an external load balancer, which manages access to the OpenShift API; the HAProxy load balancer, for external access applications; and the internal load balancer, which uses Netfilter rules for internal access to applications and services.
+
+Route resources use HAProxy to manage external access to the cluster. Service resources use Netfilter rules to manage traffic from inside the cluster. The technology that external load balancers use is dependent on the cloud provider that runs your cluster.
+
+Automating Scaling
+OpenShift clusters can adapt to increased application traffic in real time by automatically starting new containers, and terminating containers when the load decreases. This features ensures that your application's access time remains optimal regardless of the number of concurrent connections or activity.
+
+OpenShift clusters can also add or remove more worker nodes from the cluster according to the aggregated load from many applications, keeping responsiveness and costs down on public and private clouds.
+
+Logging and Monitoring
+RHOCP ships with an advanced monitoring solution, based on Prometheus, which gathers hundreds of metrics about your cluster. This solution interacts with an alerting system that allows you to obtain detailed information about your cluster activity and health.
+
+RHOCP ships with an advanced aggregated logging solution, based on Elasticsearch, which allows long-term retention of logs from cluster nodes and containers.
+
+Services Discovery
+RHOCP runs an internal DNS service on the cluster, and configures all containers to use that internal DNS for name resolution. This means that applications can rely on friendly names to find other applications and services, without the overhead of an external services catalog.
+
+Storage
+Kubernetes adds an abstraction layer between the storage back end and the storage consumption. As such, applications can consume long-lived, short-lived, block, and file-based storage using unified storage definitions that are independent of the storage back end. This way your applications are not dependent on particular cloud provider storage APIs.
+
+RHOCP embeds a number of storage providers that allow for automatic provisioning of storage on popular cloud providers and virtualization platforms, and so cluster administrators do not need to manage the fine details of proprietary storage arrays.
+
+Application Management
+RHOCP empowers developers to automate the development and deployment of their applications. Use the OpenShift Source-to-Image (S2I) feature to automatically build containers based on your source code and run them in OpenShift. The internal registry stores application container images, which can be reused. This decreases the time it takes to publish your applications.
+
+The developer catalog, accessible from the web console, is a place for publishing and accessing application templates. It supports many runtime languages, such as Python, Ruby, Java, and Node.js, and also database and messaging servers. You can expand the catalog by installing new operators, which are prepackaged applications and services that embed operational intelligence for deploying, updating, and monitoring their applications.
+
+Cluster Extensibility
+RHOCP relies on standard extension mechanisms from Kubernetes, such as extension APIs and custom resource definitions, to add features that are otherwise not provided by upstream Kubernetes. OpenShift packages these extensions as operators for ease of installation, update, and management.
+
+OpenShift also includes the Operator Lifecycle Manager (OLM), which facilitates the discovery, installation, and update of applications and infrastructure components packaged as operators.
+
+Red Hat, in collaboration with AWS, Google Cloud, and Microsoft, launched the OperatorHub, accessible at https://operatorhub.io. The platform is a public repository and marketplace for operators compatible with OpenShift and other distributions of Kubernetes that include the OLM.
+
+ 
+REFERENCES
+Further information is available in the Red Hat OpenShift Container Platform 4.2 product documentation at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/

@@ -1,0 +1,250 @@
+Controlling Application Permissions with Security Context Constraints (SCCs)
+Objectives
+After completing this section, you should be able to:
+
+Manage security context constraints.
+
+Create service accounts and apply permissions to pods.
+
+Security Context Constraints (SCCs)
+Red Hat OpenShift provides security context constraints (SCCs), a security mechanism that restricts access to resources, but not to operations in OpenShift.
+
+SCCs limit the access from a running pod in OpenShift to the host environment. SCCs control:
+
+Running privileged containers
+
+Requesting extra capabilities to a container
+
+Using host directories as volumes
+
+Changing the SELinux context of a container
+
+Changing the user ID
+
+Some containers developed by the community might require relaxed security context constraints to access resources that are forbidden by default, such as file systems, sockets or to access a SELinux context.
+
+You can run the following command as a cluster administrator to list the SCCs defined by OpenShift:
+
+[user@demo ~]$ oc get scc
+OpenShift provides eight SCCs:
+
+anyuid
+
+hostaccess
+
+hostmount-anyuid
+
+hostnetwork
+
+node-exporter
+
+nonroot
+
+privileged
+
+restricted
+
+To get additional information about an SCC, use the oc describe command.
+
+[user@demo ~]$ oc describe scc anyuid
+Name:           anyuid
+Priority:         10
+Access:
+  Users:          <none>
+  Groups:         system:cluster-admins
+Settings:
+  Allow Privileged:       false
+  Default Add Capabilities:     <none>
+  Required Drop Capabilities:     MKNOD,SYS_CHROOT
+  Allowed Capabilities:       <none>
+  Allowed Volume Types:       configMap,downwardAPI,emptyDir,persistentVolumeClaim,secret
+  Allow Host Network:       false
+  Allow Host Ports:       false
+  Allow Host PID:       false
+  Allow Host IPC:       false
+  Read Only Root Filesystem:      false
+  Run As User Strategy: RunAsAny
+    UID:          <none>
+    UID Range Min:        <none>
+    UID Range Max:        <none>
+  SELinux Context Strategy: MustRunAs
+    User:         <none>
+    Role:         <none>
+    Type:         <none>
+    Level:          <none>
+  FSGroup Strategy: RunAsAny
+    Ranges:         <none>
+  Supplemental Groups Strategy: RunAsAny
+    Ranges:         <none>
+All containers created by OpenShift use the SCC named restricted, which provides limited access to resources external to OpenShift.
+
+For the anyuid SCC, the run as user strategy is defined as RunAsAny, which means that the pod can run as any user ID available in the container. This allows containers that require a specific user to run the commands using a specific user ID.
+
+To change the container to run using a different SCC, you need to create a service account bound to a pod. To create a service account, use the following command:
+
+[user@demo ~]$ oc create serviceaccount service-account-name
+To associate the service account with an SCC, use the following command:
+
+[user@demo ~]$ oc adm policy add-scc-to-user SCC -z service-account
+To identify which account can create a pod that requires elevated security requirements, use the scc-subject-review subcommand. This returns all the security context constraints that can be used to overcome the limitations of a container. For example:
+
+[user@demo ~]$ oc get pod podname  -o yaml | \ 
+>    oc adm policy scc-subject-review -f -
+Privileged Containers
+Some containers might need to access the runtime environment of the host. For example, the S2I builder containers are a class of privileged containers that require access beyond the limits of their own containers. These containers can pose security risks because they can use any resources on an OpenShift node. SCCs can be used to enable access for privileged containers by creating service accounts with privileged access.
+
+ 
+REFERENCES
+For more information, refer to the Managing Security Context Constraints chapter in the OpenShift Container Platform 4.2 Official Documentation at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/authentication/index#managing-pod-security-policies
+
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy
+Red Hat Training Policies
+Terms of Use
+All policies and guidelines
+
+
+
+Guided Exercise: Controlling Application Permissions with Security Context Constraints (SCC)
+In this exercise, you will deploy applications that require pods with extended permissions.
+
+Outcomes
+
+You should be able to:
+
+Create service accounts and assign security context constraints (SCCs) to them.
+
+Assign a service account to a deployment configuration.
+
+Run applications that need root privileges.
+
+To perform this exercise, ensure you have access to:
+
+A running OpenShift cluster.
+
+The OpenShift CLI (/usr/local/bin/oc)
+
+The gitlab/gitlab-ce:8.4.3-ce.0 container image from Docker Hub.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+This command ensures that the cluster API is reachable and creates some HTPasswd users for the exercise.
+
+[student@workstation ~]$ lab authorization-scc start
+Log in to the OpenShift cluster and create the authorization-scc project.
+
+Source the classroom configuration file at /usr/local/etc/ocp4.config.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to the cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Create the authorization-scc project.
+
+[student@workstation ~]$ oc new-project authorization-scc
+Now using project "authorization-scc" on server
+"https://api.cluster.domain.example.com:6443".
+...output omitted...
+Deploy a gitlab/gitlab-ce:8.4.3-ce.0 application and verify that it fails because the container image needs root privileges.
+
+Deploy a gitlab/gitlab-ce:8.4.3-ce.0 application.
+
+[student@workstation ~]$ oc new-app --name gitlab \
+--docker-image gitlab/gitlab-ce:8.4.3-ce.0
+...output omitted...
+--> Creating resources ...
+    imagestream.image.openshift.io "gitlab" created
+    deploymentconfig.apps.openshift.io "gitlab" created
+    service "gitlab" created
+--> Success
+...output omitted...
+Determine if the application was successfully deployed. It should give an error because this image needs root privileges to properly deploy.
+
+[student@workstation ~]$ oc get pods
+NAME              READY   STATUS      RESTARTS   AGE
+gitlab-1-deploy   0/1     Completed   0          89s
+gitlab-1-ltjhs    0/1     Error       1          81s
+NOTE
+It might take some time for the image to reach the Error state. You might also see the CrashLoopBackOff status while checking the pod's health.
+
+Review the application logs to confirm that the failure is caused by insufficient privileges.
+
+[student@workstation ~]$ oc logs pod/gitlab-1-ltjhs
+...output omitted...
+================================================================================
+Recipe Compile Error in /opt/gitlab/embedded/cookbooks/\
+cache/\cookbooks/gitlab/recipes/default.rb
+================================================================================
+
+Chef::Exceptions::InsufficientPermissions
+-----------------------------------------
+directory[/etc/gitlab] (gitlab::default line 26) had an error: \
+Chef::Exceptions::InsufficientPermissions: Cannot create directory[/etc/gitlab] at \
+/etc/gitlab due to insufficient permissions
+...output omitted...
+Create a new service account and add the anyuid SCC to it.
+
+Create a service account named gitlab-sa.
+
+[student@workstation ~]$ oc create sa gitlab-sa
+serviceaccount/gitlab-sa created
+Log in as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Assign the anyuid SCC to the gitlab-sa service account.
+
+[student@workstation ~]$ oc adm policy add-scc-to-user anyuid -z gitlab-sa
+securitycontextconstraints.security.openshift.io/anyuid added to: ["system:serviceaccount:authorization-scc:gitlab-sa"]
+Modify the gitlab application so that it uses the newly created service account. Verify that the new deployment is successful.
+
+Log in as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Assign the gitlab-sa service account to the gitlab deployment.
+
+[student@workstation ~]$ oc set serviceaccount deploymentconfig gitlab gitlab-sa
+deploymentconfig.apps.openshift.io/gitlab serviceaccount updated
+Verify that the gitlab redeployment was successful. You may need to run the oc get pods command multiple times until you see a running application pod.
+
+[student@workstation ~]$ oc get pods
+NAME              READY   STATUS      RESTARTS   AGE
+gitlab-1-deploy   0/1     Completed   0          47m
+gitlab-2-cjkvd    1/1     Running     0          119s
+gitlab-2-deploy   0/1     Completed   0          2m8s
+Verify that the gitlab application is properly working.
+
+Expose the gitlab application.
+
+[student@workstation ~]$ oc expose service gitlab --port 80
+route.route.openshift.io/gitlab exposed
+Get the exposed route.
+
+[student@workstation ~]$ oc get route gitlab
+NAME      HOST/PORT                                                 PATH    ...
+gitlab    gitlab-authorization-scc.apps.cluster.domain.example.com  gitlab  ...
+Verify that the gitlab application is answering HTTP queries.
+
+[student@workstation ~]$ curl http://gitlab-authorization-scc.apps.
+>cluster.domain.example.com/users/sign_in | grep title
+...output omitted...
+<title>Sign in · GitLab</title>
+...output omitted...
+Delete the authorization-scc project.
+
+[student@workstation ~]$ oc delete project authorization-scc
+project.project.openshift.io "authorization-scc" deleted
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab authorization-scc finish
+This concludes the section.
+
+

@@ -1,0 +1,637 @@
+
+Chapter 5. Configuring OpenShift Networking Components
+Troubleshooting OpenShift Software-defined Networking
+Guided Exercise: Troubleshooting OpenShift Software-defined Networking
+Controlling Cluster Network Ingress
+Guided Exercise: Controlling Cluster Network Ingress
+Lab: Configuring OpenShift Networking Components
+Summary
+Abstract
+
+Goal	Identify the components of Red Hat OpenShift Container Platform software-defined networking and configure some of the components.
+Objectives	
+Troubleshoot OpenShift software-defined networking using the command-line interface.
+
+Describe the ingress components of OpenShift and create a route.
+
+Sections	
+Troubleshooting OpenShift Software-defined Networking (and Guided Exercise)
+
+Controlling Cluster Network Ingress (and Guided Exercise)
+
+Lab	
+Configuring OpenShift Networking Components
+
+Troubleshooting OpenShift Software-defined Networking
+Objectives
+After completing this section, you should be able to troubleshoot OpenShift software-defined networking using the command-line interface.
+
+Introducing OpenShift Software-defined Networking
+OpenShift implements a software-defined network (SDN) to manage the network infrastructure of the cluster and user applications. Software-defined networking is a networking model that allows you to manage network services through the abstraction of several networking layers. It decouples the software that handles the traffic, called the control plane, and the underlying mechanisms that route the traffic, called the data plane. Among the many features of SDN, open standards enable vendors to propose their solutions, centralized management, dynamic routing, and tenant isolation.
+
+In OpenShift Container Platform, the SDN solves the following five requirements:
+
+Managing the network traffic and network resources programmatically, so that the organization teams can decide how to expose their applications.
+
+Managing communication between containers that run in the same project.
+
+Managing communication between pods, whether they belong to a same project or run in separate projects.
+
+Managing network communication from a pod to a service.
+
+Managing network communication from an external network to a service, or from containers to external networks.
+
+The SDN implementation creates a backwards-compatible model, in which pods are akin to virtual machines in terms of port allocation, IP address leasing, and reservation.
+
+Discussing OpenShift Networking Model
+The OpenShift SDN uses Linux namespaces to partition the usage of resources and processes on physical and virtual hosts. This implementation allows containers inside pods to share network resources, such as devices, IP stacks, firewall rules, and also routing tables. The OpenShift SDN allocates a unique routable IP to each pod so that you can access the pod from any other service in the same network.
+
+Migrating Legacy Applications
+The SDN design makes it easy to containerize your legacy applications because you do not need to change the way the application components communicate with each other. If your application is comprised of many services that communicate over the TCP/UDP stack, this approach still works as containers in a pod share the same network stack. Although using OpenShift services is the recommended approach, you can seamlessly migrate those services before considering migrating all your services in OpenShift.
+
+The following diagram shows how all pods are connected to a shared network.
+
+NOTE
+The OpenShift Cluster Network Operator manages the network, as discussed later.
+
+
+Figure 5.1: Kubernetes basic networking
+Using Services for Accessing Pods
+Kubernetes provides the concept of a service, which is an essential resource in any OpenShift application. Services allow for the logical grouping of pods under a common access route. A service acts as a load balancer in front of one or more pods, thus decoupling the application specifications (such as the number running of replicas) from the access to said application. It load-balances client requests across member pods, and provides a stable interface that enables communication with pods without tracking individual pod IP addresses.
+
+Most real-world applications do not run as a single pod. They need to scale horizontally, so an application could run on many pods to meet growing user demand. In an OpenShift cluster, pods are constantly created and destroyed across the nodes in the cluster, such as during the deployment of a new application version or when draining a node for maintenance. Pods are assigned a different IP address each time they are created; thus, pods are not easily addressable. Instead of having a pod discover the IP address of another pod, you can use services, which provide a single, unique IP address for other pods to use, independent of where the pods are running.
+
+Services rely on selectors (labels) that indicate which pods receive the traffic through the service. Each pod matching these selectors is added to the service resource as an endpoint. As pods are created and killed, the service automatically updates the endpoints.
+
+Using selectors brings flexibility to the way you design the architecture and routing of your applications. For example, you can divide the application into tiers and decide to create a service for each tier. Selectors allow a design that is flexible and highly resilient.
+
+OpenShift uses two subnets: one subnet for pods, and one subnet for services. The traffic is forwarded in a transparent way to the pods; an agent (depending on the network mode that you use) manages routing rules to route traffic to the pods that match the selectors.
+
+The following diagram shows how three API pods are running on separate nodes. The service1 service is able to balance the load between these three pods.
+
+
+Figure 5.2: Using services for accessing applications
+The following YAML definition shows how you create a service. This defines the application-frontend service, which creates a virtual IP that exposes the TCP port 443. The front-end application listens on the unprivileged port 8843.
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: application-frontend 1
+  labels:
+    app: frontend-svc 2
+spec:
+  ports: 3
+    - name: HTTP
+      protocol: TCP
+      port: 443 4
+      targetPort: 8443 5
+  selector: 6
+    app: shopping-cart
+    name: frontend
+1
+
+The name of the service. This identifier allows you to manage the service after its creation.
+
+2
+
+A label that you can use as a selector. This allow you to logically group your services.
+
+3
+
+An array of objects that describes network ports to expose.
+
+Each entry defines the name for the port mapping. This value is generic and is used for identification purposes only.
+
+4
+
+This is the port that the service exposes. You use this port to connect to the application that the service exposes.
+
+5
+
+This is the port on which the application listens. The service creates a forwarding rule from the service port to the service target port.
+
+6
+
+The selector defines which pods are in the service pool. Services use this selector to determine where to route the traffic.
+
+In this example, the service targets all pods whose labels match app: shopping-cart and name: frontend.
+
+Defining Service Types
+OpenShift supports many service types to accommodate a variety of use cases. The following lists presents the available service types.
+
+Cluster IP (ClusterIP): This service type exposes the service using an IP internal to the cluster. As such, this IP is not accessible from an external network. This is the default value when you define a service; as an administrator, you can configure the CIDR for these IPs at installation time.
+
+Node port (NodePort): This service type instructs the OpenShift control plane to map to an IP address that a node in the cluster uses. This is a legacy type, and Red Hat recommends using routes instead, which expose the service as a host name. Routes are discussed in the next section.
+
+When using this service type, each node proxies the same port number on every node to your service.
+
+Node ports are in the 30000-32767 range by default, which means that a node port is unlikely to match an intended port for a service.
+
+Load balancer (LoadBalancer): This service type exposes the service through a cloud provider load balancer. You access the virtual IP of the provider's load balancer, and the OpenShift control plane automatically creates a node port or cluster IP to route the incoming packets.
+
+External name (ExternalName): This service type creates a CNAME in the DNS zone that matches an external host name. You typically use this service type to create different access points for applications that are external to the cluster. The service returns the CNAME record whose value matches the external name.
+
+The various service types allow you to control how to access your services. Some service types may be better suited for your environment, such as the LoadBalancer type when deploying in Amazon Web Services (AWS), Microsoft Azure, or Google Compute Engine (GCE). With this service type, OpenShift redirects the traffic from the external load balancer to the back-end pods, however, the provider determines the load balancing mechanism and strategy. This can increase the administration overhead associated with the cluster, as you must also manage the permissions for developers to create or delete their services.
+
+NOTE
+The configuration of load balancers is outside the scope of this course.
+
+The NodePort type is an older Kubernetes-based approach, whereby the control plane exposes the service to external clients by binding to available ports on the node host. The node then proxies connections to the service IP address. Then you access your application through the node host and the port value. When using this service type, you must manually maintain the list of ports that you use to avoid port collisions. Moreover, you must use a valid port number, that is, a port that is inside the range and that is configured for the NodePort service type.
+
+The ExternalName service type is a recent addition. Services that use this service type do not map to selectors. Instead, they use DNS names to determine how to access the application that matches the host name. The control plane creates a CNAME record whose value corresponds to the external name. This is a convenient solution for migrating your legacy applications to the cluster, as you can run parts of the application outside of the cluster until their migration is complete.
+
+Discussing the DNS Operator
+The DNS operator deploys and runs a DNS server managed by CoreDNS, a lightweight DNS server written in GoLang. The DNS operator provides DNS name resolution between pods, which enables services to discover their endpoints.
+
+Every time you create a new application, OpenShift configures the pods so that they contact the CoreDNS service IP for DNS resolution.
+
+Run the following command to review the configuration of the DNS operator.
+
+[user@demo ~]$ oc describe dns.operator/default
+Name:         default
+...output omitted...
+API Version:  operator.openshift.io/v1
+Kind:         DNS
+...output omitted...
+Spec:
+Status:
+  Cluster Domain:  cluster.local
+  Cluster IP:      172.30.0.10
+...output omitted...
+The DNS operator is responsible for the following:
+
+Creating a default cluster DNS name (cluster.local).
+
+Assigning a DNS name to a namespace (for example, backend.cluster.local).
+
+Assigning DNS names to services that you define (for example, db.backend.cluster.local).
+
+Assigning DNS names to pods in a namespace (such as db001.backend.cluster.local).
+
+Managing DNS Records for Services
+This DNS implementation allows pods to seamlessly resolve DNS names for resources in a project or the cluster. Pods can use a predictable naming scheme for accessing a service. For example, querying the db.backend.cluster.local from a container returns the IP address of the service. In this case, db is the name of the service, backend is the project name, and cluster.local is the cluster DNS name.
+
+CoreDNS creates two kind of records for services: A records that resolve to services, and SRV records that match the following format:
+
+_port-name._port-protocol.svc.namespace.svc.cluster.local
+For example, if you use a service that exposes the TCP port 443 through the HTTPS service, the SRV record is created as follows:
+
+_443._tcp.https.frontend.svc.cluster.local
+NOTE
+When services do not have a cluster IP, the DNS operator assigns them a DNS A record that resolves to the set of IPs of the pods behind the service.
+
+Similarly, the SRV record that is created resolves to all the pods that are behind the service.
+
+Introducing the Cluster Network Operator
+OpenShift Container Platform uses the Cluster Network Operator for managing the SDN. This includes the network CIDR to use, the network mode, the network provider, and the IP address pools.
+
+Run the following oc get command as an administrative user to consult the SDN configuration, which is managed by the Network.config.openshift.io custom resource definition.
+
+[user@demo ~]$ oc get \
+>    Network.config.openshift.io cluster -oyaml
+apiVersion: config.openshift.io/v1
+kind: Network
+...output omitted...
+spec:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14 1
+    hostPrefix: 23 2
+  externalIP:
+    policy: {}
+  networkType: OpenshiftSDN 3
+  serviceNetwork:
+  - 172.30.0.0/16
+...output omitted...
+1
+
+Defines the CIDR for all pods in the cluster. In this example, the SDN has a netmask of 255.252.0.0 and can allocate 262144 IP addresses.
+
+2
+
+Defines the host prefix. A value of 23 indicates a netmask of 255.255.254.0, which translates to 512 allocatable IPs.
+
+3
+
+Shows the current SDN provider. You can choose between OpenShiftSDN, OVNKubernetes, and Kuryr. Red Hat only supports the OpenShiftSDN network provider.
+
+NOTE
+Configuring additional networks is outside the scope of the course. For more information on the Kubernetes network custom resource definition, consult the Kubernetes Network Custom Resource Definition De-facto Standard Version 1 document listed in the references section.
+
+Introducing OpenShift Network Modes
+The OpenShift software-defined networking (SDN) provides the network layer that the pods in the cluster use for communication. To establish this network layer, the OpenShift SDN uses a plug-in model that allows you to select the appropriate technology for your use case.
+
+In OpenShift Container Platform 4, the OpenShiftSDN API resource defines and manages the SDN mode. Configure the mode to use in the defaultNetwork section of the install-config.yaml installation file.
+
+IMPORTANT
+The SDN configuration is done at installation time.
+
+OpenShift supports three modes: Multitenant, Subnet, and NetworkPolicy; the default mode is NetworkPolicy.
+
+The following excerpt shows the SDN mode configuration:
+
+defaultNetwork:
+  type: OpenShiftSDN
+  openshiftSDNConfig:
+    mode: NetworkPolicy
+    mtu: 1450
+    vxlanPort: 4789 
+The configuration instructs the installer to use the NetworkPolicy mode, and to define the values of the MTU overlay and the VXLAN UDP port for creating the tunnel. Adjust the MTU value to prevent packets fragmentation, which typically happens when you encapsulate an Ethernet frame into another frame, such as for overlay networks.
+
+Comparing and Contrasting Network Modes
+The Subnet mode allows you to create a flat network, in which all pods can communicate with each other across projects and tenants.
+
+The Mutitenant mode implements segregation at the project level, which provides an extra layer of isolation for pods and services. When using this mode, each project receives a unique VLAN ID that identifies traffic from the pods that belong to the project. Pods are restricted to accessing those pods whose network packet tags use the same VNID. Pods cannot communicate with pods and services in a different project.
+
+NOTE
+Projects with a VNID of 0 can communicate with all other pods, and vice versa. This is true for all pods that you create in the default project, which assigns a VNID of 0 to the pods.
+
+The NetworkPolicy mode provides an extra level of flexibility by allowing you to define network policies for your pods. By default, without any network policy resources defined, pods in a project can access any other pod.
+
+To isolate one or more pods in a project, define a NetworkPolicy resource in that project to indicate the allowed ingress and egress connections.
+
+IMPORTANT
+After declaring any network policy in a project, OpenShift defaults to preventing all ingress and egress traffic, unless you explicitly define a rule to allow network connections.
+
+The following excerpt shows how to allow external users to access an application with labels matching app: product-catalog over a TCP connection on port 8080.
+
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: external-access
+spec:
+  podSelector:
+    matchLabels:
+      app: product-catalog
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 8080
+One benefit of using network policies is the management of security between projects (tenants), which you cannot do with layer 2 technologies such as VLANs. Network policies allow you to create tailored policies between projects to make sure applications and users can only access what they should.
+
+Introducing Multus Container Network Interface (CNI)
+As container adoption increases, so does the need to manage the traffic flow between applications. This means having ways of segregating traffic based on policy, performance, and security.
+
+One way to segregate and manage this traffic flow is to use network function virtualization software (NFVS). NFVS allows you to control and manage the traffic flow on both the data plane and the control plane. Using NFVS allows you to work with a variety of protocols for performance and security reasons.
+
+Multus is an open source project to support multiple network cards in OpenShift. One of the challenges that Multus solves is the migration of network function virtualization to containers. Multus acts as a broker and arbiter of other CNI plug-ins for managing the implementation and life-cycle of supplementary network devices in containers. Multus supports plug-ins such as SR-IOV, vHost CNI, Flannel, and Calico.
+
+ 
+REFERENCES
+For more information, refer to the Configuring network policy with OpenShift SDN chapter in the Red Hat OpenShift Container Platform 4.2 Networking Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/networking/index#configuring-networkpolicy
+
+Network Policy Objects in Action
+
+Kubernetes Networking Design Document
+
+Kubernetes Network Custom Resource Definition De-facto Standard Version 1
+
+CoreDNS: DNS and Service Discovery
+
+Multus-CNI
+
+
+
+
+Guided Exercise: Troubleshooting OpenShift Software-defined Networking
+In this exercise, you will diagnose and fix connectivity issues with a Kubernetes-style application deployment.
+
+Outcomes
+
+You should be able to:
+
+Deploy the To Do Node.js application.
+
+Create a route to expose an application service.
+
+Use oc debug to troubleshoot communication between pods in your application.
+
+Update an OpenShift service.
+
+To perform this exercise, ensure that you have access to:
+
+A running OpenShift cluster.
+
+The OpenShift CLI (/usr/local/bin/oc).
+
+On the workstation machine, use the lab command to prepare your system for this exercise.
+
+The command ensures that the cluster API is reachable.
+
+[student@workstation ~]$ lab network-sdn start
+As an OpenShift developer, you just completed the migration of a To Do Node.js application to OpenShift. The application is comprised of two deployments, one for the database, and one for the front end. It also contains two services for communication between pods.
+
+Although the application seems to initialize, you cannot access it via a web browser. In this activity, you will troubleshoot your application and correct the issue.
+
+Log in to the OpenShift cluster and create the network-sdn project.
+
+From workstation, open a terminal and source the classroom configuration file that is accessible at /usr/local/etc/ocp4.config.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to the cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Create the network-sdn project.
+
+[student@workstation ~]$ oc new-project network-sdn
+Now using project "network-sdn" on server
+"https://api.cluster.domain.example.com:6443".
+...output omitted...
+Deploy the database and restore its data.
+
+The /home/student/DO280/labs/network-sdn/todo-db.yaml file defines the following resources:
+
+A deployment that creates a container based on a MySQL image.
+
+A service that points to the mysql application.
+
+Go to the network-sdn directory and list the files. In a later step, you will use db-data.sql to initialize the database for the application.
+
+[student@workstation ~]$ cd ~/DO280/labs/network-sdn
+[student@workstation network-sdn]$ ls
+db-data.sql  todo-db.yaml  todo-frontend.yaml
+Use oc create with the -f against todo-db.yml to deploy the database server pod.
+
+[student@workstation network-sdn]$ oc create -f todo-db.yaml
+deployment.apps/mysql created
+service/mysql created
+Run oc status to review the resources that are present in the project. The mysql service points to the database pod.
+
+[student@workstation network-sdn]$ oc status
+In project network-sdn on server https://api.cluster.domain.example.com:6443
+
+svc/mysql - 172.30.223.41:3306
+  deployment/mysql deploys mysql:8.0
+    deployment #1 running for 4 seconds - 0/1 pods
+...output omitted...
+Wait a few moments to ensure that the database pod is running. Retrieve the name of the database pod to restore the tables of the items database.
+
+[student@workstation network-sdn]$ oc get pods
+NAME                    READY   STATUS    RESTARTS   AGE
+mysql-94dc6645b-hjjqb   1/1     Running   0          33m
+Use oc cp to transfer the database dump to the pod. Make sure to replace the pod name with the one you obtained in the previous step.
+
+[student@workstation network-sdn]$ oc cp db-data.sql mysql-94dc6645b-hjjqb:/tmp/
+NOTE
+The command does not produce any output.
+
+Use oc rsh to connect to the pod and restore the database.
+
+[student@workstation network-sdn]$ oc rsh mysql-94dc6645b-hjjqb bash
+1000570000@mysql-94dc6645b-hjjqb:/$ mysql -u root -p$MYSQL_ROOT_PASSWORD \
+>    items < /tmp/db-data.sql
+
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Ensure that the Item table is present in the database.
+
+1000570000@mysql-94dc6645b-hjjqb:/$ mysql -u root -p$MYSQL_ROOT_PASSWORD \
+>     items -e "show tables;"
+
+mysql: [Warning] Using a password on the command line interface can be insecure.
++-----------------+
+| Tables_in_items |
++-----------------+
+| Item            |
++-----------------+
+Exit the container.
+
+1000570000@mysql-94dc6645b-hjjqb:/$ exit
+Deploy the front end application. The /home/student/DO280/labs/network-sdn/todo-frontend.yaml file defines the following resources:
+
+A deployment that creates the Todo Node.js application.
+
+A service that points to the frontend application.
+
+Use oc create to create the front-end application.
+
+[student@workstation network-sdn]$ oc create -f todo-frontend.yaml
+deployment.apps/frontend created
+service/frontend created
+Wait a few moments for the front end container to start, and then run oc get pods.
+
+[student@workstation network-sdn]$ oc get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+frontend-57b8b445df-f56qh   1/1     Running   0          34s
+...output omitted...
+Create a route to access the frontend service and access the application.
+
+You must create a route to access the application from an external network. To do so, use the oc expose command against the frontend service. Use the --hostname option to override the default FQDN that OpenShift creates.
+
+[student@workstation network-sdn]$ oc expose service frontend \
+>    --hostname todo.${RHT_OCP4_WILDCARD_DOMAIN}
+route.route.openshift.io/frontend exposed
+List the routes in the project.
+
+[student@workstation network-sdn]$ oc get routes
+NAME       HOST/PORT                              ... PORT  ...
+frontend   todo.apps.cluster.domain.example.com   ... 8080 ...
+As you can see, OpenShift detects the port on which the application listens and creates a forwarding rule from port 80 to port 8080, which is the target port.
+
+From workstation, open Firefox and access http://todo.apps.cluster.domain.example.com/todo/. Make sure to replace the content of the URL with your cluster values and add the trailing slash.
+
+The application is not reachable, as shown in the following screen capture.
+
+
+Inspect the pod logs for errors. The output does not indicate any errors.
+
+[student@workstation network-sdn]$ oc logs frontend-57b8b445df-f56qh
+App is ready at : 8080
+Run oc debug to create a carbon copy of an existing pod in the frontend deployment. You use this pod to check connectivity to the database.
+
+Before creating a debug pod, retrieve the database service IP. In a later step, you use curl to access the database endpoint.
+
+The JSONPath expression allows you to retrieve the service IP.
+
+[student@workstation network-sdn]$ oc get service/mysql \
+>    -o jsonpath="{.spec.clusterIP}{'\n'}"
+172.30.103.29
+Run the oc debug command against the frontend deployment, which runs the web application pod.
+
+[student@workstation network-sdn]$ oc debug -t deployment/frontend
+Starting pod/frontend-debug ...
+Pod IP: 10.131.0.144
+If you don't see a command prompt, try pressing enter.
+sh-4.2$ 
+One way to test the connectivity between the frontend and the database is the usage of curl, which supports a variety of protocols.
+
+Use curl to connect to the database over the port 3306, which is MySQL's default port; make sure to replace the IP address with the one that you obtained in Step 5.1. When done, type Ctrl+C to exit the session, and type exit to exit the debug pod.
+
+sh-4.2$ curl -v telnet://172.30.103.29:3306
+* About to connect() to 172.30.103.29 port 3306 (#0)
+*   Trying 172.30.103.29
+* TCP_NODELAY set
+* Connected to 172.30.103.29... (172.30.103.29) port 3306 (#0)
+* RCVD IAC 193
+Ctrl+C
+sh-4.2$ exit
+exit
+
+Removing debug pod ...
+The output indicates that the database is up and running, and that it is accessible from the frontend deployment.
+
+In the following steps, you ensure that the network connectivity inside the cluster is operational by connecting to the front end container from the database container.
+
+Obtain some information about the frontend pod and use the oc debug command to diagnose the issue from the mysql deployment.
+
+Before creating a debug pod, retrieve IP address of the frontend service.
+
+[student@workstation network-sdn]$ oc get service/frontend \
+>    -o jsonpath="{.spec.clusterIP}{'\n'}"
+172.30.23.147
+Run the oc debug command to create a container for troubleshooting based on the mysql deployment. You must override the container image because the MySQL Server image does not provide the curl command.
+
+[student@workstation network-sdn]$ oc debug -t deployment/mysql \
+>    --image registry.access.redhat.com/ubi8/ubi:8.0
+Starting pod/mysql-debug ...
+Pod IP: 10.131.0.146
+If you don't see a command prompt, try pressing enter.
+sh-4.4$ 
+Use curl to connect to the frontend application over the port 8080. Make sure to replace the IP address with the one that you obtained in Step 6.1
+
+The following output indicates that curl times out. This could either indicate that the application is not running or that the service is not able to access the application.
+
+sh-4.4$ curl -m 10 -v http://172.30.23.147:8080
+* Rebuilt URL to: http://172.30.23.147:8080/
+*   Trying 172.30.23.147...
+* TCP_NODELAY set
+* Connection timed out after 10000 milliseconds
+* Closing connection 0
+curl: (28) Connection timed out after 10000 milliseconds
+Exit the debug pod.
+
+sh-4.4$ exit
+
+Removing debug pod ...
+In the following steps, you connect to the frontend pod through its private IP. This allows testing whether or not the issue is related to the service.
+
+Retrieve the IP of the frontend pod.
+
+[student@workstation network-sdn]$ oc get pods -o wide -l name=frontend
+NAME                        READY   STATUS    RESTARTS   AGE   IP             ...
+frontend-57b8b445df-f56qh   1/1     Running   0          39m   10.128.2.61   ...
+Create a debug pod from the mysql deployment.
+
+[student@workstation network-sdn]$ oc debug -t deployment/mysql \
+>    --image registry.access.redhat.com/ubi8/ubi:8.0
+Starting pod/mysql-debug ...
+Pod IP: 10.131.1.27
+If you don't see a command prompt, try pressing enter.
+sh-4.4$ 
+Run curl in verbose mode against the frontend pod on port 8080. Replace the IP with the one that you obtained in Step 7.1 and append the name of the application.
+
+sh-4.2$ curl -v http://10.128.2.61:8080/todo/
+*   Trying 10.128.2.61...
+* TCP_NODELAY set
+* Connected to 10.128.2.61 (10.128.2.61) port 8080 (#0)
+> GET /todo/ HTTP/1.1
+> Host: 10.128.2.61:8080
+> User-Agent: curl/7.61.1
+> Accept: */*
+>
+< HTTP/1.1 200 OK
+< Server: restify
+< Cache-Control: public, max-age=3600
+< Content-Length: 4508
+< Content-Type: text/html
+< Last-Modified: Thu, 05 Dec 2019 22:50:51 GMT
+< Connection: Keep-Alive
+< Date: Fri, 03 Jan 2020 19:53:04 GMT
+< Request-Id: aaba2e54-ee4a-47db-8492-8a2f67fc97f1
+< Response-Time: 1
+...output omitted...
+Curl can access the application through the pod's private IP.
+
+Exit the debug pod.
+
+sh-4.2$ exit
+exit
+
+Removing debug pod ...
+Review the configuration of the frontend service.
+
+List the services in the project and ensure that the frontend service exists.
+
+[student@workstation network-sdn]$ oc get svc
+NAME       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)     AGE
+frontend   ClusterIP   172.30.23.147   <none>        8080/TCP    93m
+mysql      ClusterIP   172.30.103.29   <none>        3306/TCP    93m
+Review the configuration and status of the frontend service. Notice the value of the service selector that indicates to which pod the service should forward packets.
+
+[student@workstation network-sdn]$ oc describe svc/frontend
+Name:              frontend
+Namespace:         network-sdn
+Labels:            app=todonodejs
+                   name=frontend
+Annotations:      <none>
+Selector:          name=api
+Type:              ClusterIP
+IP:                172.30.23.147
+Port:              <unset>  8080/TCP
+TargetPort:        8080/TCP
+Endpoints:         <none>
+Session Affinity:  None
+Events:            <none>
+This ...output omitted... also indicates that the service has no endpoint, so it is not able to forward incoming traffic to the application.
+
+Retrieve the labels of the frontend deployment. The output shows that pods are created with a name label that has a value of frontend, whereas the service uses api as the value.
+
+[student@workstation network-sdn]$ oc describe deployment/frontend | \
+>    grep Labels -A3
+Labels:          app=todonodejs
+                 name=frontend
+Annotations:     deployment.kubernetes.io/revision: 2
+Selector:        app=todonodejs,name=frontend
+--
+  Labels:  app=todonodejs
+           name=frontend
+  Containers:
+   todonodejs:
+Update the frontend service and access the application.
+
+Run oc edit to edit the frontend service. Update the selector to match the correct label.
+
+[student@workstation network-sdn]$ oc edit svc/frontend
+Locate the section that defines the selector, and then update the name: frontend label inside the selector. After making the changes, exit the editor.
+
+...output omitted...
+  selector:
+    name: frontend
+...output omitted...
+Save your changes and verify that the oc edit command applied them.
+
+service/frontend edited
+Review the service configuration to ensure that the service has an endpoint.
+
+[student@workstation network-sdn]$ oc describe svc/frontend
+Name:              frontend
+Namespace:         network-sdn
+Labels:            app=todonodejs
+                   name=frontend
+Annotations:       <none>
+Selector:          name=frontend
+Type:              ClusterIP
+IP:                172.30.169.113
+Port:              <unset>  8080/TCP
+TargetPort:        8080/TCP
+Endpoints:         10.128.2.61:8080
+Session Affinity:  None
+Events:            <none>
+From workstation, open Firefox and access the To Do application at http://todo.apps.cluster.domain.example.com/todo/. Replace the content of the URL with your cluster values.
+
+You should see the To Do application.
+
+
+Go to the user home directory and delete the network-sdn project.
+
+[student@workstation network-sdn]$ cd
+[student@workstation ~]$ oc delete project network-sdn
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab network-sdn finish
+This concludes the guided exercise.
+
+

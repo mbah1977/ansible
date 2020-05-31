@@ -1,0 +1,513 @@
+Executing Troubleshooting Commands
+Objectives
+After completing this section, you should be able to:
+
+Execute commands that assist in troubleshooting common problems.
+
+Verify that your OpenShift cluster nodes are healthy.
+
+Troubleshoot common issues with OpenShift and Kubernetes styles of deployment.
+
+Troubleshooting Common Issues with an OpenShift Cluster
+Most troubleshooting of the OpenShift cluster is very similar to troubleshooting application deployments, because most components of Red Hat OpenShift 4 are operators, and operators are Kubernetes applications. For each operator, you can identify the project where it resides, the deployment that manages the operator application, and its pods. If that operator has configuration settings that you need to change, then you can identify the custom resource (CR), or sometimes the configuration map or secret resource that stores these settings.
+
+Most OpenShift operators manage applications that are also deployed from standard Kubernetes Workload API resources, such as daemon sets and deployments. The role of the operator is usually to create these resources and keep them in sync with the CR.
+
+This section begins by focusing on cluster issues that are not directly related to operators or application deployments; later in this section, you learn how to troubleshoot application deployments.
+
+Verifying the Health of OpenShift Nodes
+The following commands display information about the status and health of nodes in an OpenShift cluster:
+
+oc get nodes
+Displays a column with the status of each node. If a node is not Ready, then it cannot communicate with the OpenShift control plane, and is effectively dead to the cluster.
+
+oc adm top nodes
+Displays the current CPU and memory usage of each node. These are actual usage numbers, not the resource requests that the OpenShift scheduler considers as the available and used capacity of the node.
+
+oc describe node my-node-name
+Displays the resources available and used from the scheduler point of view, and other information. Look for the headings "Capacity," "Allocatable," and "Allocated resources" in the output. The heading "Conditions" indicates whether the node is under memory pressure, disk pressure, or some other condition that would prevent the node from starting new containers.
+
+Reviewing the Cluster Version Resource
+To log in to the cluster, start by exporting the KUBECONFIG variable, whose value points to the auth/kubeconfig file in the installation directory. The oc command uses this environment variable to locate the API endpoint of the cluster.
+
+[user@demo ~]$ export KUBECONFIG=INSTALL_DIR/auth/kubeconfig
+Run oc login to connect to the cluster with a user name of kubeadmin. The password of the kubeadmin user is in the kubeadmin-password file in the same auth directory.
+
+[user@dem ~]$ oc login -u kubeadmin -p MMTUc-TnXjo-NFyh3-aeWmC 
+Login successful.
+...output omitted...
+ClusterVersion is a custom resource that holds high-level information about the cluster, such as the update channels, the status of the cluster operators, and the cluster version (for example 4.2.2). Use this resource to declare the version of the cluster you wish to run. Defining a new version for the cluster instructs the cluster-version operator to upgrade the cluster to that version.
+
+You can retrieve the cluster version to verify that it is running the desired version, but also to ensure that the cluster uses the right subscription channel.
+
+Run oc get clusterversion to retrieve the cluster version. The output lists the version, including minor releases, the cluster uptime for a given version, and the overall status of the cluster.
+
+[user@demo ~]$ oc get clusterversion
+NAME      VERSION  AVAILABLE   PROGRESSING   SINCE   STATUS
+version   4.2.2    True        False         14d     Cluster version is 4.2.2
+Run oc describe clusterversion to obtain more detailed information about the cluster status.
+
+[user@demo ~]$ oc describe clusterversion
+Name:         version
+Namespace:
+Labels:       <none>
+Annotations:  <none>
+API Version:  config.openshift.io/v1
+Kind:         ClusterVersion
+...output omitted...
+Spec:
+  Channel:     stable-4.2 1
+  Cluster ID:  f33267f8-260b-40c1-9cf3-ecc406ce035e 2
+  Upstream:    https://api.openshift.com/api/upgrades_info/v1/graph 3
+Status:
+  Available Updates: 4
+    Image:    quay.io/openshift-release-dev/ocp-release@sha256:...
+    Version:  4.2.13
+    Image:    quay.io/openshift-release-dev/ocp-release@sha256:...
+    Version:  4.2.7
+  Conditions:
+    Last Transition Time:  2019-04-02T23:17:25Z
+    Message:               Done applying 4.2.2 5
+    Status:                True
+    Type:                  Available
+...output omitted...
+  Desired:
+    Image:    quay.io/openshift-release-dev/ocp-release@sha256:...
+    Version:  4.2.2
+...output omitted...
+  History:
+    Completion Time:    2019-04-02T23:17:25Z 6
+    Image:              quay.io/openshift-release-dev/ocp-release@sha256:...
+    Started Time:       2019-04-02T23:06:33Z
+    State:              Completed 7
+    Version:            4.2.2
+  Observed Generation:  1
+  ...output omitted...
+1
+
+Displays the version of the cluster and its channel. Depending on your subscription, the channel might be different.
+
+2
+
+Displays the unique identifier for the cluster. This identifier is used by Red Hat to identify clusters and cluster entitlements.
+
+3
+
+This URL corresponds to the Red Hat update server. The endpoint allows the cluster to determine its upgrade path when updating to a new version.
+
+4
+
+This entry lists the available images for updating the cluster. In the following example, the cluster is two versions behind the most current OpenShift version; images for the two required updates are available on Red Hat container images registry.
+
+5
+
+This entry lists the history. The output indicates that an update completed.
+
+6
+
+This entry shows when the cluster deployed the version indicated in the Version entry
+
+7
+
+This entry indicates that the version successfully deployed. Use this entry to determine whether or not the cluster is healthy.
+
+Reviewing Cluster Operators
+
+OpenShift Container Platform cluster operators are top level operators that manage the cluster. They are responsible for the main components, such as the API server, the web console, storage, or the SDN. Their information is accessible through the ClusterOperator resource, which allows you to access the overview of all cluster operators, or detailed information on a given operator.
+
+Run oc get clusteroperators to retrieve the list of all cluster operators.
+
+[user@demo ~]$ oc get clusteroperators
+NAME                     VERSION     AVAILABLE   PROGRESSING   FAILING   SINCE
+authentication 1                 4.2.2       True  2       False  3         False  4     14d
+cloud-credential              4.2.2     True        False         False      52d
+cluster-autoscaler            4.2.2     True        False         False      52d
+console                       4.2.2     True        False         False      33d
+dns                           4.2.2     True        False         False      6d5h
+image-registry                4.2.2     True        False         False      6d4h
+ingress                       4.2.2     True        False         False      60m
+insights                      4.2.2     True        False         False      52d
+kube-apiserver                4.2.2     True        False         False      52d
+kube-controller-manager       4.2.2     True        False         False      52d
+kube-scheduler                4.2.2     True        False         False      52d
+machine-api                   4.2.2     True        False         False      52d
+machine-config                4.2.2     True        False         False      33d
+marketplace                   4.2.2     True        False         False      60m
+monitoring                    4.2.2     True        False         False      60m
+network                       4.2.2     True        False         False      52d
+node-tuning                   4.2.2     True        False         False      61m
+openshift-apiserver           4.2.2     True        False         False      19d
+openshift-controller-manager  4.2.2     True        False         False      52d
+openshift-samples             4.2.2     True        False         False      52d
+operator-lifecycle-manager    4.2.2     True        False         False      52d
+...output omitted...
+1
+
+Indicates the name of the operator, in this case, the operator is responsible for managing authentication.
+
+2
+
+This entry indicates that the operator deployed successfully and is available for use in the cluster. Notice that a cluster operator might return a status of available even if its degraded. An operator reports degraded when its current state does not match its desired state over a period of time. For example, if the operator requires three running pods, but one pod is crashing, the operator is available but in a degraded state.
+
+3
+
+This entry indicates whether an operator is being updated to a newer version by the top level operator. If new resources are being deployed by the cluster version operator, then the columns read True .
+
+4
+
+The entry returns the health of the operator. The entry reads True if the operator encounters an error that prevents it from working properly. The operator services might still be available, however, all the requirements might not be satisfied. This can indicate that the operator will fail and require user intervention.
+
+Displaying the Logs of OpenShift Nodes
+Most of the infrastructure components of OpenShift are containers inside pods; you can view their logs the same way you view logs for any end-user application. Some of these containers are created by the Kubelet, and thus invisible to most distributions of Kubernetes, but OpenShift cluster operators create pod resources for them.
+
+An OpenShift node based on Red Hat Enterprise Linux CoreOS runs very few local services that would require direct access to a node to inspect their status. Most of the system services in Red Hat Enterprise Linux CoreOS run as containers. The main exceptions are the CRI-O container engine and the Kubelet, which are Systemd units. To view these logs, use the oc adm node-logs command as shown in the following examples:
+
+[user@demo ~]$ oc adm node-logs -u crio my-node-name
+[user@demo ~]$ oc adm node-logs -u kubelet my-node-name
+You can also display all journal logs of a node:
+
+[user@demo ~]$ oc adm node-logs my-node-name
+Opening a Shell Prompt on an OpenShift Node
+Administrators who manage Red Hat OpenShift Cluster Platform 3 and other distributions of Kubernetes frequently open SSH sessions to their nodes to inspect the state of the control plane and the container engine, or to make changes to configuration files. Although this can still be done, it is no longer recommended with Red Hat OpenShift Cluster Platform 4.
+
+If you install your cluster using the full-stack automation method, then your cluster nodes are not directly accessible from the internet because they are on a virtual private network, which AWS calls Virtual Private Cloud (VPC). To open SSH sessions, a bastion server on the same VPC of your cluster that is also assigned a public IP address is required. Creating a bastion server depends on your cloud provider and is out of scope for this course.
+
+The oc debug node command provides a way to open a shell prompt in any node of your cluster. That prompt comes from a special-purpose tools container that mounts the node root file system at the /host folder, and allows you to inspect any files from the node.
+
+To run local commands directly from the node, while in a oc debug node session, you must start a chroot shell in the /host folder. Then you can inspect the local file systems of the node, the status of its systemd services, and perform other tasks that would otherwise require a SSH session. The following is an example oc debug node session:
+
+[user@demo ~]$ oc debug node/my-node-name
+...output omitted...
+sh-4.2# chroot /host
+sh-4.2# systemctl is-active kubelet
+active
+A shell session started from the oc debug node command depends on the OpenShift control plane to work. It uses the same tunneling technology that allows opening a shell prompt inside a running pod (see the oc rsh command later in this section). The oc debug node command is not based on the SSH or RSH protocols.
+
+If your control plane is not working, your node is not ready, or for some reason your node is not able to communicate with the control plane, then you cannot rely on the oc debug node command and will require a bastion host.
+
+WARNING
+Exercise care when using the oc debug node command. Some actions can render your node unusable, such as stopping the Kubelet, and you cannot recover using only oc commands.
+
+Troubleshooting The Container Engine
+From an oc debug node session, use the crictl command to get low-level information about all local containers running on the node. You cannot use the podman command for this task because it does not have visibility on containers created by CRI-O. The following example lists all containers running on a node. The oc describe node command provides the same information but organized by pod instead of by container.
+
+[user@demo ~]$ oc debug node/my-node-name
+...output omitted...
+sh-4.2# chroot /host
+sh-4.2# crictl ps
+...output omitted...
+Troubleshooting Application Deployments
+You can usually ignore the differences between Kubernetes deployments and OpenShift deployment configurations when troubleshooting applications. The common failure scenarios and the ways to troubleshoot them are essentially the same.
+
+There are many scenarios that will be described in later chapters of this course, such as pods that cannot be scheduled. This section focuses on common scenarios that apply to generic applications, and the same scenarios usually apply to operators also.
+
+Troubleshooting Pods That Fail to Start
+A common scenario is that OpenShift creates a pod and that pod never establishes a Running state. This means that OpenShift could not start the containers inside that pod. Start troubleshooting using the oc get pod and oc status commands to verify whether your pods and containers are running. At some point, the pods are in an error state, such as ErrImagePull or ImagePullBackOff.
+
+When this happens, the first step is listing events from the current project using the oc get events command. If your project contains many pods, then you can get a list of events filtered by pod using the oc describe pod command. You can also run similar oc describe commands to filter events by deployments and deployment configurations.
+
+Troubleshooting Running and Terminated Pods
+Another common scenario is that OpenShift creates a pod, and for a short time no problem is encountered. The pod enters the Running state, which means at least one of its containers started running. Later, an application running inside one of the pod containers stops working. It might either terminate or return error messages to user requests.
+
+If the application is managed by a properly designed deployment, then it should include health probes that will eventually terminate the application and stop its container. If that happens, then OpenShift tries to restart the container several times. If the application continues terminating, due to health probes or other reasons, then the pod will be left in the CrashLoopBackOff state.
+
+A container that is running, even for a very short time, generates logs. These logs are not discarded when the container terminates. The oc logs command displays the logs from any container inside a pod. If the pod contains a single container, then the oc logs command only requires the name of the pod.
+
+[user@demo ~]$ oc logs my-pod-name
+If the pod contains multiple containers, then the oc logs command requires the -c option.
+
+[user@demo ~]$ oc logs my-pod-name -c my-container-name
+Interpreting application logs requires specific knowledge of that particular application. If all goes well, the application provides clear error messages that can help you find the problem.
+
+Introducing OpenShift Aggregated Logging
+Red Hat OpenShift Container Platform 4 provides the Cluster Logging subsystem, based on Elasticsearch, Fluentd or Rsyslog, and Kibana, which aggregates logs from the cluster and its containers.
+
+Deploying and configuring the OpenShift Cluster Logging subsystem through its operator is beyond the scope of this course. Refer to the references section at the end of this section for more information.
+
+Creating Troubleshooting Pods
+If you are not sure whether your issues relate to the application container image, or to the settings it gets from its OpenShift resources, then the oc debug command is very useful. This command creates a pod based on an existing pod, a deployment configuration, a deployment, or any other resource from the Workloads API.
+
+The new pod runs an interactive shell instead of the default entry point of the container image. It also runs with health probes disabled. This way, you can easily verify environment variables, network access to other services, and permissions inside the pod.
+
+The command-line options of the oc debug command allow you to specify settings that you do not want to clone. For example, you could change the container image, or specify a fixed user id. Some settings might require cluster administrator privileges.
+
+A common scenario is creating a pod from a deployment, but running as the root user and thus proving that the deployment references a container image that was not designed to run under the default security policies of OpenShift:
+
+[user@demo ~]$ oc debug deployment/my-deployment-name --as-root
+Changing a Running Container
+Because container images are immutable, and containers are supposed to be ephemeral, it is not recommended that you make changes to running containers. However, sometimes making these changes can help with troubleshooting application issues. After you try changing a running container, do not forget to apply the same changes back to the container image and its application resources, and then verify that the now permanent fixes work as expected.
+
+The following commands help with making changes to running containers. They all assume that pods contain a single container. If not, you must add the -c my-container-name option.
+
+oc rsh my-pod-name
+Opens a shell inside a pod to run shell commands interactively and non-interactively.
+
+oc cp /local/path my-pod-name:/container/path
+Copies local files to a location inside a pod. You can also reverse arguments and copy files from inside a pod to your local file system. See also the oc rsync command for copying multiple files at once.
+
+oc port-forward my-pod-name local-port:remote-port
+Creates a TCP tunnel from local-port on your workstation to local-port on the pod. The tunnel is alive as long as you keep the oc port-forward running. This allows you to get network access to the pod without exposing it through a route. Because the tunnel starts at your localhost, it cannot be accessed by other machines.
+
+Troubleshooting OpenShift CLI Commands
+Sometimes, you cannot understand why an oc command fails and you need to troubleshoot its low-level actions to find the cause. Maybe you need to know what a particular invocation of the oc command does behind the scenes, so you can replicate the behavior with an automation tool that makes OpenShift and Kubernetes API requests, such as Ansible Playbooks using the k8s module.
+
+The --loglevel level option displays OpenShift API requests, starting with level 6. As you increase the level, up to 10, more information about those requests is added, such as their HTTP request headers and response bodies. Level 10 also includes a curl command to replicate each request.
+
+You can try these two commands, from any project, and compare their outputs.
+
+[user@demo ~]$ oc get pod --loglevel 6
+[user@demo ~]$ oc get pod --loglevel 10
+Sometimes, you only need the authentication token that the oc command uses to authenticate OpenShift API requests. With this token, an automation tool can make OpenShift API requests as if it was logged in as your user. To get your token, use the -t option of the oc whoami command:
+
+[user@demo ~]$ oc whoami -t
+REFERENCES
+For more information about OpenShift events, Working with clusters chapter in the Red Hat OpenShift Container Platform 4.2 Nodes Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/nodes/index#nodes-containers-events
+
+For more information about how to copy files to running containers, refer to the Working with containers chapter in the Red Hat OpenShift Container Platform 4.2 Nodes Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/nodes/index#nodes-containers-copying-files
+
+For more information about how to execute commands on running containers, refer to the Working with containers chapter in the Red Hat OpenShift Container Platform 4.2 Nodes Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/nodes/index#nodes-containers-remote-commands
+
+For more information about how to forward local ports to running containers, refer to the Working with containers chapter in the Red Hat OpenShift Container Platform 4.2 Nodes Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/nodes/index#nodes-containers-port-forwarding
+
+For more information about aggregated logging, refer to the Red Hat OpenShift Container Platform 4.2 Logging Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/logging/index
+
+ClusterOperator Custom Resource
+
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy
+
+
+
+Guided Exercise: Executing Troubleshooting Commands
+In this exercise, you will execute commands that assist in troubleshooting common problems with the OpenShift control plane and with application deployments.
+
+Outcomes
+
+You should be able to:
+
+Inspect the general state of an OpenShift cluster.
+
+Inspect local services and pods running in an OpenShift worker node.
+
+Diagnose and fix issues with the deployment of an application.
+
+To perform this exercise, ensure you have access to:
+
+A running OpenShift cluster.
+
+The OpenShift CLI (/usr/local/bin/oc).
+
+The PostgreSQL container image from Red Hat (registry.access.redhat.com/rhscl/postgresql-96-rhel7:1).
+
+As the student user on the workstation machine, use the lab command to prepare your system for the exercise.
+
+This command ensures that the cluster API is reachable, and creates the resource files that you will be using in the activity. It also creates the execute-troubleshoot project with an application that you will diagnose and fix during this exercise.
+
+[student@workstation ~]$ lab execute-troubleshoot start
+Log in to the OpenShift cluster and inspect the status of your cluster nodes.
+
+Source the classroom configuration file that is accessible at /usr/local/etc/ocp4.config.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to the cluster as the kubeadmin user. When prompted, accept the insecure certificate.
+
+[student@workstation ~]$ oc login -u kubeadmin -p ${RHT_OCP4_KUBEADM_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+The server uses a certificate signed by an unknown authority.
+You can bypass the certificate check, but any data you send to the server could be intercepted by others.
+Use insecure connections? (y/n): y
+
+Login successful.
+...output omitted...
+Verify that all nodes on your cluster are ready. The names of the nodes from your cluster will differ.
+
+[student@workstation ~]$ oc get nodes
+NAME                                         STATUS   ROLES    ...
+ip-10-0-134-122.us-west-1.compute.internal   Ready    master   ...
+ip-10-0-140-84.us-west-1.compute.internal    Ready    worker   ...
+ip-10-0-152-96.us-west-2.compute.internal    Ready    worker   ...
+...output omitted...
+Verify whether any of your worker nodes are close to using all of the CPU and memory available to them. Use the node-role.kubernetes.io/worker label to filter the oc adm top command output to show only worker nodes.
+
+Repeat the following command a few times to prove that you see actual usage of CPU and memory from your nodes. The numbers you see should change slightly each time you repeat the command.
+
+[student@workstation ~]$ oc adm top node -l node-role.kubernetes.io/worker
+NAME                                        CPU(cores)  CPU%  MEMORY(bytes)  ...
+ip-10-0-140-84.us-west-1.compute.internal   489m        13%   6447Mi         ...
+ip-10-0-152-96.us-west-2.compute.internal   159m        4%     921Mi         ...
+...output omitted...
+Pick up one of your worker nodes and pass its name to the oc describe command to verify that all of the conditions that might indicate problems are false.
+
+[student@workstation ~]$ oc describe node \
+>    ip-10-0-140-84.us-west-1.compute.internal
+...output omitted...
+Conditions:
+  Type             Status  ...   Message
+  ----             ------  ...   -------
+  MemoryPressure   False   ...   kubelet has sufficient memory available
+  DiskPressure     False   ...   kubelet has no disk pressure
+  PIDPressure      False   ...   kubelet has sufficient PID available
+  Ready            True    ...   kubelet is posting ready status
+Addresses:
+...output omitted...
+Review the logs of the internal registry operator, the internal registry server, and the Kubelet of a node. You are not looking for anything in these logs, but you must be able to find them.
+
+List all pods inside the openshift-image-registry project, and then identify the pod that runs the operator and the pod that runs the internal registry server.
+
+[student@workstation ~]$ oc get pod -n openshift-image-registry
+NAME                                               READY   STATUS    ...
+cluster-image-registry-operator-564bd5dd8f-s46bz   2/2     Running   ...
+image-registry-794dfc7978-w7w69                    1/1     Running   ...
+...output omitted...
+Follow the logs of the operator pod (cluster-image-registry-operator-xxx). The following command fails because that pod has two containers.
+
+[student@workstation ~]$ oc logs --tail 3 -n openshift-image-registry \
+>    cluster-image-registry-operator-564bd5dd8f-s46bz
+Error from server (BadRequest): a container name must be specified for pod cluster-image-registry-operator-564bd5dd8f-s46bz, choose one of: [cluster-image-registry-operator cluster-image-registry-operator-watch]
+Follow the logs of the first container of the operator pod. Your output might be different than the following example.
+
+[student@workstation ~]$ oc logs --tail 3 -n openshift-image-registry \
+>    -c cluster-image-registry-operator \
+>    cluster-image-registry-operator-564bd5dd8f-s46bz
+I0925 13:15:48.252294      13 controller.go:260] event from workqueue successfully processed
+I0925 13:15:51.261479      13 controller.go:260] event from workqueue successfully processed
+I0925 13:15:54.273422      13 controller.go:260] event from workqueue successfully processed
+Follow the logs of the image registry server pod (image-registry-xxx from the output of the oc get pod command run previously). Your output might be different than the following example.
+
+[student@workstation ~]$ oc logs --tail 3 -n openshift-image-registry \
+>    image-registry-794dfc7978-w7w69
+time="2019-09-25T21:18:06.824891032Z" level=info msg="authorized request" go.version=go1.11.6 http.request.host="10.129.2.44:5000" http.request.id=e160dea2-d336-48aa-aed3-cf154343f32b http.request.method=GET http.request.remoteaddr="10.129.2.50:59500" http.request.uri=/extensions/v2/metrics http.request.useragent=Prometheus/2.11.0 openshift.auth.user="system:serviceaccount:openshift-monitoring:prometheus-k8s"
+time="2019-09-25T21:18:06.827613809Z" level=info msg="response completed" go.version=go1.11.6 http.request.host="10.129.2.44:5000" http.request.id=e160dea2-d336-48aa-aed3-cf154343f32b http.request.method=GET http.request.remoteaddr="10.129.2.50:59500" http.request.uri=/extensions/v2/metrics http.request.useragent=Prometheus/2.11.0 http.response.contenttype="text/plain; version=0.0.4" http.response.duration=12.008217ms http.response.status=200 http.response.written=2326
+time="2019-09-25T21:18:06.827703727Z" level=info msg=response go.version=go1.11.6 http.request.host="10.129.2.44:5000" http.request.id=f4d83df5-8ed7-4651-81d4-4ed9f758c67d http.request.method=GET http.request.remoteaddr="10.129.2.50:59500" http.request.uri=/extensions/v2/metrics http.request.useragent=Prometheus/2.11.0 http.response.contenttype="text/plain; version=0.0.4" http.response.duration=12.141585ms http.response.status=200 http.response.written=2326
+Follow the logs of the Kubelet from the same node that you inspected for CPU and memory usage in the previous step. Your output might be different than the following example.
+
+[student@workstation ~]$ oc adm node-logs --tail 3 -u kubelet \
+>    ip-10-0-140-84.us-west-1.compute.internal
+-- Logs begin at Fri 2019-09-20 09:39:27 UTC, end at Wed 2019-09-25 13:19:54 UTC. --
+Sep 25 13:19:54 ip-10-0-140-84 hyperkube[2015]: I0925 13:19:54.325329    2015 prober.go:125] Liveness probe for "kube-apiserver-ip-10-0-140-84.us-west-2.compute.internal_openshift-kube-apiserver(bfe09eb62916b8951088b20e1aa485f0):kube-apiserver-12" succeeded
+Sep 25 13:19:54 ip-10-0-140-84 hyperkube[2015]: I0925 13:19:54.375124    2015 prober.go:125] Readiness probe for "kube-apiserver-ip-10-0-140-84.us-west-2.compute.internal_openshift-kube-apiserver(bfe09eb62916b8951088b20e1aa485f0):kube-apiserver-12" succeeded
+Sep 25 13:19:54 ip-10-0-140-84 hyperkube[2015]: I0925 13:19:54.701851    2015 prober.go:125] Liveness probe for "kube-controller-manager-ip-10-0-140-84.us-west-2.compute.internal_openshift-kube-controller-manager(07e7f7c664aa27443aec3bb3245638c7):kube-controller-manager-7" succeeded
+Start a shell session to the same worker node that you previously used to inspect its OpenShift services and pods. Do not make any change to the node, such as stopping services or editing configuration files.
+
+Start a shell session on the working node, and then use the chroot command to enter the local file system of the host.
+
+[student@workstation ~]$ oc debug node/ip-10-0-140-84.us-west-1.compute.internal
+Starting pod/ip-10-0-140-20us-east-2computeinternal-debug ...
+To use host binaries, run `chroot /host`
+Pod IP: 10.0.140.84
+If you don't see a command prompt, try pressing enter.
+sh-4.2# chroot /host
+sh-4.2# 
+Still using the same shell session, verify that the Kubelet and the CRI-O container engine are running. Type q to exit the command.
+
+sh-4.2# systemctl status kubelet
+● kubelet.service - Kubernetes Kubelet
+   Loaded: loaded (/etc/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+  Drop-In: /etc/systemd/system/kubelet.service.d
+           └─10-default-env.conf
+   Active: active (running) since Mon 2019-09-23 16:41:32 UTC; 3h 59min ago
+...output omitted...
+q
+Rerun the same command against the cri-o service. Type q to exit from the command.
+
+sh-4.2# systemctl status cri-o
+● crio.service - Open Container Initiative Daemon
+   Loaded: loaded (/usr/lib/systemd/system/crio.service; disabled; vendor preset: disabled)
+  Drop-In: /etc/systemd/system/crio.service.d
+           └─10-default-env.conf
+   Active: active (running) since Mon 2019-09-23 16:41:30 UTC; 4h 1min ago
+...output omitted...
+q
+Still using the same shell session, verify that the openvswitch pod is running.
+
+sh-4.2# crictl ps --name openvswitch
+CONTAINER ID    ...   STATE     NAME          ATTEMPT   POD ID
+13f0b0ed3497a   ...   Running   openvswitch   1         4bc278dddf007
+Terminate the chroot session and shell session to the node. This also terminates the oc debug node command.
+
+sh-4.4# exit
+exit
+sh-4.2# exit
+exit
+
+Removing debug pod ...
+[student@workstation ~]$
+Enter the execute-troubleshoot project to diagnose a pod that is in an error state.
+
+Use the execute-troubleshoot project.
+
+[student@workstation ~]$ oc project execute-troubleshoot
+Now using project "execute-troubleshoot" on server
+"https://api.cluster.domain.example.com:6443".
+Verify that the project has a single pod in either the ErrImagePull or ImagePullBackOff status.
+
+[student@workstation ~]$ oc get pod
+NAME                   READY   STATUS             ...
+psql-7d4cc9d6d-m5r59   0/1     ImagePullBackOff   ...
+Verify that the project includes a Kubernetes deployment that manages the pod.
+
+[student@workstation ~]$ oc status
+...output omitted...
+deployment/psql deploys registry.access.redhat.com/rhscl/postgresq-96-rhel7:1
+  deployment #1 running for 8 minutes - 0/1 pods
+...output omitted...
+List all events from the current project and look for error messages related to the pod.
+
+[student@workstation ~]$ oc get events
+LAST SEEN   TYPE      REASON              OBJECT                      MESSAGE
+112s        Normal    Scheduled           pod/psql-7d4cc9d6d-m5r59    Successfully assigned execute-troubleshoot/psql-7d4cc9d6d-m5r59 to ip-10-0-143-197.us-west-1.compute.internal
+21s         Normal    Pulling             pod/psql-7d4cc9d6d-m5r59    Pulling image "registry.access.redhat.com/rhscl/postgresq-96-rhel7:1"
+21s         Warning   Failed              pod/psql-7d4cc9d6d-m5r59    Failed to pull image "registry.access.redhat.com/rhscl/postgresq-96-rhel7:1": rpc error: code = Unknown desc = Error reading manifest 1-40 in registry.rht-16-1.dev.nextcle.com/rhscl/postgresq-96-rhel7: manifest unknown: manifest unknown
+21s         Warning   Failed              pod/psql-7d4cc9d6d-m5r59    Error: ErrImagePull
+8s          Normal    BackOff             pod/psql-7d4cc9d6d-m5r59    Back-off pulling image "registry.access.redhat.com/rhscl/postgresq-96-rhel7:1"
+8s          Warning   Failed              pod/psql-7d4cc9d6d-m5r59    Error: ImagePullBackOff
+112s        Normal    SuccessfulCreate    replicaset/psql-7d4cc9d6d   Created pod: psql-7d4cc9d6d-m5r59
+112s        Normal    ScalingReplicaSet   deployment/psql             Scaled up replica set psql-7d4cc9d6d to 1
+This output also indicates a problem getting the image for deploying the pod.
+
+Use Skopeo to find information about the container image from the events.
+
+[student@workstation ~]$ skopeo inspect \
+>    docker://registry.access.redhat.com/rhscl/postgresq-96-rhel7:1
+FATA[0003] Error reading manifest 1 in registry.access.redhat.com/rhscl/postgresq-96-rhel7: name unknown: Repo not found 
+It looks like the container image is misspelled. Verify that it works if you replace postgresq-96-rhel7 with postgresql-96-rhel7.
+
+[student@workstation ~]$ skopeo inspect \
+>    docker://registry.access.redhat.com/rhscl/postgresql-96-rhel7:1
+{
+    "Name": "registry.access.redhat.com/rhscl/postgresql-96-rhel7",
+...output omitted...
+To verify that the image name is the root cause of the error, edit the psql deployment to correct the name of the container image. The oc edit commands uses vi as the default editor.
+
+WARNING
+In a real-world scenario, you would ask whoever deployed the PostgreSQL database to fix their YAML and redeploy their application.
+
+[student@workstation ~]$ oc edit deployment/psql
+...output omitted...
+    spec:
+      containers:
+      - env:
+        - name: POSTGRESQL_DATABASE
+          value: db
+        - name: POSTGRESQL_PASSWORD
+          value: pass
+        - name: POSTGRESQL_USER
+          value: user
+        image: registry.access.redhat.com/rhscl/postgresql-96-rhel7:1
+...output omitted...
+Verify that a new deployment is active.
+
+[student@workstation ~]$ oc status
+...output omitted...
+  deployment #2 running for 10 seconds - 0/1 pods
+  deployment #1 deployed 5 minutes ago
+List all pods in the current project. You might see both the old failing pod and the new pod for a few moments. Repeat the following command until you see that the new pod is ready and running, and you no longer see the old pod.
+
+[student@workstation ~]$ oc get pods
+NAME                             READY   STATUS    RESTARTS   AGE
+psql-544c9c666f-btlw8  1/1     Running   0          55s
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab execute-troubleshoot finish

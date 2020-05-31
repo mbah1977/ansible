@@ -1,0 +1,99 @@
+Describing Cluster Operators
+Objectives
+After completing this section, you should be able to describe what a cluster operator is, how it works, and name the major cluster operators.
+
+Introducing Kubernetes Operators
+Kubernetes operators are applications that invoke the Kubernetes API to manage Kubernetes resources. As for any Kubernetes application, you deploy an operator by defining Kubernetes resources such as services and deployments that reference the operator's container image. Because operators, unlike common applications, require direct access to the Kubernetes resources, they usually require custom security settings.
+
+Operators usually define custom resources (CR) that store their settings and configurations. An OpenShift administrator manages an operator my editing its custom resources. The syntax of a custom resource is defined by a custom resource definition (CRD).
+
+Most operators manage another application; for example, an operator that manages a database server. In that case, the operator creates the resources that describe that other application using the information from its custom resource.
+
+The purpose of an operator is usually to automate tasks that a human administrator (or human operator) would perform to deploy, update, and manage an application.
+
+Introducing the Operator Framework
+You can develop operators using your preferred programming language. Technically you do not need a special-purpose SDK to develop an operator. All you need is the ability to invoke REST APIs and consume secrets that contain access credentials to the Kubernetes APIs.
+
+The Operator Framework is an open source toolkit for building, testing, and packaging operators. The Operator Framework makes these tasks easier than coding directly to low-level Kubernetes APIs by providing the following components:
+
+Operator Software Development Kit (Operator SDK)
+Provides a set of Golang libraries and source code examples that implement common patterns in operator applications. It also provides a container image and playbook examples that allow you to develop operators using Ansible.
+
+Operator Life Cycle Manager (OLM)
+Provides an application that manages the deployment, resource utilization, updates, and deletion of operators that have been deployed through an operator catalog. The OLM itself is an operator that comes preinstalled with OpenShift.
+
+The Operator Framework also defines a set of recommended practices for implementing operators and CRDs and a standard way of packaging an operator manifest, as a container image, that allows an operator to be distributed using an operator catalog. The most common form of an operator catalog is an image registry server.
+
+An operator container image that follows the Operator Framework standards contains all resource definitions required to deploy the operator application. This way the OLM can install an operator automatically. If an operator is not built and packaged by following the Operator Framework standards, the OLM will not be able to install nor manage that operator.
+
+Introducing OperatorHub
+OperatorHub provides a web interface to discover and publish operators that follow the Operator Framework standards. Both open source operators and commercial operators can be published to the Operator hub. Operator container images can be hosted at different image registries, for example Quay.io.
+
+Introducing OpenShift Cluster Operators
+Cluster operators are regular operators except that they are not managed by the OLM. They are managed by the OpenShift Cluster Version Operator, which is sometimes called a first-level operator. All cluster operators are also called second-level operators.
+
+OpenShift cluster operators provide OpenShift extension APIs and infrastructure services such as:
+
+The OAuth server, which authenticates access to the master and extensions APIs.
+
+The core DNS server, which manages service discovery inside the cluster.
+
+The web console, which allows graphical management of the cluster.
+
+The internal image registry, which allow developers to host container images inside the cluster, using either S2I or another mechanism.
+
+The monitoring stack, which generates metrics and alerts about the cluster health.
+
+Some cluster operators manage node or control plane settings. For example, with upstream Kubernetes you edit a node configuration file to add storage and network plug-ins, and these plug-ins may require additional configuration files. OpenShift supports operators that manage configuration files in all nodes and reload the node services that are affected by changes to these files.
+
+IMPORTANT
+OpenShift 4 deprecates the usage of SSH sessions to manage nodes configuration and system services. This ensures that you do not customize the nodes, and that they can be safely added or removed from a cluster. You are expected to perform all administrative actions indirectly by editing custom resources and then wait for their respective operators to apply your changes.
+
+Exploring OpenShift Cluster Operators
+Usually an operator and its managed application share the same project. In the case of cluster operators, these are in the openshift-* projects.
+
+Every cluster operator defines a custom resource of type ClusterOperator. Cluster operators manage the cluster itself, including the API server, the web console, or the network stack. Each cluster operator defines a set of custom resources, to further control its components. The ClusterOperator API resource exposes information such as the health of the update, or the version of the component.
+
+Operators are apparent from their name, for example, the console cluster operator provides the web console, the ingress cluster operator enables ingresses and routes. The following lists some of the cluster operators.
+
+network
+
+ingress
+
+storage
+
+authentication
+
+console
+
+monitoring
+
+image-registry
+
+cluster-autoscaler
+
+openshift-apiserver
+
+dns
+
+openshift-controller-manager
+
+cloud-credential
+
+ 
+REFERENCES
+Further information is accessible in the Red Hat OpenShift Container Platform 4.2 product documentation at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/
+
+Introducing the Operator Framework
+
+
+
+Operator Terminology	Name
+An open source toolkit for building, testing, and packaging operators.	operator sdk
+A repository for discovering and installing operators.	operator catalog
+An extension of the Kubernetes API that defines the syntax of a custom resource. custom resource definition	
+The artifact defined by the Operator Framework that you can publish for consumption by an OLM instance.	operator image
+An application that manages Kubernetes resources.	operator
+An application that manages Kubernetes operators.	OLM
+A public web service where you can publish operators that are compatible with the OLM.	oepratorhub
+

@@ -1,0 +1,505 @@
+
+Guided Exercise: Controlling Cluster Network Ingress
+In this exercise, you will expose an application secured by TLS certificates.
+
+Outcomes
+
+You should be able to:
+
+Deploy an application and create an unencrypted route for it.
+
+Create an OpenShift edge route with encryption.
+
+Update an OpenShift deployment to support a new version of the application.
+
+Create an OpenShift TLS secret and mount it to your application.
+
+Verify that the communication to the application is encrypted.
+
+To perform this exercise, ensure that you have access to:
+
+A running OpenShift cluster.
+
+On the workstation machine, use the lab command to prepare your system for this exercise.
+
+The command ensures that the cluster API is reachable, and creates the network-ingress OpenShift project. It also gives the developer user edit access on the project.
+
+[student@workstation ~]$ lab network-ingress start
+As an application developer, you are ready to deploy your application in OpenShift. In this activity, you will deploy two versions of the application, one that is exposed over unencrypted traffic (HTTP), and one that is exposed over secure traffic.
+
+The container image, accessible at https://quay.io/redhattraining/todo-angular, has two tags: v1.1, which is the insecure version of the application, and v1.2, which is the secure version. Your organization uses its own certificate authority (CA) that can sign certificates for the *.apps.cluster.domain.example.com and *.cluster.domain.example.com domains.
+
+The CA certificate is accessible at ~/DO280/labs/network-ingress/certs/training-CA.pem. The passphrase.txt contains a unique password that protects the CA key. The certs folder also contains the CA key.
+
+Log in to the OpenShift cluster and create the network-ingress project.
+
+From workstation, open a terminal and source the classroom configuration file that is accessible at /usr/local/etc/ocp4.config.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to the cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD} \
+>   ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Create the network-ingress project.
+
+[student@workstation ~]$ oc new-project network-ingress
+The OpenShift deployment file for the application is accessible at ~/DO280/labs/network-ingress/todo-app-v1.yaml. The deployment points to quay.io/redhattraining/todo-angular:v1.1, which is the initial and unencrypted version of the application. The file defines the todo-http service that points to the application pod.
+
+Create the application and expose the service.
+
+Use oc create to deploy the application in the network-ingress OpenShift project.
+
+[student@workstation ~]$ oc create -f \
+>   ~/DO280/labs/network-ingress/todo-app-v1.yaml
+deployment.apps/todo-http created
+service/todo-http created
+Wait a couple of minutes, so that the application can start, and then review the resources in the project.
+
+[student@workstation ~]$ oc status
+In project network-sdn on server https://api.cluster.domain.example.com:6443
+
+svc/todo-http - 172.30.247.75:80 -> 8080
+  deployment/todo-http deploys quay.io/redhattraining/todo-angular:v1.1
+    deployment #1 running for 16 seconds - 1 pod
+...output omitted...
+Run oc expose to create a route for accessing the application. Give the route a host name of todo-http.apps.cluster.domain.example.com.
+
+[student@workstation ~]$ oc expose svc todo-http \
+>   --hostname http.${RHT_OCP4_WILDCARD_DOMAIN}
+route.route.openshift.io/todo-http exposed
+Retrieve the name of the route and copy it to the clipboard.
+
+[student@workstation ~]$ oc get routes
+NAME        HOST/PORT                              ... SERVICES   ...
+todo-http   http.apps.cluster.domain.example.com   ... todo-http  ...
+From workstation, open Firefox and access http://http.apps.cluster.domain.example.com. Replace the domain with the content of the RHT_OCP4_WILDCARD_DOMAIN variable.
+
+Confirm that you can see the To Do application.
+
+From workstation open a new terminal tab and run tcpdump with the following options to intercept the traffic on port 80:
+
+-i ensX intercepts traffic on the main interface.
+
+-A strips the headers and prints the packets in ASCII format.
+
+-n disables DNS resolution.
+
+port 80 is the port of the application.
+
+Optionally, the grep command allows you to filter on JavaScript resources.
+
+Start by retrieving the name of the main interface whose IP is 172.25.250.9.
+
+[student@workstation ~]$ ip a | grep 172.25.250.9
+inet 172.25.250.9/24 brd 172.25.250.255 scope global noprefixroute ens3
+[student@workstation ~]$ sudo tcpdump -i ens3 -A \
+>    -n port 80 | grep js
+NOTE
+The full command is available at ~/DO280/labs/network-ingress/tcpdump-command.txt.
+
+On Firefox, refresh the page and notice the activity in the terminal. Type Ctrl+C to stop the capture.
+
+...output omitted...
+             toBe('Pretty text with some links: http://angularjs.org/, us@somewhere.org, ' +
+             toBe('Pretty text with some links: http://angularjs.org/, mailto:us@somewhere.org, ' +
+            toBe('http://angularjs.org/');
+...output omitted...
+    /*jshint validthis: true */
+    /*jshint validthis: true */
+...output omitted...
+Create a secure edge route. Edge certificates encrypt the traffic between the client and the router, but leave the traffic between the router and the service unencrypted. OpenShift generates its own certificate that it signs with its CA.
+
+In later steps, you extract the CA to ensure the signing of the route certificate.
+
+Go to ~/DO280/labs/network-ingress and run the oc create route command to define the new route.
+
+Give the route a host name of https.apps.cluster.domain.example.com.
+
+[student@workstation ~]$ cd ~/DO280/labs/network-ingress
+[student@workstation network-ingress]$ oc create route edge https \
+>   --service todo-http \
+>   --hostname https.${RHT_OCP4_WILDCARD_DOMAIN}
+route.route.openshift.io/https created
+To test the route and read the certificate, open Firefox and access https://https.apps.cluster.domain.example.com. Upon first access, Firefox warns you about the certificate. Click Advanced, then Add Exception and then View Certificate to read the certificate.
+
+Locate the CN entry that indicates that the OpenShift ingress operator created the certificate with its own CA.
+
+
+Use curl to further confirm rejection of the certificate.
+
+[student@workstation network-ingress]$ curl \
+>   https://https.${RHT_OCP4_WILDCARD_DOMAIN}
+curl: (60) SSL certificate problem: self signed certificate in certificate chain
+...output omitted...
+One way to verify how the certificate is signed by OpenShift is to retrieve the CA that the ingress operator uses. This allows you to validate the edge certificate against the CA.
+
+From workstation, log in to the cluster as the admin user. The developer user is not allowed to retrieve the CA.
+
+IMPORTANT
+In a real word scenario, administrators with access to the namespace retrieve that CA and give it to the developers.
+
+[student@workstation network-ingress]$ oc login -u admin \
+>   -p ${RHT_OCP4_USER_PASSWD}
+Run oc extract to retrieve the CA present in the openshift-ingress-operator namespace.
+
+[student@workstation network-ingress]$ oc extract secrets/router-ca \
+>   --keys tls.crt -n openshift-ingress-operator
+tls.crt
+From the terminal, use curl to retrieve the connection headers. Use the --cacert option to pass the CA to Curl.
+
+The Server certificate section shows some information about the certificate, and the alternative name matches the name of the route.
+
+[student@workstation network-ingress]$ curl -I -v \
+>   --cacert tls.crt https://https.${RHT_OCP4_WILDCARD_DOMAIN}
+...output omitted...
+* Server certificate:
+*  subject: CN=*.apps.cluster.domain.example.com
+*  start date: Nov 22 16:15:50 2019 GMT
+*  expire date: Nov 21 16:15:51 2021 GMT
+*  subjectAltName: host "https.apps.cluster.domain.example.com \
+   matched cert's "*.apps.cluster.domain.example.com"
+*  issuer: CN=ingress-operator@1574439346
+*  SSL certificate verify ok.
+...output omitted...
+The output indicates that Curl trusts the remote certificate, since it matches the CA.
+
+Log back as the developer user.
+
+[student@workstation network-ingress]$ oc login -u developer \
+>   -p ${RHT_OCP4_USER_PASSWD}
+Although the traffic is encrypted at the edge with a certificate, you can still access the insecure traffic at the service level. This is because the pod behind the service does not offer an encrypted route.
+
+Retrieve the IP address of the todo-http service.
+
+[student@workstation network-ingress]$ oc get svc todo-http \
+>   -o jsonpath="{.spec.clusterIP}{'\n'}"
+172.30.102.29
+Create a debug pod in the todo-http deployment. Use the Red Hat Universal Base Image (UBI), which contains some basic tools to interact with containers.
+
+[student@workstation network-ingress]$ oc debug -t deployment/todo-http \
+>   --image registry.access.redhat.com/ubi8/ubi:8.0
+Starting pod/todo-http-debug ...
+Pod IP: 10.131.0.255
+If you don't see a command prompt, try pressing enter.
+sh-4.4$ 
+From the debug pod, use curl to access the service over HTTP. Replace the IP address with the one that you obtained in a previous step.
+
+The output indicates that the application is available over HTTP.
+
+sh-4.4$ curl -v 172.30.102.29
+* Rebuilt URL to: 172.30.102.29/
+*   Trying 172.30.102.29...
+* TCP_NODELAY set
+* Connected to 172.30.102.29 (172.30.102.29) port 80 (#0)
+> GET / HTTP/1.1
+> Host: 172.30.102.29
+> User-Agent: curl/7.61.1
+> Accept: */*
+>
+< HTTP/1.1 200 OK
+< Server: nginx/1.14.1
+< Date: Fri, 29 Nov 2019 22:21:09 GMT
+< Content-Type: text/html
+< Transfer-Encoding: chunked
+< Connection: keep-alive
+...output omitted...
+Exit the debug pod.
+
+sh-4.4$ exit
+Removing debug pod ...
+Delete the edge route. In the next steps, you define the pass-through route.
+
+[student@workstation network-ingress]$ oc delete route https
+route.route.openshift.io "https" deleted
+Generate TLS certificates for the application.
+
+In the following steps, you generate a CA-signed certificate that you attach as a secret to the pod. You then configure a secure route in pass-through mode and let the application expose that certificate.
+
+Go to the ~/DO280/labs/network-ingress/certs directory and list the files.
+
+[student@workstation network-ingress]$ cd certs
+[student@workstation certs]$ ls -al
+total 16
+drwxr-xr-x. 2 student student   94 Nov 29 19:20 .
+drwxr-xr-x. 3 student student  113 Nov 29 19:06 ..
+-rw-rw-r--. 1 student student  604 Nov 29 17:35 openssl-commands.txt
+-rw-r--r--. 1 student student   33 Nov 29 17:35 passphrase.txt
+-rw-r--r--. 1 student student 1743 Nov 29 17:35 training-CA.key
+-rw-r--r--. 1 student student 1363 Nov 29 17:35 training-CA.pem
+-rw-r--r--. 1 student student  406 Nov 29 17:35 training.ext
+Generate the private key for your CA-signed certificate.
+
+NOTE
+The following commands for generating a signed certificate are all available in the openssl-commands.txt file, available in the directory.
+
+[student@workstation certs~]$ openssl genrsa \
+>   -out training.key 2048
+Generating RSA private key, 2048 bit long modulus
+....................
+.....+++
+..........................................+++
+e is 65537 (0x10001)
+Generate the certificate signing request (CSR) for todo-apps.cluster.domain.example.com. Make sure to type the subject of the request in one line. Alternatively, remove the -subj option and its content. This prompts you for the values; make sure to indicate a common name (CN) of https.${RHT_OCP4_WILDCARD_DOMAIN}.
+
+[student@workstation certs]$ openssl req -new \
+>   -subj "/C=US/ST=North Carolina/L=Raleigh/O=Red Hat/\
+> CN=https.${RHT_OCP4_WILDCARD_DOMAIN}" \
+>   -key training.key -out training.csr
+Finally, generate the signed certificate. Notice the usage of the -CA and -CAkey options for signing the certificate against the CA. The -passin option allows you to reuse the password of the CA. The extfile option allows you to define a Subject Alternative Name (SAN).
+
+[student@workstation certs]$ openssl x509 -req -in training.csr \
+>   -passin file:passphrase.txt \
+>   -CA training-CA.pem -CAkey training-CA.key -CAcreateserial \
+>   -out training.crt -days 1825 -sha256 -extfile training.ext
+Signature ok
+subject=/C=US/ST=North Carolina/L=Raleigh/O=Red Hat/
+CN=https.apps.cluster.domain.example.com
+Getting CA Private Key
+Ensure that the newly created certificate and key are present in the current directory.
+
+[student@workstation certs]$ ls -alt
+total 36
+-rw-rw-r--. 1 student student 1484 Nov 29 19:46 training.crt
+-rw-rw-r--. 1 student student   17 Nov 29 19:46 training-CA.srl
+-rw-rw-r--. 1 student student 1050 Nov 29 19:45 training.csr
+-rw-rw-r--. 1 student student 1050 Nov 29 19:31 .
+-rw-rw-r--. 1 student student 1675 Nov 29 19:45 training.key
+drwxr-xr-x. 3 student student  109 Nov 29 19:42 ..
+-rw-r--r--. 1 student student 1363 Nov 29 19:38 training-CA.pem
+-rw-r--r--. 1 student student 1751 Nov 29 19:38 training-CA.key
+-rw-r--r--. 1 student student  406 Nov 29 19:38 training.ext
+-rw-r--r--. 1 student student   33 Nov 29 19:38 passphrase.txt
+-rw-r--r--. 1 student student  604 Nov 29 19:32 openssl-commands.txt
+Go back to the network-ingress directory. This is important as the next step involves the creation of a route using the self-signed certificate.
+
+[student@workstation certs]$ cd ~/DO280/labs/network-ingress
+Deploy a new version of your application. The new version of the application expects a certificate and a key inside the container at /usr/local/etc/ssl/certs. The web server in that version is configured with SSL support. Create a secret to import the certificate from workstation. In a later step, the application deployment requests that secret and exposes its content to the container at /usr/local/etc/ssl/certs.
+
+Create a tls OpenShift secret named todo-certs. Use the --cert and --key options to embed the TLS certificates. Use training.csr as the certificate, and training.key as the key.
+
+[student@workstation network-ingress]$ oc create secret tls todo-certs \
+>   --cert=certs/training.crt \
+>   --key=certs/training.key
+secret/todo-certs created
+The deployment file, accessible at ~/DO280/labs/network-ingress/todo-app-v2.yaml, points to version 2 of the container image. The new version of the application is configured to support SSL certificates. Run oc create to create a new deployment using that image.
+
+[student@workstation network-ingress]$ oc create -f todo-app-v2.yaml
+deployment.apps/todo-https created
+service/todo-https created
+Wait a couple of minutes to ensure that the application pod is running. Copy the pod name to your clipboard.
+
+[student@workstation network-ingress]$ oc get pods
+NAME                          READY   STATUS    RESTARTS   AGE
+...output omitted...
+todo-https-59d8fc9d47-265ds   1/1     Running   0          62s
+Review the volumes that are mounted inside the pod. The output indicates that the certificates are mounted to /usr/local/etc/ssl/certs.
+
+[student@workstation network-ingress]$ oc describe pod \
+>   todo-https-59d8fc9d47-265ds | grep Mounts -A2
+    Mounts:
+      /usr/local/etc/ssl/certs from tls-certs (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-prz4k (ro)
+Create the secure pass-through route.
+
+Run the oc create route command to define the new route.
+
+Give the route a host name of todo-https.apps.cluster.domain.example.com.
+
+[student@workstation network-ingress]$ oc create route passthrough https \
+>   --service todo-https --port 8443 \
+>   --hostname https.${RHT_OCP4_WILDCARD_DOMAIN}
+route.route.openshift.io/todo-https created
+Use curl in verbose mode to test the route and read the certificate. Use the --cacert option to pass the CA certificate to curl.
+
+The output indicates a match between the certificate chain and the application certificate. This indicates that the OpenShift router only forwards packets that are encrypted by the application web server certificate.
+
+[student@workstation network-ingress]$ curl -vvI \
+>   --cacert certs/training-CA.pem \
+>   https://https.${RHT_OCP4_WILDCARD_DOMAIN}
+...output omitted...
+* Server certificate:
+*  subject: C=US; ST=North Carolina; L=Raleigh; O=Red Hat; \
+   CN=https.apps.cluster.domain.example.com
+*  start date: Jan  3 21:31:19 2020 GMT
+*  expire date: Jan  1 21:31:19 2025 GMT
+*  subjectAltName: host "https.apps.cluster.domain.example.com" \
+   matched cert's "*.apps.cluster.domain.example.com"
+*  issuer: C=US; ST=North Carolina; L=Raleigh; O=Red Hat; \
+   CN=cluster.domain.example.com
+*  SSL certificate verify ok.
+Create a new debug pod to further confirm proper encryption at the service level.
+
+Retrieve the IP address of the todo-https service.
+
+[student@workstation network-ingress]$ oc get svc todo-https \
+>   -o jsonpath="{.spec.clusterIP}{'\n'}"
+172.30.121.154
+Create a debug pod in the todo-https deployment with the Red Hat UBI.
+
+[student@workstation network-ingress]$ oc debug -t deployment/todo-https \
+>   --image registry.access.redhat.com/ubi8/ubi:8.0
+Starting pod/todo-https-debug ...
+Pod IP: 10.128.2.129
+If you don't see a command prompt, try pressing enter.
+sh-4.4$ 
+From the debug pod, use curl to access the service over HTTP. Replace the IP address with the one that you obtained in a previous step.
+
+The output indicates that the application is not available over HTTP, and the web server redirects you to the secure version.
+
+sh-4.4$ curl -I http://172.30.102.29
+HTTP/1.1 301 Moved Permanently
+Server: nginx/1.14.1
+Date: Sat, 30 Nov 2019 00:01:35 GMT
+Content-Type: text/html
+Connection: keep-alive
+Location: https://172.30.102.29:8443/
+Finally, access the application over HTTPS. Use the -k option because the container does not have access to the CA certificate.
+
+sh-4.4$ curl -k https://172.30.102.29:8443
+<!DOCTYPE html>
+<html lang="en" ng-app="todoItemsApp" ng-controller="appCtl">
+<head>
+    <meta charset="utf-8">
+    <title>ToDo app</title>
+Exit the debug pod.
+
+sh-4.4$ exit
+Removing debug pod ...
+Go to the home directory and delete the network-ingress project.
+
+[student@workstation network-ingress]$ cd
+[student@workstation ~]$ oc delete project network-ingress
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab network-ingress finish
+This concludes the guided exercise.
+
+
+
+
+Lab: Configuring OpenShift Networking Components
+In this lab, you will configure a TLS pass-through route for your application.
+
+Outcomes
+
+You should be able to:
+
+Deploy an application and configure an insecure route.
+
+Generate a TLS certificate for an application.
+
+Configure a pass-through termination route for an application with a TLS certificate.
+
+To perform this exercise, ensure that you have access to:
+
+A running OpenShift cluster.
+
+The OpenShift CLI (/usr/local/bin/oc).
+
+On the workstation machine, use the lab command to prepare your system for this exercise.
+
+The command ensures that the cluster API is reachable and creates the self-signed certificate authority (CA) that you use in this lab.
+
+[student@workstation ~]$ lab network-review start
+In this review, you deploy the PHP application named PHP-SSL, which prints some information about the system. The application is available in two flavors: one that runs with an unencrypted network that listens on port 8080, and one that uses a TLS certificate to encrypt the network traffic, which listens on port 8443.
+
+The container image for this review is accessible at quay.io/redhattraining/php-ssl. It has two tags: v1.0 for the insecure version of the application, and v1.1 for the secure version.
+
+As the OpenShift developer user, create the network-review project. Credentials for accessing the cluster are available at /usr/local/etc/ocp4.config
+
+
+
+
+As the developer user, deploy the first insecure version of the PHP-SSL application in the network-review OpenShift project. Use the resources file available at ~/DO280/labs/network-review/php-http.yaml.
+
+Before deploying the application, make the necessary changes to the file, namely, the location of the container image and the port on which it listens.
+
+After creating the application, wait a few moments to ensure that one pod is running.
+
+
+
+
+
+
+
+
+Create a route named php-http, with a host name of php-http.apps.cluster.domain.example.com, to access the application. Replace .apps.cluster.domain.example.com with the value of the RHT_OCP4_WILDCARD_DOMAIN variable.
+
+From workstation, use Firefox to access http://php-http.apps.cluster.domain.example.com. Confirm the availability of the application before proceeding to the next step.
+
+
+
+
+
+Generate and sign a TLS certificate for the encrypted version of the application.
+
+Create a certificate signing request (CSR) for the php-https.apps.cluster.domain.example.com domain. Save the CSR to ~/DO280/labs/network-review/certs/training.csr.
+
+Use the CSR to generate a certificate and save it to ~/DO280/labs/network-review/certs/training.crt. To generate the certificate, pass as arguments the CA accessible at ~/DO280/labs/network-review/certs/training-CA.pem and the CSR.
+
+You can use the ~/DO280/labs/network-review/certs/openssl-commands.txt text file for help. This file contains the commands for generating the certificate signing request and the certificate. Make sure to replace the values in the file before copying and running the OpenSSL commands.
+
+
+
+
+
+
+
+
+
+
+As the developer user, create an OpenShift TLS secret named php-certs in the network-review project. Use ~/DO280/labs/network-review/certs/training.crt for the certificate and ~/DO280/labs/network-review/certs/training.key for the key.
+
+
+
+Use the resources file, available at ~/DO280/labs/network-review/php-https.yaml, to deploy the second, secure version of the PHP-SSL application. Deploy the application in the network-review OpenShift project.
+
+Before deploying the application, make the necessary changes to the resources file, namely:
+
+The location of the container.
+
+The port the application listens on.
+
+The name of the secret to mount as a volume.
+
+
+
+
+
+
+
+
+
+Create a secure pass-through route named php-https, with a host name of php-https.apps.cluster.domain.example.com, to access the secure version of the application. Replace .apps.cluster.domain.example.com with the value of the RHT_OCP4_WILDCARD_DOMAIN variable.
+
+From workstation use Firefox to access https://php-https.apps.cluster.domain.example.com. Accept the signed certificate and confirm the availability of the application.
+
+
+
+
+
+Optional step: from workstation, use curl to access the HTTPS version of the application.
+
+Pass the CA certificate to the command so that Curl accepts the connection.
+
+
+Return to your home folder as the lab network-review finish command will delete the network-review folder.
+
+[student@workstation network-review]$ cd
+Evaluation
+
+As the student user on the workstation machine, use the lab command to grade your work. Correct any reported failures and rerun the command until successful.
+
+[student@workstation ~]$ lab network-review grade
+Finish
+
+As the student user on the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab network-review finish
+This concludes the lab.
+
+

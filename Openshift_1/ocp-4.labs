@@ -1,0 +1,213 @@
+Lab: Controlling access to OpenShift resources
+In this lab, you will configure users with different access levels on the cluster and on a project, and protect access credentials inside a project with a secret.
+
+Outcomes
+
+You should be able to:
+
+Remove the ability to create projects at the cluster level.
+
+Grant groups the ability to create projects.
+
+Manage user privileges in projects by granting privileges to groups.
+
+Use security context constraints to give extra privileges to service accounts.
+
+Use secrets to provide sensitive information to deployments.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+This command ensures that the cluster API is reachable and downloads the resource files necessary for this exercise.
+
+[student@workstation ~]$ lab authorization-review start
+Log in to your OpenShift cluster as the admin user and remove the ability to create projects cluster wide.
+
+Source the classroom configuration file at /usr/local/etc/ocp4.config.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to the cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Remove the self-provisioner cluster role from the system:authenticated:oauth virtual group.
+
+[student@workstation ~]$ oc adm policy remove-cluster-role-from-group  \
+>    self-provisioner system:authenticated:oauth
+Warning: Your changes may get lost whenever a master is restarted, unless you prevent reconciliation of this rolebinding using the following command: oc annotate clusterrolebinding.rbac self-provisioner 'rbac.authorization.kubernetes.io/autoupdate=false' --overwrite
+clusterrole.rbac.authorization.k8s.io/self-provisioner removed: "system:authenticated:oauth"
+NOTE
+You can safely ignore the warning about your changes being lost.
+
+Create a group named wp-mgrs for the WordPress managers and grant project creation privileges to it. Add the leader user to the group and create the authorization-review project as the leader user.
+
+Create a group named wp-mgrs.
+
+[student@workstation ~]$ oc adm groups new wp-mgrs
+group.user.openshift.io/wp-mgrs created
+Grant cluster creation privileges to the wp-mgrs group.
+
+[student@workstation ~]$ oc adm policy add-cluster-role-to-group  \
+>    self-provisioner wp-mgrs
+clusterrole.rbac.authorization.k8s.io/self-provisioner added: "wp-mgrs"
+Add the leader user to the wp-mgrs group.
+
+[student@workstation ~]$ oc adm groups add-users wp-mgrs leader
+group.user.openshift.io/wp-mgrs added: "leader"
+As the leader user, create the authorization-review project.
+
+[student@workstation ~]$ oc login -u leader -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+[student@workstation ~]$ oc new-project authorization-review
+Now using project "authorization-review" on server
+"https://api.cluster.domain.example.com:6443".
+...output omitted...
+Create a group named wp-devs and grant edit privileges on the authorization-review project. Add the developer user to the group.
+
+Log in to the cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Create a group named wp-devs.
+
+[student@workstation ~]$ oc adm groups new wp-devs
+group.user.openshift.io/wp-devs created
+Add the developer user to wp-devs.
+
+[student@workstation ~]$ oc adm groups add-users wp-devs developer
+group.user.openshift.io/wp-devs added: "developer"
+Grant edit privileges to the wp-devs group on the authorization-review project.
+
+[student@workstation ~]$ oc policy add-role-to-group edit wp-devs
+clusterrole.rbac.authorization.k8s.io/edit added: "wp-devs"
+Create a group named wp-qa and grant view privileges on the authorization-review project. Add the qa user to the group.
+
+Create a group named wp-qa.
+
+[student@workstation ~]$ oc adm groups new wp-qa
+group.user.openshift.io/wp-qa created
+Add the qa user to wp-qa.
+
+[student@workstation ~]$ oc adm groups add-users wp-qa qa
+group.user.openshift.io/wp-qa added: "qa"
+Grant view privileges to the wp-qa group on the authorization-review project.
+
+[student@workstation ~]$ oc policy add-role-to-group view wp-qa
+clusterrole.rbac.authorization.k8s.io/view added: "wp-qa"
+Allow the wordpress application to run as root: create a service account named wordpress-sa and grant the anyuid SCC to it.
+
+Create a service account named wordpress-sa.
+
+[student@workstation ~]$ oc create sa wordpress-sa
+serviceaccount/wordpress-sa created
+Grant anyuid SCC to the wordpress-sa service account.
+
+[student@workstation ~]$ oc adm policy add-scc-to-user anyuid -z wordpress-sa
+securitycontextconstraints.security.openshift.io/anyuid added to: ["system:serviceaccount:authorization-review:wordpress-sa"]
+As the developer user, create a secret named review-secret, which you will use with the MySQL database and WordPress application.
+
+The secret should include three key-value pairs: user=wpuser, password=redhat123, and database=wordpress.
+
+Log in as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Create a secret named review-secret.
+
+[student@workstation ~]$ oc create secret generic review-secret \
+>   --from-literal user=wpuser --from-literal password=redhat123 \
+>   --from-literal database=wordpress
+secret/review-secret created
+Deploy a MySQL database application named mysql using the image located at registry.access.redhat.com/rhscl/mysql-57-rhel7:5.7-47. After it was deployed, modify the deployment configuration to use the review-secret secret, as environment variables with the MYSQL_ prefix.
+
+Create a new application to deploy a mysql database server.
+
+[student@workstation ~]$ oc new-app --name mysql \
+>   --docker-image registry.access.redhat.com/rhscl/mysql-57-rhel7:5.7-47
+...output omitted...
+--> Creating resources ...
+    imagestream.image.openshift.io "mysql" created
+    deploymentconfig.apps.openshift.io "mysql" created
+    service "mysql" created
+--> Success
+...output omitted...
+Use the review-secret secret to initialize the environment variables on the mysql deployment.
+
+[student@workstation ~]$ oc set env dc/mysql --prefix MYSQL_ \
+>   --from secret/review-secret
+deploymentconfig.apps.openshift.io/mysql updated
+NOTE
+It may take a while for the deployment to roll out successfully after setting the secret.
+
+Deploy a WordPress application named wordpress using the container image located at docker.io/library/wordpress:5.3.0. Add the WORDPRESS_DB_HOST=mysql and WORDPRESS_DB_NAME=wordpress environmental variables when creating the application. Once deployed, modify the wordpress deployment configuration to use the review-secret secret as environment variables with the WORDPRESS_DB_ prefix. The application needs these additional variables to connect to the database. Because the wordpress application needs extra privileges, assign the wordpress-sa service account to it.
+
+Deploy a wordpress application.
+
+[student@workstation ~]$ oc new-app --name wordpress \
+>    --docker-image docker.io/library/wordpress:5.3.0 \
+>    -e WORDPRESS_DB_HOST=mysql \
+>    -e WORDPRESS_DB_NAME=wordpress
+...output omitted...
+-> Creating resources ...
+    imagestream.image.openshift.io "wordpress" created
+    deploymentconfig.apps.openshift.io "wordpress" created
+    service "wordpress" created
+--> Success
+...output omitted...
+Set the wordpress-sa service account to the wordpress deployment configuration.
+
+[student@workstation ~]$ oc set serviceaccount deploymentconfig wordpress \
+>    wordpress-sa
+deploymentconfig.apps.openshift.io/wordpress serviceaccount updated
+Use the review-secret secret to initialize the environment variables on the wordpress deployment.
+
+[student@workstation ~]$ oc set env dc/wordpress --prefix WORDPRESS_DB_ \
+>   --from secret/review-secret
+deploymentconfig.apps.openshift.io/wordpress updated
+NOTE
+It may take a while for the deployment to roll out successfully after setting the secret.
+
+As the qa user, verify the mysql database and wordpress application status and try to make a change to the wordpress deployment.
+
+Log in as the qa user.
+
+[student@workstation ~]$ oc login -u qa -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Verify the wordpress application status.
+
+[student@workstation ~]$ oc status
+...output omitted...
+svc/mysql - 172.30.158.22:3306
+  dc/mysql deploys istag/mysql:5.7-47
+    deployment #2 deployed 14 minutes ago - 1 pod
+    deployment #1 failed 14 minutes ago: newer deployment was found running
+
+svc/wordpress - 172.30.6.39:80
+  dc/wordpress deploys istag/wordpress:5.3.0
+    deployment #3 deployed 26 seconds ago - 1 pod
+    deployment #2 deployed 12 minutes ago
+    deployment #1 deployed 12 minutes ago
+...output omitted...
+Try to delete the wordpress application to verify that the qa user does not have edit privileges in the project.
+
+[student@workstation ~]$ oc delete all -l app=wordpress
+Error from server ... User "qa" cannot delete resource "pods" in API group "" in the namespace "authorization-review"
+Error from server ... User "qa" cannot delete resource "replicationcontrollers" in API group "" in the namespace "authorization-review"
+Error from server ... User "qa" cannot delete resource "services" in API group "" in the namespace "authorization-review"
+Error from server ... User "qa" cannot delete resource "deploymentconfigs" in API group "apps.openshift.io" in the namespace "authorization-review"
+Error from server ... User "qa" cannot delete resource "imagestreams" in API group "image.openshift.io" in the namespace "authorization-review"
+Evaluation
+
+As the student user on the workstation machine, use the lab command to grade your work. Correct any reported failures and rerun the command until successful.
+
+[student@workstation ~]$ lab authorization-review grade
+Finish
+
+As the student user on the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab authorization-review finish

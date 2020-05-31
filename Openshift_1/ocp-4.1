@@ -1,0 +1,316 @@
+Chapter 4. Controlling Access to OpenShift Resources
+Defining and Applying Permissions Using RBAC
+Guided Exercise: Defining and Applying Permissions using RBAC
+Managing Sensitive Information with Secrets
+Guided Exercise: Managing Sensitive Information With Secrets
+Controlling Application Permissions with Security Context Constraints (SCCs)
+Guided Exercise: Controlling Application Permissions with Security Context Constraints (SCC)
+Lab: Controlling access to OpenShift resources
+Summary
+Abstract
+
+Goal	Define and apply role-based access controls and protect sensitive information with secrets.
+Objectives	
+Define role-based access controls and apply permissions to users.
+
+Create and apply secrets to manage sensitive information.
+
+Create service accounts and apply permissions to pods.
+
+Sections	
+Defining and Applying Permissions using RBAC (and Guided Exercise)
+
+Managing Sensitive Information with Secrets (and Guided Exercise)
+
+Controlling Application Permissions with Security Context Constraints (and Guided Exercise)
+
+Lab	
+Chapter Review
+
+Defining and Applying Permissions Using RBAC
+Objectives
+After completing this section, you should be able to define role-based access controls and apply permissions to users.
+
+Role-based Access Control (RBAC)
+Role-based access control (RBAC) is a technique for managing access to resources in a computer system. In Red Hat OpenShift, RBAC determines if a user can perform certain actions within the cluster or project. There are two types of roles that can be used depending on the level of responsibility of the user: cluster and local.
+
+NOTE
+Authorization is a separate step from authentication.
+
+Authorization Process
+The authorization process is managed by rules, roles, and bindings.
+
+RBAC Object	Description
+Rule	Allowed actions for objects or groups of objects
+Role	Sets of rules. Users and groups can be associated with multiple roles.
+Binding	Assignment of users or groups to a role.
+RBAC Scope
+Red Hat OpenShift Container Platform (RHOCP) defines two groups of roles and bindings depending on the scope and responsibility of users: cluster roles and local roles.
+
+Role Level	Description
+Cluster Role	Users or groups with this role level can manage the OpenShift cluster.
+Local Role	Users or groups with this role level can only manage elements at a project level.
+NOTE
+Cluster role bindings take precedence over local role bindings.
+
+Managing RBAC Using the CLI
+To add a cluster role to a user, use the add-cluster-role-to-user subcommand:
+
+[user@demo ~]$ oc adm policy add-cluster-role-to-user cluster-role username
+For example, to change a regular user to a cluster administrator, use the following command:
+
+[user@demo ~]$ oc adm policy add-cluster-role-to-user cluster-admin username
+To remove a cluster role from a user, use the remove-cluster-role-from-user subcommand:
+
+[user@demo ~]$ oc adm policy remove-cluster-role-from-user cluster-role username
+For example, to change a cluster administrator to a regular user, use the following command:
+
+[user@demo ~]$ oc adm policy remove-cluster-role-from-user cluster-admin username
+Rules are defined by an action and a resource. For example, the create user rule is part of the cluster-admin role.
+
+You can use the oc adm policy who-can command to determine if a user can execute an action on a resource. For example:
+
+[user@demo ~]$ oc adm policy who-can delete user
+Default Roles
+OpenShift ships with a set of default cluster roles that can be assigned locally or to the entire cluster. You can modify these roles for fine-grained access control to OpenShift resources, but additional steps are required that are outside the scope of this course.
+
+Default roles	Description
+admin	Users with this role can manage all project resources, including granting access to other users to the project.
+basic-user	Users with this role have read access to the project.
+cluster-admin	Users with this role have superuser access to the cluster resources. These users can perform any action on the cluster, and have full control of all projects.
+cluster-status	Users with this role can get cluster status information.
+edit	Users with this role can create, change, and delete common application resources from the project, such as services and deployment configurations. These users cannot act on management resources such as limit ranges and quotas, and cannot manage access permissions to the project.
+self-provisioner	Users with this role can create new projects. This is a cluster role, not a project role.
+view	Users with this role can view project resources, but cannot modify project resources.
+The admin role gives a user access to project resources such as quotas and limit ranges, and also the ability to create new applications. The edit role gives a user sufficient access to act as a developer inside the project, but working under the restraints configured by a project administrator.
+
+Add a specified role to a user with the add-role-to-user subcommand. For example:
+
+[user@demo ~]$ oc adm policy add-role-to-user role-name username -n project
+For example, to add the user dev to the role basic-user in the wordpress project:
+
+[user@demo ~]$ oc adm policy add-role-to-user basic-user dev -n wordpress
+User Types
+Interaction with OpenShift Container Platform is associated with a user. An OpenShift Container Platform user object represents a user who may be granted permissions in the system by adding roles to that user or to a user's group via rolebindings.
+
+Regular users
+This is the way most interactive OpenShift Container Platform users are represented. Regular users are represented with the User object. This type of user represents a person that has been allowed access to the platform. Examples of regular users include user1 and user2.
+
+System users
+Many of these are created automatically when the infrastructure is defined, mainly for the purpose of enabling the infrastructure to securely interact with the API. System users include a cluster administrator (with access to everything), a per-node user, users for use by routers and registries, and various others. An anonymous system user also exists that is used by default for unauthenticated requests. Examples of system users include: system:admin, system:openshift-registry, and system:node:node1.example.com.
+
+Service accounts
+These are special system users associated with projects; some are created automatically when the project is first created, and project administrators can create more for the purpose of defining access to the contents of each project. Service accounts are often used to give extra privileges to pods or deployment configurations. Service accounts are represented with the ServiceAccount object. Examples of service account users include system:serviceaccount:default:deployer and system:serviceaccount:foo:builder.
+
+Every user must authenticate before they can access OpenShift Container Platform. API requests with no authentication or invalid authentication are authenticated as requests by the anonymous system user. After successful authentication, policy determines what the user is authorized to do.
+
+ 
+REFERENCES
+For more information about Kubernetes namespaces refer to the Kubernetes Documentation
+
+REFERENCES
+For more information about RBAC, refer to the Using RBAC to define and apply permissions chapter in the OpenShift Container Platform 4.2 Official Documentation at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/authentication/index#using-rbac
+
+For more information about groups, refer to the Understanding authentication chapter in the OpenShift Container Platform 4.2 Official Documentation at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/authentication/index#understanding-authentication
+
+
+
+Guided Exercise: Defining and Applying Permissions using RBAC
+In this exercise, you will define role-based access controls and apply permissions to users.
+
+Outcomes
+
+You should be able to:
+
+Remove from all Red Hat OpenShift users the privilege to create new projects.
+
+Create OpenShift groups and add members to these groups.
+
+Create a project and assign project administration privileges over that project to a non-cluster administrator user.
+
+As a project administrator, assign read and write privileges to different groups of users.
+
+To perform this exercise, ensure you have access to:
+
+A running OpenShift cluster.
+
+The OpenShift CLI (/usr/local/bin/oc)
+
+The Apache HTTP Server container image from OpenShift.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+This command ensures that the cluster API is reachable and creates some HTPasswd users for the exercise.
+
+[student@workstation ~]$ lab authorization-rbac start
+Log in to the OpenShift cluster and determine which cluster role bindings assign the self-provisioner cluster role.
+
+Source the classroom configuration file at /usr/local/etc/ocp4.config.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to the cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+List all cluster role bindings that reference the self-provisioner cluster role.
+
+[student@workstation ~]$ oc get clusterrolebinding -o wide \
+>    | grep -E 'NAME|self-provisioner'
+NAME                      ROLE                           ...
+self-provisioners   ...   ClusterRole/self-provisioner   ...
+Remove the privilege to create new projects from all users by deleting the self-provisioner cluster role from the system:authenticated:oauth virtual group.
+
+Confirm that the self-provisioners cluster role bindings that you found in the previous step assign the self-provisioner cluster role to the system:authenticated:oauth group.
+
+[student@workstation ~]$ oc describe clusterrolebindings self-provisioners
+Name:         self-provisioners
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  ClusterRole
+  Name:  self-provisioner
+Subjects:
+  Kind   Name                        Namespace
+  ----   ----                        ---------
+  Group  system:authenticated:oauth
+Remove the self-provisioner cluster role from the system:authenticated:oauth virtual group, which deletes the self-provisioners role binding. You can safely ignore the warning about your changes being lost.
+
+[student@workstation ~]$ oc adm policy remove-cluster-role-from-group  \
+>    self-provisioner system:authenticated:oauth
+Warning: Your changes may get lost whenever a master is restarted, unless you prevent reconciliation of this rolebinding using the following command: oc annotate clusterrolebinding.rbac self-provisioner 'rbac.authorization.kubernetes.io/autoupdate=false' --overwrite
+clusterrole.rbac.authorization.k8s.io/self-provisioner removed: "system:authenticated:oauth"
+Verify that the role has been removed from the group. The cluster role binding self-provisioners should not exist.
+
+[student@workstation ~]$ oc describe clusterrolebindings self-provisioners
+Error from server (NotFound): clusterrolebindings.rbac.authorization.k8s.io "self-provisioners" not found
+Determine if any other cluster role bindings reference the self-provisioner cluster role.
+
+[student@workstation ~]$ oc get clusterrolebinding -o wide \
+>    | grep -E 'NAME|self-provisioner'
+NAME                      ROLE    ...
+Log in as the leader user, using the password from the RHT_OCP4_USER_PASSWD variable, and try to create a project. It should fail.
+
+[student@workstation ~]$ oc login -u leader -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+[student@workstation ~]$ oc new-project test
+Error from server (Forbidden): You may not request a new project via this API.
+Create a project and add project administration privileges to the leader user.
+
+Log in as the admin user and create the authorization-rbac project.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+[student@workstation ~]$ oc new-project authorization-rbac
+Now using project "authorization-rbac" on server
+"https://api.cluster.domain.example.com:6443".
+...output omitted...
+Grant project administration privileges to the leader user on the authorization-rbac project.
+
+[student@workstation ~]$ oc policy add-role-to-user admin leader
+clusterrole.rbac.authorization.k8s.io/admin added: "leader"
+Create the dev-group and qa-group groups and add their respective members.
+
+Create a group called dev-group.
+
+[student@workstation ~]$ oc adm groups new dev-group
+group.user.openshift.io/dev-group created
+Add the developer user to dev-group.
+
+[student@workstation ~]$ oc adm groups add-users dev-group developer
+group.user.openshift.io/dev-group added: "developer"
+Create a second group called qa-group.
+
+[student@workstation ~]$ oc adm groups new qa-group
+group.user.openshift.io/qa-group created
+Add the qa-engineer user to qa-group.
+
+[student@workstation ~]$ oc adm groups add-users qa-group qa-engineer
+group.user.openshift.io/qa-group added: "qa-engineer"
+Review all existing OpenShift groups to verify that they have the correct members.
+
+[student@workstation ~]$ oc get groups
+NAME        USERS
+dev-group   developer
+qa-group    qa-engineer
+As the leader user, assign write privileges for dev-group and read privileges for qa-group to the authorization-rbac project.
+
+Log in as the leader user.
+
+[student@workstation ~]$ oc login -u leader -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Using project "authorization-rbac".
+Add write privileges to dev-group on the authorization-rbac project.
+
+[student@workstation ~]$ oc policy add-role-to-group edit dev-group
+clusterrole.rbac.authorization.k8s.io/edit added: "dev-group"
+Add read privileges to qa-group on the authorization-rbac project.
+
+[student@workstation ~]$ oc policy add-role-to-group view qa-group
+clusterrole.rbac.authorization.k8s.io/view added: "qa-group"
+Review all role bindings on the authorization-rbac project to verify that they assign roles to the correct groups and users. The following output omits default role bindings assigned by OpenShift to service accounts.
+
+[student@workstation ~]$ oc get rolebindings -o wide
+NAME      AGE   ROLE                USERS    GROUPS      ...
+admin     58s   ClusterRole/admin   admin
+admin-0   51s   ClusterRole/admin   leader
+edit      12s   ClusterRole/edit             dev-group
+...output omitted...
+view      8s    ClusterRole/view             qa-group
+As the developer user, deploy an Apache HTTP Server to prove that it has write privileges in the project. Also try to grant write privileges to the qa-engineer user to prove that the developer user has no project administration privileges.
+
+Log in as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Using project "authorization-rbac".
+Deploy an Apache HTTP Server using the standard image stream from OpenShift.
+
+[student@workstation ~]$ oc new-app --name httpd httpd:2.4
+...output omitted...
+--> Creating resources ...
+imagestreamtag.image.openshift.io "httpd:2.4" created
+deploymentconfig.apps.openshift.io "httpd" created
+service "httpd" created
+--> Success
+...output omitted...
+Try to grant write privileges to the qa-engineer user. It should fail.
+
+[student@workstation ~]$ oc policy add-role-to-user edit qa-engineer
+Error from server (Forbidden): rolebindings.rbac.authorization.k8s.io is forbidden: User "developer" cannot list resource "rolebindings" in API group "rbac.authorization.k8s.io" in the namespace "authorization-rbac"
+Verify that the qa-engineer user only has read privileges on the httpd application.
+
+Log in as the qa-engineer user.
+
+[student@workstation ~]$ oc login -u qa-engineer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Using project "authorization-rbac".
+Attempt to scale the httpd application. It should fail.
+
+[student@workstation ~]$ oc scale dc httpd --replicas 3
+Error from server (Forbidden): deploymentconfigs.apps.openshift.io "httpd" is forbidden: User "qa-engineer" cannot update resource "deploymentconfigs/scale" in API group "apps.openshift.io" in the namespace "authorization-rbac"
+Restore project creation privileges to all users.
+
+Log in as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Restore project creation privileges for all users by recreating the self-provisioners cluster role binding created by the OpenShift installer. You can safely ignore the warning that the group was not found.
+
+[student@workstation ~]$ oc adm policy add-cluster-role-to-group \
+>    --rolebinding-name self-provisioners \
+>    self-provisioner system:authenticated:oauth
+Warning: Group 'system:authenticated:oauth' not found
+clusterrole.rbac.authorization.k8s.io/self-provisioner added: "system:authenticated:oauth"
+Finish
+
+On the workstation machine, run the lab command to complete this exercise.
+
+[student@workstation ~]$ lab authorization-rbac finish

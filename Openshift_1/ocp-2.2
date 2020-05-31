@@ -1,0 +1,103 @@
+
+Configuring a Lab Environment
+Objectives
+After completing this section, you should be able to configure the OpenShift cluster used for classroom exercises.
+
+Configuring Your workstation
+The lab environment provides a workstation virtual machine (VM) on which you run commands required for all hands-on activities in this course. Because your OpenShift cluster and your workstation machine are independent entities, you must configure workstation with information to access your OpenShift cluster. Keeping the OpenShift cluster and workstation machine loosely connected allows customer support to troubleshoot your cluster, or recreate it if required. It also allows your instructor, classmates, and support staff to access your OpenShift cluster to help with troubleshooting, or when you need help completing a hands-on activity.
+
+To configure your workstation machine, run the lab-configure command that comes preinstalled on the workstation machine. Answer all the prompts of the lab-configure command. The information that you need is displayed in the Red Hat Online Training Environment (ROL), after the provisioning of your dedicated OpenShift cluster. All prompts from the lab-configure command provide full line editing capabilities.
+
+The lab-configure command tries to access your OpenShift cluster; if successful, then your configuration is saved in a local configuration file accessible at /usr/local/etc/ocp4.config. Most hands-on activities and lab scripts in this course use the shell variables in the configuration file.
+
+
+Figure 2.1: Accessing the cluster from your workstation
+The following excerpt shows a completed /usr/local/etc/ocp4.config
+
+RHT_OCP4_MASTER_API=https://api.cluster.domain.example.com:6443
+RHT_OCP4_WILDCARD_DOMAIN=apps.cluster.domain.example.com
+RHT_OCP4_CLUSTER_ID=6ffeab7d-51a8-47e7-9a18-dba9fd46e26c
+RHT_OCP4_KUBEADM_PASSWD=ikkaa-6VVJJ-zzIQQ-T6969
+RHT_OCP4_USER_PASSWD=9bc3b0f409eb727a68850fe0407849d0
+If necessary, you can rerun the lab-configure command again at a later time to point your workstation machine to a different OpenShift cluster.
+
+
+
+Guided Exercise: Configuring a Lab Environment
+In this exercise, you will configure the lab environment to access the dedicated, cloud-based OpenShift cluster that ROL provides for each student.
+
+Outcomes
+
+Your lab environment accesses your dedicated OpenShift cluster.
+
+To perform this exercise, ensure you have access to:
+
+The Red Hat Online Learning Environment (ROL).
+
+The access credentials and ID of your dedicated cluster.
+
+IMPORTANT
+The following activity requires the credentials that you obtained in the the section called “Guided Exercise: Creating a Lab Environment”. Refer to this activity to retrieve the credentials to connect to your cluster.
+
+The lab-configure command saves the connection information to your OpenShift cluster in a configuration file. Rerun the command to modify the configuration.
+
+NOTE
+To avoid problems pasting text into the workstation machine, open the Firefox browser on workstation and navigate to https://rol.redhat.com. Copy the necessary values from Firefox and paste them into the GNOME Terminal window.
+
+Run the lab-configure command to configure your workstation environment to connect to your OpenShift cluster on Amazon Web Services (AWS). The lab-configure command provides interactive prompts. Enter the connection information to your OpenShift cluster. This information is available on ROL.
+
+Run the lab-configure command and provide the Cluster API URL of your cluster. Make sure to include https:// if it is not part of the Cluster API URL provided to you:
+
+[student@workstation ~]$ lab-configure
+
+This script configures the connection parameters to access the OpenShift cluster for your lab scripts
+
+· Enter the Cluster API URL: https://api.cluster.domain.example.com:6443
+Provide the Cluster ID of your cluster:
+
+· Enter the Cluster ID: long-and-random-hexadecimal-string
+The script attempts to determine the correct wildcard domain for your cluster, as displayed in the following output. If the domain is incorrect, make the necessary changes.
+
+· Enter the Wildcard Domain: apps.cluster.domain.example.com
+Enter the Cluster Password of your cluster:
+
+· Enter the Cluster Password: long-and-random-password
+The lab-configure command displays all values that you provided and does not wait for you to confirm them. Then, the lab-configure command verifies that it can access your cluster.
+
+Verify that you provided the correct values for your OpenShift cluster to the lab-configure command.
+
+You entered:
+ · Cluster API URL:           https://api.cluster.domain.example.com:6443
+ · Cluster ID:                long-and-random-hexadecimal-string
+ · Wildcard Domain:           apps.cluster.domain.example.com
+ · Cluster Password:          long-and-random-password
+Wait until the lab-configure command verifies that it can connect to your OpenShift cluster and saves your configuration to the /usr/local/etc/ocp4.config file.
+
+Verifying your Cluster API URL...
+
+Verifying your kubeadmin user credentials...
+
+Verifying your cluster configuration...
+
+Saving your lab configuration file...
+
+All fine, lab config saved to /usr/local/etc/ocp4.config. You can now proceed with your exercises.
+If the lab-configure command finds any issues, then it displays an error message and exits. You must verify the information you got from ROL and run the lab-configure command again. The following listing shows an example of a verification error:
+
+...output omitted...
+
+Verifying your Master API URL...
+
+ERROR:
+Cannot connect to an OpenShift 4 API using your URL.
+Please verify your network connectivity and that the URL does not point to an OpenShift 3.x nor to a non-OpenShift Kubernetes API.
+No changes made to your lab configuration.
+If your configuration saved without errors, then you are ready to start any of the exercises for this course. If there were any errors, then do not start any exercise until you can execute the lab-configure command successfully.
+
+Finish
+
+This exercise has no command to finish it. You should now be set up to perform any exercise in this course.
+
+This concludes the guided exercise.
+
+

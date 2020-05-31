@@ -1,0 +1,49 @@
+After completing this section, you should be able to describe the architecture of Red Hat OpenShift Container Platform.
+
+Introducing the Declarative Architecture of Kubernetes
+The architecture of OpenShift is based on the declarative nature of Kubernetes. Most system administrators are used to imperative architectures, where you perform actions that indirectly change the state of the system, such as starting and stopping containers on a given server. In a declarative architecture, you change the state of the system and the system updates itself to comply with the new state. For example, with Kubernetes, you define a pod resource that specifies that a certain container should run under specific conditions. Then Kubernetes finds a server (a node) that can run that container under these specific conditions.
+
+Declarative architectures allow for self-optimizing and self-healing systems that are easier to manage than imperative architectures.
+
+Kubernetes defines the state of its cluster, including the set of deployed applications, as a set of resources stored in the etcd database. Kubernetes also runs controllers that monitor these resources and compares them to the current state of the cluster. These controllers take any action necessary to reconcile the state of the cluster with the state of the resources, for example by finding a node with sufficient CPU capacity to start a new container from a new pod resource.
+
+Kubernetes provides a REST API to manage these resources. All actions that an OpenShift user takes, either using the command-line interface or the web console, are performed by invoking this REST API.
+
+Introducing the OpenShift Control Plane
+A Kubernetes cluster consists of a set of nodes that run the kubelet system service and a container engine. OpenShift runs exclusively the CRI-O container engine.
+
+Some nodes are master nodes that run the REST API, the etcd database, and the platform controllers. OpenShift configures its master nodes so that they are not schedulable to run end-user application pods and are dedicated to running the control plane services. OpenShift calls its non-master nodes worker nodes.
+
+Figure 1.4: Architecture of an OpenShift master node provides an overview of an OpenShift master node, illustrating the main processes that run in a regular node and in a master node, as either system services or containers.
+
+
+Figure 1.4: Architecture of an OpenShift master node
+Depending on the node settings, the kubelet agent starts different sets of static pods. Static pods are pods that do not require connection to the API server to start. The kubelet agent manages the pod’s life-cycle. Static pods can provide either control plane services, such as the scheduler, or node services, such as software-defined networking (SDN). OpenShift provides operators that create pod resources for these static pods so that they are monitored like regular pods.
+
+Describing OpenShift Extensions
+A lot of functionality from Kubernetes depends on external components, such as ingress controllers, storage plug-ins, network plug-ins, and authentication plug-ins. Similar to Linux distributions, there are many ways to build a Kubernetes distribution by picking and choosing different components.
+
+A lot of functionality from Kubernetes also depends on extension APIs, such as access control and network isolation.
+
+OpenShift is a Kubernetes distribution that provides many of these components already integrated and configured, and managed by operators. OpenShift also provides preinstalled applications, such as a container image registry and a web console, managed by operators.
+
+OpenShift also adds to Kubernetes a series of extension APIs and custom resources. For example, build configurations for the Source-to-Image process, and route resources to manage external access to the cluster.
+
+Red Hat develops all extensions as open source projects and works with the larger Kubernetes community not only to make these official components of Kubernetes but also to evolve the Kubernetes platform to allow easier maintainability and customization.
+
+With OpenShift 3 these extensions were sometimes patches (or forks) of upstream Kubernetes. With OpenShift 4 and operators, these extensions are standard Kubernetes extensions that could be added to any distribution of Kubernetes.
+
+Introducing the OpenShift Default Storage Class
+Unlike many container platforms that focus on cloud-native, stateless applications, OpenShift also supports stateful applications that do not follow the standard Twelve-Factor App methodology.
+
+OpenShift supports stateful applications by offering a comprehensive set of storage capabilities and supporting operators. OpenShift ships with integrated storage plug-ins and storage classes that rely on the underlying cloud or virtualization platform to provide dynamically provisioned storage.
+
+For example, if you install OpenShift on Amazon Web Services (AWS), your OpenShift cluster comes pre-configured with a default storage class that uses AWS EBS service automatically to provision storage volumes on-demand. Users can deploy an application that requires persistent storage, such as a database, and OpenShift automatically creates an EBS volume to host the application data.
+
+OpenShift cluster administrators can later define additional storage classes that use different EBS service tiers. For example, you could have one storage class for high-performance storage that sustains a high input-output operations per second (IOPS) rate, and another storage class for low-performance, low-cost storage. Cluster administrators can then allow only certain applications to use the high-performance storage class, and configure data archiving applications to use the low-performance storage class.
+
+ 
+REFERENCES
+Further information is accessible in the Red Hat OpenShift Container Platform 4.2 product documentation at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/
+
+Red Hat Training + Certification logo

@@ -1,0 +1,335 @@
+
+Managing Sensitive Information with Secrets
+Objectives
+After completing this section, you should be able to:
+
+Create and apply secrets to manage sensitive information.
+
+Share secrets between applications.
+
+Secrets Overview
+Modern applications are designed to loosely couple code, configuration, and data. Configuration files and data are not hard-coded as part of the software. Instead, the software loads configuration and data from an external source. This enables application deployment to different environments without requiring a change to the application source code.
+
+Often applications require access to sensitive information. As an example, a back-end web application requires access to database credentials to perform a database query.
+
+Kubernetes and OpenShift uses secret resources to hold sensitive information, such as:
+
+Passwords.
+
+Sensitive configuration files.
+
+Credentials to an external resource, such as an SSH key or OAuth token.
+
+A secret can store any type of data. Data in a secret is Base64-encoded, so it is not stored in plain text. Secret data is not encrypted; you can decode the secret from Base64 format to access the original data.
+
+Although secrets can store any type of data, Kubernetes and OpenShift support different types of secrets. Different types of secret resources exist, including service account tokens, SSH keys, and TLS certificates. When you store information in a specific secret resource type, Kubernetes validates that the data conforms to the type of secret.
+
+Features of Secrets
+The main features of secrets include:
+
+Secret data can be shared within a project namespace.
+
+Secret data is referenced independently of secret definition. Administrators can create and manage a secret resource, and other team members reference the secret in their deployment configurations.
+
+Secret data is injected into pods when OpenShift creates a pod. You can expose a secret as an environment variable or as a mounted file in the pod.
+
+If the value of a secret changes during pod execution, the secret data does not update in the pod. After a secret value changes, you must create new pods to inject the new secret data.
+
+Any secret data that OpenShift injects into a pod is ephemeral. If OpenShift exposes sensitive data to a pod as environment variables, those variables are destroyed when the pod is destroyed.
+
+If a secret is mounted as a file in the pod, the file is also destroyed when the pod is destroyed. Secret data volumes are backed by temporary file storage.
+
+Use Cases for Secrets
+Two primary use cases for secrets are storing credentials and securing communication between services. These are discussed below.
+
+Credentials
+Store sensitive information, such as passwords and user names, in a secret.
+
+If an application expects to read sensitive information from a file, then you mount the secret as a data volume to the pod. The application can read the secret as an ordinary file to access the sensitive information. Some databases, for example, read credentials from a file to authenticate users.
+
+Some applications use environment variables to read configuration and sensitive data. You can link secret variables to pod environment variables in a deployment configuration.
+
+Transport Layer Security (TLS) and Key Pairs
+You can secure communication to a service by having the cluster generate a signed certificate and key pair into a secret within the project namespace. The certificate and key pair are stored using PEM format, in files such as tls.crt and tls.key, located in the secret's data volume of the pod.
+
+Creating a Secret
+If a pod requires access to sensitive information, then create a secret for the information before you deploy the pod.
+
+To create a secret:
+
+Create a secret object with secret data:
+
+[user@demo ~]$ oc create secret generic secret_name \
+>    --from-literal key1=secret1 \
+>    --from-literal key2=secret2
+Update the pod service account to allow the reference to the secret. For example, to allow a secret to be mounted by a pod running under a specific service account:
+
+[user@demo ~]$ oc secrets add --for mount serviceaccount/serviceaccount-name \
+>    secret/secret_name
+Create a pod that consumes the secret as an environment variable or as a file using a data volume.
+
+Exposing Secrets to Pods
+To expose a secret to a pod, first create the secret. Assign each piece of sensitive data to a key. After creation, the secret contains key-value pairs.
+
+The following command creates a generic secret named demo-secret with two keys: username with the demo-user value and root_password with the =zT1KTgk value. The secret contains a single key-value pair.
+
+[user@demo ~]$ oc create secret generic demo-secret \
+>    --from-literal username=demo-user
+>    --from-literal root_password=zT1KTgk 
+Secrets as Pod Environment Variables
+Consider a database application that reads the database administrator password from the MySQL_ROOT_PASSWORD environment variable. Modify the environment variables section of the deployment configuration to use values from the secret:
+
+env:
+  - name: MYSQL_ROOT_PASSWORD1
+    valueFrom:
+      secretKeyRef:
+        name: demo-secret2
+        key: root_password3
+1
+
+The environment variable name in the pod, which contains data from a secret.
+
+2
+
+The name of the secret that contains the desired sensitive information.
+
+3
+
+The key contains the sensitive information in the secret.
+
+You can also use the oc set env command to set application environment variables from secret values:
+
+[user@demo ~]$ oc set env dc/demo --from=secret/demo-secret
+The previous command creates an environment variable for each key in the secret. If a secret key is lowercase, the corresponding environment variable is converted to uppercase.
+
+Secrets as Files in a Pod
+The following command creates a volume mount in the pod that contains the contents of a secret:
+
+[user@demo ~]$ oc set volume dc/demo1 \
+>    --add2 \
+>    --type=secret3 \
+>    --secret-name=demo-secret4 \
+>    --mount-path=/app-secrets5
+1
+
+Modify the volume configuration in the demo deployment configuration.
+
+2 3
+
+Add a new volume from a secret.
+
+4
+
+Use the demo-secret secret.
+
+5
+
+Make the secret data available in the /app-secrets directory in the pod.
+
+ 
+REFERENCES
+For more information on secrets, refer to the OpenShift Container Platform Documentation at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html/nodes/working-with-pods#nodes-pods-secrets-about_nodes-pods-secrets
+
+
+
+Guided Exercise: Managing Sensitive Information With Secrets
+In this exercise, you will understand how to manage information using secrets
+
+Outcomes
+
+You should be able to:
+
+Manage secrets and use them to initialize environment variables in applications.
+
+Use secrets for a MySQL database application.
+
+Assign secrets to an application that connects to a MySQL database.
+
+To perform this exercise, ensure you have access to:
+
+A running OpenShift cluster.
+
+The OpenShift CLI (/usr/local/bin/oc).
+
+The rhscl/mysql-57-rhel7:5.7-47 container image from Red Hat.
+
+The redhattraining/famous-quotes:1.0 image from Quay.io.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+This command ensures that the cluster API is reachable and downloads the resource files necessary for this exercise.
+
+[student@workstation ~]$ lab authorization-secrets start
+Log in to the OpenShift cluster and create the authorization-secrets project.
+
+Source the classroom configuration file at /usr/local/etc/ocp4.config.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to the cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD} \
+>   ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Create the authorization-secrets project.
+
+[student@workstation ~]$ oc new-project authorization-secrets
+Now using project "authorization-secrets" on server "https:///api.cluster.domain.example.com:6443".
+...output omitted...
+Create a secret with the credentials and connection information to access a MySQL database.
+
+[student@workstation ~]$ oc create secret generic mysql \
+>   --from-literal user=myuser --from-literal password=redhat123 \
+>   --from-literal database=test_secrets --from-literal hostname=mysql 
+secret/mysql created
+Deploy a database and add the secret for user and database configuration.
+
+Try to deploy an ephemeral database server. This should fail because the MySQL image needs environment variables for its initial configuration. The values for these variables can not be assigned using secrets because the oc new-app command does not support the use of this type of secrets.
+
+[student@workstation ~]$ oc new-app --name mysql \
+>   --docker-image registry.access.redhat.com/rhscl/mysql-57-rhel7:5.7-47
+--> Creating resources ...
+    imagestream.image.openshift.io "mysql" created
+    deploymentconfig.apps.openshift.io "mysql" created
+    service "mysql" created
+--> Success
+...output omitted...
+Run the oc get pods command with the -w option to retrieve the status of the deployment in real time. Notice how the database pod is in a failed state. Type Ctrl+C to exit the command.
+
+[student@workstation ~]$ oc get pods -w
+NAME             READY   STATUS              RESTARTS   AGE
+mysql-1-deploy   1/1     Running             0          15s
+mysql-1-8mjmm    0/1     ContainerCreating   0          7s
+NAME             READY   STATUS              RESTARTS   AGE
+mysql-1-8mjmm    0/1     ContainerCreating   0          8s
+mysql-1-8mjmm    0/1     Error               0          28s
+mysql-1-8mjmm    0/1     Error               1          29s
+mysql-1-8mjmm    0/1     CrashLoopBackOff    1          30s
+...output omitted...
+NOTE
+It might take a while for the pod to reach the error state.
+
+Use the mysql secret to initialize environment variables on the mysql deployment configuration. The deployment needs the MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE environment variables for a successful initialization. The secret has the user, password, and database keys that can be assigned to the deployment configuration as environment variables, adding the prefix MYSQL_.
+
+Setting the mysql secret as an environment variable to the deployment configuration triggers a new build of the application.
+
+[student@workstation ~]$ oc set env dc/mysql --prefix MYSQL_ \
+>   --from secret/mysql
+deploymentconfig.apps.openshift.io/mysql updated
+Verify that the mysql application was deployed successfully after adding the secret.
+
+[student@workstation ~]$ oc get pods
+NAME             READY   STATUS      RESTARTS   AGE
+mysql-2-deploy   0/1     Completed   0          33s
+mysql-2-rqp77    1/1     Running     0          24s
+Take note of the pod name in the Running state; you will need it in further steps.
+
+Verify that the database now authenticates using the environment variables initialized from the mysql secret.
+
+Open a remote shell session to the mysql pod in the Running state.
+
+[student@workstation ~]$ oc rsh mysql-2-rqp77
+sh-4.2$
+Start a MySQL session to verify that the environment variables initialized by the mysql secret were used to configure the mysql application.
+
+sh-4.2$ mysql -u myuser --password=redhat123 test_secrets -e 'show databases;'
+mysql: [Warning] Using a password on the command line interface can be insecure.
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| test_secrets       |
++--------------------+
+Close the remote shell session to continue from your workstation.
+
+sh-4.2$ exit
+exit
+[student@workstation ~]$
+Create a new application that uses the MySQL database.
+
+Create a new application using the redhattraining/famous-quotes image from Quay.io.
+
+[student@workstation ~]$ oc new-app --name quotes \
+>   --docker-image quay.io/redhattraining/famous-quotes:1.0
+--> Found container image c511b06 (19 hours old) from quay.io for "quay.io/redhattraining/famous-quotes:1.0"
+...output omitted...
+--> Creating resources ...
+    imagestream.image.openshift.io "quotes" created
+    deploymentconfig.apps.openshift.io "quotes" created
+    service "quotes" created
+--> Success
+...output omitted...
+Verify the quotes application pod status. This should display an error because you have not added the environment variables it needs to connect to the database. This might take a while to display in the output.
+
+[student@workstation ~]$ oc get pods -l app=quotes -w
+NAME             READY   STATUS              RESTARTS   AGE
+quotes-1-8cnjb   0/1     ContainerCreating   0          1s
+NAME             READY   STATUS              RESTARTS   AGE
+quotes-1-8cnjb   0/1     ContainerCreating   0          8s
+quotes-1-8cnjb   0/1     Error               0          35s
+...output omitted...
+Use the mysql secret to initialize the environment variables that the quotes application needs to connect to the database.
+
+The quotes application requires the following environment variables: QUOTES_USER, QUOTES_PASSWORD, QUOTES_DATABASE, and QUOTES_HOSTNAME, which correspond to the user, password, database, and hostname keys of the mysql secret. As in the MySQL application case, the secret can be added to the quotes application to initialize its environment variables with the prefix QUOTES_.
+
+Use the mysql secret to initialize environment variables in the application so it can connect to the mysql database.
+
+[student@workstation ~]$ oc set env dc/quotes --prefix QUOTES_ \
+>   --from secret/mysql
+deploymentconfig.apps.openshift.io/quotes updated
+Wait until the quotes application is successfully redeployed. The older containers should be automatically terminated.
+
+[student@workstation ~]$ oc get pods -l app=quotes
+NAME             READY   STATUS    RESTARTS   AGE
+quotes-2-6zn7f   1/1     Running   0          9m35s
+NOTE
+It might take a while for the pod to finish the deployment.
+
+Verify that the quotes application environment variables were successfully set and that the application is working properly.
+
+Verify that the application started correctly.
+
+[student@workstation ~]$ oc logs pod/quotes-2-6zn7f
+... Connecting to the database: myuser:redhat123@tcp(...:3306)/test_secrets
+... Database connection OK
+...output omitted...
+Expose the application service so that it can be accessed from outside the cluster.
+
+[student@workstation ~]$ oc expose service quotes
+route.route.openshift.io/quotes exposed
+Verify the application host name.
+
+[student@workstation ~]$ oc get route quotes
+NAME     HOST/PORT                                                        ...
+quotes   quotes-authorization-secrets.apps.cluster.domain.example.com     ...
+Verify that the variables are being properly set in the application by accessing the env REST entry point.
+
+[student@workstation ~]$ curl \
+>   http://quotes-authorization-secrets.apps.cluster.domain.example.com/env
+...output omitted...
+                <li>QUOTES_USER: test_user </li>
+                <li>QUOTES_PASSWORD: redhat123 </li>
+                <li>QUOTES_DATABASE: test_secrets</li>
+                <li>QUOTES_HOST: mysql</li>
+...output omitted...
+Access the application status REST API entry point to test the database connection.
+
+[student@workstation ~]$ curl \
+>   http://quotes-authorization-secrets.apps.cluster.domain.example.com/status
+Database connection OK
+Test application functionality by accessing the random REST API entry point.
+
+[student@workstation ~]$ curl \
+>   http://quotes-authorization-secrets.apps.cluster.domain.example.com/random
+8: Those who can imagine anything, can create the impossible.
+- Alan Turing
+Remove the authorization-secrets project.
+
+[student@workstation ~]$ oc delete project authorization-secrets
+project.project.openshift.io "authorization-secrets" deleted
+Finish
+
+On workstation, run the lab command to complete this exercise.
+
+[student@workstation ~]$ lab authorization-secrets finish
+This concludes the section.

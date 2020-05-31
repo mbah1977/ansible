@@ -1,0 +1,540 @@
+Chapter 3. Configuring Authentication
+Configuring Identity Providers
+Guided Exercise: Configuring Identity Providers
+Summary
+Abstract
+
+Goal	Configure authentication with an identity provider
+Objectives	
+Describe the resources associated with OpenShift authentication and authorization.
+
+Authenticate as a cluster administrator using the kubeconfig file or kubeadmin virtual user.
+
+Configure the HTPasswd identity provider for OpenShift authentication.
+
+Assign a user to a cluster role.
+
+Sections	
+Configuring Identity Providers (and Guided Exercise)
+
+Configuring Identity Providers
+Objectives
+After completing this section, you should be able to Configure the HTPasswd identity provider for OpenShift authentication.
+
+Describing OpenShift Users and Groups
+There are a number of OpenShift resources related to authentication and authorization. The following is a list of the main resource types and their definitions:
+
+User
+In the OpenShift Container Platform architecture, users are entities that interact with the API server. The user resource is a representation of an actor within the system. Assign permissions by adding roles to the user directly, or to the groups of which the user is a member.
+
+Identity
+Identity is a resource that keeps a record of successful authentication attempts from a specific user and identity provider. Any data concerning the source of the authentication is stored on the identity. Only a single user resource is associated with an identity resource.
+
+Service Account
+In OpenShift, applications can communicate with the API independently when user credentials cannot be acquired. To preserve the integrity of a regular user's credentials, credentials are not shared and service accounts are used instead. Service accounts enable you to control API access without the need borrow a regular user's credentials.
+
+Group
+Groups represent a specific set of users. Users are assigned to one or to multiple groups. Groups are leveraged when implementing authorization policies to assign permissions to multiple users at the same time. For example, if you want to allow twenty users access to objects within a project, it is advantageous to use a group instead of granting access to each of the users individually. OpenShift Container Platform also provides system groups or virtual groups that are provisioned automatically by the cluster.
+
+Role
+A role is a set of permissions that enables a user to perform API operations over one or more resource types. You grant permissions to users, groups, and service accounts by assigning roles to them.
+
+User and identity resources are usually not created in advance. They are usually created automatically by OpenShift after a successful interactive log in using OAuth.
+
+Authenticating API Requests
+Authorization and Authentication are the two security layers responsible for enabling a user to interact with the cluster. When a user makes a request to the API, that user is associated with the request. The authentication layer is responsible for identifying the user. Information concerning the requesting user from the authentication layer is then used by the authorization layer to determine if the request is honored. After a user is authenticated, the RBAC policy determines what the user is authorized to do. If an API request contains invalid authentication, it is authenticated as a request by the anonymous system user.
+
+The OpenShift API has two methods for authenticating requests:
+
+OAuth Access Tokens
+
+X.509 Client Certificates
+
+If the request does not present an access token or certificate, then the authentication layer assigns it the system:anonymous virtual user, and the system:unauthenticated virtual group.
+
+Introducing the Authentication Operator
+The OpenShift Container Platform provides the Authentication operator, which runs an OAuth server. The OAuth server provides OAuth access tokens to users when they attempt to authenticate to the API. An identity provider must be configured and available to the OAuth server. The OAuth server uses an identity provider to validate the identity of the requester. The server reconciles the user with the identity and creates the OAuth access token that is then granted to the user. Identity and user resources are created automatically upon logging in.
+
+Introducing Identity Providers
+OpenShift OAuth server can be configured to use a number of identity providers. The following lists includes the more common ones:
+
+HTPasswd
+Validate user names and passwords against a secret that stores credentials generated using the htpasswd.
+
+Keystone
+Enables shared authentication with an OpenStack Keystone v3 server.
+
+LDAP
+Configure the LDAP identity provider to validate user names and passwords against an LDAPv3 server, using simple bind authentication.
+
+GitHub or GitHub Enterprise
+Configure a GitHub identity provider to validate user names and passwords against GitHub or the GitHub Enterprises OAuth authentication server.
+
+OpenID Connect
+Integrates with an OpenID Connect identity provider using an Authorization Code Flow.
+
+The OAuth custom resource must be updated with your desired identity provider. You can define multiple identity providers, of the same or different kinds, on the same OAuth custom resource.
+
+Authenticating as a Cluster Administrator
+Before you can configure an identity provider and manage users, you must access your OpenShift cluster as a cluster administrator. A just-installed OpenShift cluster provides two ways to authenticate API requests with cluster administrator privileges:
+
+The kubeadmin virtual user and password that grants an OAuth access token.
+
+The kubeconfig file that embeds an X.509 client certificate that never expires.
+
+To create additional users and grant them different access levels, you must configure an identity provider and assign roles to your users.
+
+Authenticating Using the X.590 Certificate
+The kubeconfig file is created during the installation process and is specific to the cluster. It is stored in the auth directory that the OpenShift installer created during the installation. The file contains specific details and parameters used by the CLI to connect a client to the correct API server, including an X.509 certificate.
+
+The installation logs provide the location where the kubeconfig file is saved:
+
+INFO Run 'export KUBECONFIG=root/auth/kubeconfig' to manage the cluster with 'oc'.
+To use the kubeconfig file to authenticate oc commands, you must copy the file to your workstation and set the absolute or relative path to the KUBECONFIG environment variable. Then, you can run any oc that requires cluster administrator privileges without logging in to OpenShift.
+
+[user@demo ~]$ export KUBECONFIG=/home/user/auth/kubeconfig
+[user@demo ~]$ oc get nodes
+As an alternative, you can use the --config option of the oc command.
+
+[user@demo ~]$ oc --config /home/user/auth/kubeconfig get nodes
+Authenticating Using the Virtual User
+After an installation has completed, OpenShift creates the kubeadmin virtual user. There are no user or identity resources for that virtual user. The kubeadmin user is hard-coded as a cluster administrator and you cannot change its privileges. It is also hard-coded to authenticate using the password stored in kubeadmin, from the kube-system project.
+
+The kubeadmin password is dynamically generated by the installer and completely unique to your environment. The installation logs provide kubeadmin credentials used to log in to the cluster. The cluster installation logs also provide log in, password, and the URL for console access.
+
+...output omitted...
+INFO The cluster is ready when'oc login -u kubeadmin -p shdU_trbi_6ucX_edbu_aqop'
+...output omitted...
+INFO Access the OpenShift web-console here: https://console-openshift-console.apps.demo.openshift4.2-gls.com
+INFO Login to the console with user: kubeadmin, password: shdU_trbi_6ucX_edbu_aqop
+Deleting the Virtual User
+After you define an identity provider, create a new user, and assign that user the cluster-admin role, you can remove the kubeadmin user credentials to improve cluster security.
+
+[user@demo ~]$ oc delete secret kubeadmin -n kube-system
+WARNING
+If you delete the kubeadmin secret before you configure another user with cluster admin privileges, the only way you can administer your cluster would be using the kubeconfig file. If you do not have a copy of this file in a safe location, then there is no way to recover administrative access to your cluster. The only alternative is destroying and reinstalling your cluster.
+
+Configuring the HTPasswd Identity Provider
+The HTPasswd identity provider validates users against a secret that that contains user names and passwords generated with the htpasswd command from the Apache HTTP Server project. Only a cluster administrator is allowed to change the data inside the secret. Regular users cannot change their own passwords.
+
+Managing users using the HTPasswd Identity Provider might suffice for a proof-of-concept environment with a small set of users. However, most production environments require a more powerful identity provider that integrates with the organization's identity management system.
+
+Configuring the OAuth Custom Resource
+To use the HTPasswd identity provider, the OAuth custom resource must be edited to add an entry to the .spec.identityProviders array:
+
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+  - name: my_htpasswd_provider 1
+    mappingMethod: claim 2
+    type: HTPasswd
+    htpasswd:
+      fileData:
+        name: htpasswd-secret 3
+1
+
+This provider name is prefixed to provider user names to form an identity name.
+
+2
+
+Controls how mappings are established between provider identities and user objects.
+
+3
+
+An existing secret containing data generated using the htpasswd command.
+
+Updating the OAuth Custom Resource
+To update the OAuth custom resource, use the oc get command to export the existing OAuth cluster resource to a file in YAML format.
+
+[user@demo ~]$ oc get -o yaml oauth cluster > oauth.yaml
+Then, open the resulting file in a text editor and make the needed changes to the embedded identity provider settings.
+
+After completing modifications and saving the file, you must apply the new custom resource using the oc replace command.
+
+[user@demo ~]$ oc replace -f oauth.yaml
+Managing Users with the HTPasswd Identity Provider
+Managing user credentials with the HTPasswd Identity Provider requires creating a temporary htpasswd file, making changes to the file, and applying these changes to the secret.
+
+Creating an HTPasswd File
+The htpasswd utility is part of the httpd-utils package and it must be installed and available on your system.
+
+Create or update the htpasswd file.
+
+[user@demo ~]$ htpasswd -c -B -b /tmp/htpasswd student redhat123
+Add or update credentials.
+
+[user@demo ~]$ htpasswd -b /tmp/htpasswd student redhat1234
+Delete credentials.
+
+[user@demo ~]$ htpasswd -D /tmp/htpasswd student
+Creating the HTPasswd Secret
+To use the HTPasswd provider, you must create a secret that contains the htpasswd file data. In the following example, the secret is named htpasswd-secret.
+
+[user@demo ~]$ oc create secret generic htpasswd-secret \
+>    --from-file htpasswd=/tmp/htpasswd -n openshift-config
+IMPORTANT
+A secret that will be used by the HTPasswd identity provider requires adding the htpasswd= prefix before specifying the path to the file.
+
+Updating the HTPasswd Secret
+The secret must be updated after adding, changing, or deleting users. All data inside a secret must be encoded in base64. One way to encode the data is using the oc create secret, as if you are creating a new secret and sending the output YAML to the standard output. Then, you can pipe that output to the oc replace command to update the existing secret. To update the secret named htpasswd-secret, run the following command:
+
+[user@demo ~]$ oc create secret generic htpasswd-secret \
+>    --from-file htpasswd=/tmp/htpasswd --dry-run -o yaml \
+>    | oc replace -n openshift-config -f -
+When the previous oc create secret command completes successfully, the OAuth operator redeploys pods in the openshift-authentication namespace. Monitor the redeployment of the new Oauth pods by running:
+
+[user@demo ~]$ watch oc get pods -n openshift-authentication
+Additions, changes, or deletions to the secret can be tested after the new pods finish deploying.
+
+Extracting Secret Data
+When adding or removing users, an admin cannot assume the validity of a local htpasswd file. Moreover, the admin might not even be on a system that has the htpasswd file. In a real world scenario, it would behoove the administrator to use the oc extract command. The extract command downloads the contents of a configuration map or secret into a directory. The data can then be redirected to a file or displayed as standard output. To extract data from the secret and redirect it to a file name /tmp/htpasswd, use the following command:
+
+[user@demo ~]$ oc extract secret/htpasswd-secret -n openshift-config \
+>    --to - > /tmp/htpasswd
+Deleting Users and Identities
+When a scenario occurs that requires you to delete a user, it is not sufficient to delete the user from the identity provider. The user and identity resources must also be deleted.
+
+You must remove the password from the htpasswd secret. The user must be removed from the local htpasswd file, and then the secret must be updated.
+
+To delete the user from htpasswd, run the following command:
+
+[user@demo ~]$ htpasswd -D /tmp/htpasswd manager
+Update the secret to remove all remnants of the user's password.
+
+[user@demo ~]$ oc create secret generic htpasswd-secret \
+>    --from-file htpasswd=/tmp/htpasswd  --dry-run -o yaml \
+>    | oc replace -n openshift-config -f -
+Remove the user resource with the following command:
+
+[user@demo ~]$ oc delete user manager
+Identity resources include the name of the identity provider. To delete the identity resource for the manager user, find the resource and then delete it.
+
+[user@demo ~]$ oc get identities | grep manager
+my_htpasswd_provider:manager   my_htpasswd_provider   manager       manager   ...
+
+[user@demo ~]$ oc delete identity my_htpasswd_provider:manager
+identity.user.openshift.io "my_htpasswd_provider:manager" deleted
+[user@demo ~]$ oc delete identity manager
+Assigning Administrative Privileges
+The cluster-wide cluster-admin role grants cluster administration privileges to users and groups. It enables the user to perform any action on any resources within the cluster. In the following example, the cluster-admin role is assigned to the student user.
+
+[user@demo ~]$ oc adm policy add-cluster-role-to-user cluster-admin student
+ 
+REFERENCES
+For more information on identity providers, refer to the Understanding identity provider configuration section of the Authentication chapter in the Red Hat OpenShift Container Platform 4.2 Authentication guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/authentication/index
+
+
+
+
+
+Guided Exercise: Configuring Identity Providers
+In this exercise, you will configure the HTPasswd identity provider and create users for cluster administrators.
+
+Outcomes
+
+You should be able to:
+
+Create users and passwords for HTPasswd authentication.
+
+Configure the Identity Provider for HTPasswd authentication.
+
+Assign cluster administration rights to users.
+
+To perform this exercise, ensure you have access to:
+
+A running OpenShift cluster.
+
+The OpenShift CLI (/usr/local/bin/oc)
+
+On workstation, run the following lab command to prepare your system for the exercise.
+
+[student@workstation ~]$ lab auth-provider start
+The command ensures that the cluster API is reachable, the httpd-utils package is installed, and that the authentication settings are configured to the installation defaults.
+
+Add an entry for two htpasswd users, admin and developer. Assign the password from the variable RHT_OCP4_USER_PASSWD to both users.
+
+Source the classroom configuration file that is accessible at /usr/local/etc/ocp4.config.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Create an htpasswd authentication file named temp in the ~/DO280/labs/auth-provider directory, and add the admin user with the password ${RHT_OCP4_USER_PASSWD}. The name of the file is arbitrary and you can choose any name you prefer. In the following and subsequent examples throughout the exercise, the file is named ~/DO280/labs/auth-provider/temp.
+
+The htpasswd command populates the htpasswd authentication file, ~/DO280/labs/auth-provider/temp, with the user names and encrypted passwords. The -B option uses bcrypt encryption. htpasswd uses the MD5 encryption by default when you do not specify an encryption option.
+
+[student@workstation ~]$ htpasswd -c -B -b ~/DO280/labs/auth-provider/temp admin ${RHT_OCP4_USER_PASSWD}
+Adding password for user admin
+Update your ~/DO280/labs/auth-provider/temp file, and then add the developer user with the password ${RHT_OCP4_USER_PASSWORD}. The ~/DO280/labs/auth-provider/temp file is updated to reflect the additional user and password.
+
+[student@workstation ~]$ htpasswd -b ~/DO280/labs/auth-provider/temp \
+>    developer ${RHT_OCP4_USER_PASSWD}
+Adding password for user developer
+Review the contents of your ~/DO280/labs/auth-provider/temp and verify that it includes two entries with hashed passwords: one for the admin user and another for the developer user.
+
+[student@workstation ~]$ cat ~/DO280/labs/auth-provider/temp
+admin:$2y$05$QPuzHdl06IDkJssT.tdkZuSmgjUHV1XeYU4FjxhQrFqKL7hs2ZUl6
+developer:$apr1$0Nzmc1rh$yGtne1k.JX6L5s5wNa2ye.
+Log in to OpenShift and create a secret that contains the HTPasswd users file.
+
+Log in to the cluster as the kubeadmin user.
+
+[student@workstation ~]$ oc login -u kubeadmin -p ${RHT_OCP4_KUBEADM_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Create a secret from the /home/student/DO280/labs/auth-provider/temp file. To use the HTPasswd identity provider, you must define a secret with a key named htpasswd that contains the HTPasswd user file /home/student/DO280/labs/auth-provider/temp.
+
+IMPORTANT
+A secret that will be used by the HTPasswd identity provider requires adding the htpasswd= prefix before specifying the path to the file.
+
+[student@workstation ~]$ oc create secret generic localusers \
+>    --from-file htpasswd=/home/student/DO280/labs/auth-provider/temp \
+>    -n openshift-config
+secret/localusers created
+Assign the admin user the cluster-admin role.
+
+NOTE
+The output that indicates that the admin user is not found and can be safely ignored.
+
+[student@workstation ~]$ oc adm policy add-cluster-role-to-user \
+>    cluster-admin admin
+clusterrole.rbac.authorization.k8s.io/cluster-admin added: "admin"
+Update the HTPasswd identity provider for the cluster so that your users can authenticate. Configure the custom resource file and update the cluster.
+
+Export the existing OAuth resource to a file named oauth.yaml in the ~/DO280/labs/auth-provider directory.
+
+[student@workstation ~]$ oc get -o yaml oauth cluster > ~/DO280/labs/auth-provider/oauth.yaml
+NOTE
+An oauth.yaml file was downloaded for your convenience to ~/DO280/solutions/auth-provider, which contains the completed custom resource file.
+
+Edit the ~/DO280/labs/auth-provider/oauth.yaml file with your preferred text editor. You can choose the names of the identityProviders and fileData structures. For this exercise, use the myusers and localusers values respectively.
+
+The completed custom resource should match the following. Note that htpasswd, mappingMethod, name and type are at the same indentation level.
+
+apiVersion: config.openshift.io/v1
+kind: OAuth
+...output omitted...
+spec:
+  identityProviders:
+  - htpasswd:
+      fileData:
+        name: localusers
+    mappingMethod: claim
+    name: myusers
+    type: HTPasswd
+Apply the custom resource defined in the previous step.
+
+[student@workstation ~]$ oc replace -f ~/DO280/labs/auth-provider/oauth.yaml
+oauth.config.openshift.io/cluster replaced
+NOTE
+Pods in the openshift-authentication namespace will redeploy if the oc replace command succeeds. Provided the previously created secret was created correctly, you will be able to log in using the HTPasswd identity provider.
+
+Log in as admin and as developer to verify the HTPasswd user configuration.
+
+Log in to the cluster as the admin user to verify the htpasswd authentication is configured correctly. If log in fails, wait a few seconds and try again. The authentication operator takes some time to load the configuration changes from the previous step.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Use the oc get nodes command to verify that the admin user has the cluster-admin role. The names of the nodes from your cluster might be different.
+
+[student@workstation ~]$ oc get nodes
+NAME                                         STATUS   ROLES    ...
+ip-10-0-134-122.us-west-1.compute.internal   Ready    master   ...
+ip-10-0-140-84.us-west-1.compute.internal    Ready    worker   ...
+ip-10-0-152-96.us-west-2.compute.internal    Ready    worker   ...
+...output omitted...
+Log in to the cluster as the developer user to verify the htpasswd authentication is configured correctly.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Use oc get nodes command to verify that the developer and admin do not share the same level of access.
+
+[student@workstation ~]$ oc get nodes
+Error from server (Forbidden): nodes is forbidden: User "developer" cannot list
+resource "nodes" in API group "" at the cluster scope
+Log in as the admin user and list the current users.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+[student@workstation ~]$ oc get users
+NAME        UID                                    FULL NAME   IDENTITIES
+admin       0de1d76a-0198-11ea-86f1-0a580a810062         myusers:admin
+developer   18b2517a-0198-11ea-b781-0a580a80005b         myusers:developer
+Display the list of current identities.
+
+[student@workstation ~]$ oc get identity
+NAME                IDP NAME   IDP USER NAME   USER NAME
+myusers:admin       myusers    admin           admin       ...
+myusers:developer   myusers    developer       developer   ...
+As the admin user, create a new HTPasswd user named manager with the ${RHT_OCP4_USER_PASSWD} password.
+
+Extract the file data from the secret to the ~/DO280/labs/auth-provider/temp file.
+
+[student@workstation ~]$ oc extract secret/localusers -n openshift-config \
+>    --to - > ~/DO280/labs/auth-provider/temp
+# htpasswd
+Add an entry your ~/DO280/labs/auth-provider/temp file for the additional user manager with the password ${RHT_OCP4_USER_PASSWD}.
+
+[student@workstation ~]$ htpasswd -b ~/DO280/labs/auth-provider/temp manager ${RHT_OCP4_USER_PASSWD}
+Adding password for user manager
+Review the contents of your ~/DO280/labs/auth-provider/temp file and verify that it includes three entries with hashed passwords: one each for the admin, developer and manager users.
+
+[student@workstation ~]$ cat ~/DO280/labs/auth-provider/temp
+admin:$2y$05$QPuzHdl06IDkJssT.tdkZuSmgjUHV1XeYU4FjxhQrFqKL7hs2ZUl6
+developer:$apr1$0Nzmc1rh$yGtne1k.JX6L5s5wNa2ye.
+manager:$apr1$CJ/tpa6a$sLhjPkIIAy755ZArTT5EH/
+The secret must be updated after adding additional users. The oc create secret command takes the /home/student/DO280/labs/auth-provider/temp file as input, and pipes the output as stdin (standard input) to the oc replace command to update the secret. If you receive a failure, then re-run the command again after a few moments as the oauth operator might still be reloading.
+
+[student@workstation ~]$ oc create secret generic localusers \
+>    --from-file htpasswd=/home/student/DO280/labs/auth-provider/temp \
+>    --dry-run -o yaml | oc replace -n openshift-config -f -
+secret/localusers replaced
+Wait a few moments for the authentication operator to reload, and then log in to the cluster as the manager user.
+
+NOTE
+If the authentication fails, wait a few moments and try again.
+
+[student@workstation ~]$ oc login -u manager -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Create a new project named auth-provider, and then verify that the developer user cannot access the project.
+
+As the manager user, create a new auth-provider project.
+
+[student@workstation ~]$ oc new-project auth-provider
+Now using project "auth-provider" on server https://api.cluster.domain.example.com:6443".
+...output omitted...
+Log in as the developer user, and then attempt to delete the auth-provider project.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+[student@workstation ~]$ oc delete project auth-provider
+Error from server (Forbidden): projects.project.openshift.io "auth-provider"
+is forbidden: User "developer" cannot delete resource "projects"
+in API group "project.openshift.io" in the namespace "auth-provider"
+Change the password for the manager user.
+
+Log in as admin and extract the file data from the secret to the ~/DO280/labs/auth-provider/temp file.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+[student@workstation ~]$ oc extract secret/localusers -n openshift-config \
+>    --to - > ~/DO280/labs/auth-provider/temp
+# htpasswd
+Generate a random user password. Your password will differ from what is displayed in the following example.
+
+[student@workstation ~]$ openssl rand -hex 15
+ce135e2c7a89014113ed3f62a86240
+Store the password created in the previous step in the ${MANAGER_PASSWD} variable. Copy only the random hex string from the output of the previous step. If you include the dash and the spaces, then the log in will fail.
+
+[student@workstation ~]$ MANAGER_PASSWD='ce135e2c7a89014113ed3f62a86240'
+Update the manager user with the password ${MANAGER_PASSWD}.
+
+[student@workstation ~]$ htpasswd -b ~/DO280/labs/auth-provider/temp manager ${MANAGER_PASSWD}
+Updating password for user manager
+Update the secret.
+
+[student@workstation ~]$ oc create secret generic localusers \
+>    --from-file htpasswd=/home/student/DO280/labs/auth-provider/temp \
+>    --dry-run -o yaml | oc replace -n openshift-config -f -
+secret/localusers replaced
+Log in as the manager user to verify the updated password.
+
+[student@workstation ~]$ oc login -u manager -p ${MANAGER_PASSWD}
+Login successful.
+...output omitted...
+Remove the manager user.
+
+Log in as admin and extract the file data from the secret to the ~/DO280/labs/auth-provider/temp file.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+[student@workstation ~]$ oc extract secret/localusers -n openshift-config \
+>    --to - > ~/DO280/labs/auth-provider/temp
+# htpasswd
+Delete the manager user from the ~/DO280/labs/auth-provider/temp file.
+
+[student@workstation ~]$ htpasswd -D ~/DO280/labs/auth-provider/temp manager
+Deleting password for user manager
+Update the secret.
+
+[student@workstation ~]$ oc create secret generic localusers \
+>    --from-file htpasswd=/home/student/DO280/labs/auth-provider/temp \
+>    --dry-run -o yaml | oc replace -n openshift-config -f -
+secret/localusers replaced
+Delete the identity resource for the manager user.
+
+[student@workstation ~]$ oc delete identity "myusers:manager"
+identity.user.openshift.io "myusers:manager" deleted
+Delete the user resource for the manager user.
+
+[student@workstation ~]$ oc delete user manager
+user.user.openshift.io manager deleted
+Now, if you attempt to log in as the manager user, it will fail.
+
+[student@workstation ~]$ oc login -u manager -p ${MANAGER_PASSWD}
+Login failed (401 Unauthorized)
+...output omitted...
+List the current users to verify that the manager user is deleted.
+
+[student@workstation ~]$ oc get users
+NAME        UID                                    FULL NAME   IDENTITIES
+admin       39e6f2ae-01a0-11ea-86f1-0a580a810062         myusers:admin
+developer   404da1f8-01a0-11ea-b781-0a580a80005b         myusers:developer
+Display the list of current identities to verify that the manager identity is deleted.
+
+[student@workstation ~]$ oc get identity
+NAME                IDP NAME   IDP USER NAME   USER NAME
+myusers:admin       myusers    admin           admin       ...
+myusers:developer   myusers    developer       developer   ...
+Extract the secret and verify that only the users admin and developer are displayed.
+
+[student@workstation ~]$ oc extract secret/localusers -n openshift-config --to -
+# htpasswd
+admin:$apr1$n6.LnQwS$Llq47A305ssf6tN.ySXzP.
+developer:$apr1$EZibs7bc$WkEZoTAN9G4Fv1Cp3SVYM0
+Remove the identity provider and clean up all users.
+
+Log in as the kubeadmin user.
+
+[student@workstation ~]$ oc login -u kubeadmin -p ${RHT_OCP4_KUBEADM_PASSWD}
+Login successful.
+...output omitted...
+Delete the auth-provider project.
+
+[student@workstation ~]$ oc delete project auth-provider
+project.project.openshift.io "auth-provider" deleted
+Edit the resource in place to remove the identity provider from OAauth:
+
+[student@workstation ~]$ oc edit oauth
+Delete all the lines under spec:, and then append {} after spec:. Leave all the other information in the file. Your spec: line should match the following:
+
+...output omitted...
+spec: {}
+Save your changes, and then verify that the oc edit command applied you changes:
+
+oauth.config.openshift.io/cluster edited
+Delete the secret localusers.
+
+[student@workstation ~]$ oc delete secret localusers -n openshift-config
+secret "localusers" deleted
+Delete all user and identity resources.
+
+[student@workstation ~]$ oc delete user --all
+user.user.openshift.io "admin" deleted
+user.user.openshift.io "developer" deleted
+[student@workstation ~]$ oc delete identity --all
+identity.user.openshift.io "myusers:admin" deleted
+identity.user.openshift.io "myusers:developer" deleted
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab auth-provider finish

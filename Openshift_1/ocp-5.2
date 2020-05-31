@@ -1,0 +1,188 @@
+
+Controlling Cluster Network Ingress
+Objectives
+After completing this section, you should be able to describe the ingress components of OpenShift and create a route.
+
+Accessing Application from External Networks
+OpenShift Container Platform offers many ways to expose your applications to external networks. You can expose HTTP and HTTPS traffic, TCP applications, and also non-TCP traffic. Some of these methods are service types, such as NodePort or load balancer, while others use their own API resource, such as Ingress and Route. The various types are discussed in the following section.
+
+OpenShift routes allow you to expose your applications to external networks. With routes, you can access your application with a unique host name that is publicly accessible. Routes rely on a router plug-in to redirect the traffic from the public IP to pods.
+
+The following diagram shows how a route exposes an application running as pods in your cluster.
+
+NOTE
+For performance reasons, routers send requests directly to pods based on service configuration.
+
+The dotted line indicates this implementation, that is, the router accesses the pods through the services network.
+
+
+Figure 5.5: Using routes to expose applications
+Describing Methods for Managing Ingress Traffic
+OpenShift provides different methods for managing ingress traffic. The parenthesis indicates whether this is a service type or a resource.
+
+Ingress (resource). The Ingress Operator manages this resource. Ingresses accept external requests and proxy them based on the route. You can only route HTTP, HTTPS and server name identification (SNI), and TLS with SNI.
+
+NOTE
+An ingress is a Kubernetes resource that provides some of the same features as routes (which are an OpenShift resource). Routes provide advanced features that may not be supported by Kubernetes ingress controllers through a standard interface, such as TLS re-encryption, TLS passthrough, and split traffic for blue-green deployments. For more information about the differences between a route and an ingress, consult the Kubernetes Ingress vs OpenShift Route link listed in the references section.
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: example
+  namespace: network-ingress
+spec:
+  rules:
+    - host: frontend.apps.acme.com
+      http:
+        paths:
+          - path: /testpath
+            backend:
+              serviceName: test
+              servicePort: 80
+External load balancer (service type). This resources instructs OpenShift to spin up a load balancer in a cloud environment. A load balancer instructs OpenShift to interact with the cloud provider in which the cluster is running to provision a load balancer.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-lb
+spec:
+  ports:
+  - name: db
+    port: 3306
+  loadBalancerIP:
+  type: LoadBalancer
+  selector:
+    name: api-frontend
+Service external IP (service type). This method instructs OpenShift to set NAT rules to redirect traffic from one of the cluster IPs to the container.
+
+NodePort (service type). With this method, OpenShift exposes a service on a static port on the node IP address. You must ensure that the external IP addresses are properly routed to the nodes.
+
+OpenShift ingresses and routes are implemented by a shared router service that runs as a pod inside the cluster. You can scale and replicate this pod like any other regular pod. This router service is based on the open source software HAProxy.
+
+An important consideration for OpenShift administrators is that the public DNS host names configured for routes must point to the public-facing IP addresses of the nodes running the router. Router pods, unlike regular application pods, bind to public IP addresses of the nodes, instead of to the internal pod network. This is typically configured using a DNS wildcard.
+
+You must provide the following value when creating a route:
+
+The name of a service. The route uses the service to determine the pods to which to route the traffic.
+
+A host name for the route. A route is always a subdomain of your cluster wildcard domain. For example, if you are using a wildcard domain of apps.dev-cluster.acme.com, and need to expose a front-end service through a route, then it will be named:
+
+frontend.apps.dev-cluster.acme.com
+NOTE
+You can also let OpenShift automatically generate a host name for the route.
+
+An optional path, for path-based routes.
+
+A target port, which is the port on which the application listens. The target port usually corresponds to the port that you define in the targetPort key of a service.
+
+An encryption strategy, depending on whether you need a secure or insecure route.
+
+The following listing shows a minimal definition for a route:
+
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: a-simple-route 1
+  labels: 2
+    app: API
+    name: api-frontend
+spec:
+  host: api.apps.acme.com 3
+  to:
+    kind: Service
+    name: api-frontend 4
+    weight: 100
+  port: 5
+    targetPort: 8443
+1
+
+The name of the route. This name must be unique.
+
+2
+
+A set of labels that you can use as selectors.
+
+3
+
+The host name of the route. This host name must be a subdomain of your wildcard domain, since OpenShift routes the wildcard domain to the routers.
+
+4
+
+The service to which to redirect the traffic. Although you use a service name, the route only uses this information to determine the list of pods that receive the traffic.
+
+5
+
+The application port. Because routes bypass services, this must match the application port and not the service port.
+
+Describing Route Options and Route Types
+Routes can be either secured or unsecured. Secure routes provide the ability to use several types of TLS termination to serve certificates to the client. Unsecured routes are the simplest to configure because they require no key or certificates, but secured routes encrypt traffic to and from the pods.
+
+A secured route specifies the TLS termination of the route. The available types of termination are presented in the following list.
+
+OpenShift Secure Routes
+
+Edge
+With edge termination, TLS termination occurs at the router, before the traffic is routed to the pods. The router serves the TLS certificates, so you must configure them into the route; otherwise, OpenShift assigns its own certificate to the router for TLS termination. Because TLS is terminated at the router, connections from the router to the endpoints over the internal network are not encrypted.
+
+Pass-through
+With pass-through termination, encrypted traffic is sent straight to the destination pod without the router providing TLS termination. In this mode, the application is responsible for serving certificates for the traffic. This is currently the only method that supports mutual authentication between the application and a client that accesses it.
+
+Re-encryption
+Re-encryption is a variation on edge termination, whereby the router terminates TLS with a certificate, and then re-encrypts its connection to the endpoint, which might have a different certificate. Therefore, the full path of the connection is encrypted, even over the internal network. The router uses health checks to determine the authenticity of the host.
+
+Creating Insecure Routes
+Insecure routes correspond to traffic that is not encrypted.
+
+The easiest and preferred way to create a route (secure or insecure) is to use the oc expose service service command, where service corresponds to a service. Use the --hostname option to provide a custom host name for the route.
+
+[user@demo ~]$ oc expose service api-frontend \
+>    --hostname api.apps.acme.com
+When omitting the host name, OpenShift generates a host name for you with the following structure: <route-name>-<project-name>.<default-domain>
+
+For example, if you create a frontend route in an api project, in a cluster that uses apps.example.com as the wildcard domain, then the route host name will be:
+
+frontend.api.apps.example.com.
+
+IMPORTANT
+The DNS server that hosts the wildcard domain is unaware of any route host names; it only resolves any name to the configured IPs. Only the OpenShift router knows about route host names, treating each one as an HTTP virtual host.
+
+Invalid wildcard domain host names, that is, host names that do not correspond to any route, are blocked by the OpenShift router and result in an HTTP 404 error.
+
+Securing Applications
+Securing Applications with Edge Routes
+Before creating a secure route, you need to generate a TLS certificate. The following command shows how to create a secure edge route with a TLS certificate.
+
+The --key option requires the certificate private key, and the --cert option requires the certificate that has been signed with that key.
+
+[user@demo ~]$ oc create route edge \
+  >    --service api-frontend --api.apps.acme.com \
+  >    --key api.key --cert api.crt
+When using a route in edge mode, the traffic between the client and the router is encrypted, but traffic between the router and the application is not.
+
+
+Figure 5.6: Securing applications with edge routes
+NOTE
+Network policies can help you protect the internal traffic between your applications or between projects. For more information on how to accomplish this, consult the Network Policy Objects in Action document in the references section.
+
+Securing Applications with Pass-through Routes
+The previous example demonstrates how to create an edge route, that is, an OpenShift route that presents a certificate at the edge. Pass-through routes offer a secure alternative because the application exposes its TLS certificate. As such, the traffic is encrypted between the client and the application.
+
+To create a pass-through route, you need a certificate and a way for your application to access it. The best way to accomplish this is by using OpenShift TLS secrets. Secrets are exposed via a mount point into the container.
+
+The following diagram shows how you can mount a secret resource in your container. The application is then able to access your certificate. With this mode, there is no encryption between the client and the router.
+
+
+Figure 5.7: Securing applications with pass-through routes
+ 
+REFERENCES
+For more information on how to manage routes, refer to Configuring Routes chapter in the Red Hat OpenShift Container Platform 4.2 Networking Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/networking/index#configuring-routes
+
+For more information on how to configure ingress cluster traffic, refer to Configuring Routes chapter in the Red Hat OpenShift Container Platform 4.2 Networking Guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/networking/index#configuring-ingress-cluster-traffic
+
+For more information, refer to Routes section in the Red Hat OpenShift Online Developer Guide at https://docs.openshift.com/online/pro/dev_guide/routes.html
+
+Kubernetes Ingress vs OpenShift Route — OpenShift Blog
+
+Network Policy Objects in Action — OpenShift Blog
+
+
