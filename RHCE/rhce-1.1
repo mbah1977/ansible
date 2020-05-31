@@ -1,0 +1,119 @@
+
+Chapter 1. Local and Remote Logins
+Accessing the Command Line Using the Local Console
+Quiz: Practice: Local Console Access Terms
+Configuring SSH Key-based Authentication
+Guided Exercise: Practice: Using SSH Key-based Authentication
+Getting Help From Red Hat
+Guided Exercise: Practice: Creating and Viewing an SoS Report
+Abstract
+
+Overview
+Goal	To review methods for accessing the system and engaging Red Hat Support.
+Objectives	
+Use Bash shell syntax to enter commands at a Linux console.
+
+Set up ssh to allow secure password-free logins by using a private authentication key file.
+
+Use the redhat-support-tool command.
+
+Sections	
+Accessing the Command Line Using the Local Console (and Practice)
+
+Configuring SSH Key-based Authentication (and Practice)
+
+Getting Help From Red Hat (and Practice)
+
+Accessing the Command Line Using the Local Console
+Use the physical console to view output and input commands with correct syntax using the bash shell.
+
+Objectives
+After completing this section, students should be able to log into a Linux system on a local text console and run simple commands using the shell.
+
+The bash shell
+A command line is a text-based interface which can be used to input instructions to a computer system. The Linux command line is provided by a program called the shell. Over the long history of UNIX-like systems, many shells have been developed. The default shell for users in Red Hat Enterprise Linux is the GNU Bourne-Again Shell (bash). Bash is an improved version of one of the most successful shells used on UNIX-like systems, the Bourne Shell (sh).
+
+When a shell is used interactively, it displays a string when it is waiting for a command from the user. This is called the shell prompt. When a regular user starts a shell, the default prompt ends with a $ character.
+
+[student@desktopX ~]$ 
+The $ is replaced by a # if the shell is running as the superuser, root. This makes it more obvious that it is a superuser shell, which helps to avoid accidents and mistakes in the privileged account.
+
+[root@desktopX ~]# 
+Using bash to execute commands can be powerful. The bash shell provides a scripting language that can support automation of tasks. The shell has additional capabilities that can simplify or make possible operations that are hard to accomplish efficiently with graphical tools.
+
+NOTE
+The bash shell is similar in concept to the command line interpreter found in recent versions of Microsoft Windows cmd.exe, although bash has a more sophisticated scripting language. It is also similar to Windows PowerShell in Windows 7 and Windows Server 2008 R2. Mac OS X administrators who use the Macintosh's Terminal utility may be pleased to note that bash is the default shell in Mac OS X.
+
+Virtual consoles
+Users access the bash shell through a terminal. A terminal provides a keyboard for user input and a display for output. On text-based installations, this can be the Linux machine's physical console, the hardware keyboard and display. Terminal access can also be configured through serial ports.
+
+Another way to access a shell is from a virtual console. A Linux machine's physical console supports multiple virtual consoles which act like separate terminals. Each virtual console supports an independent login session.
+
+If the graphical environment is available, it will run on the first virtual console in Red Hat Enterprise Linux 7. Five additional text login prompts are available on consoles two through six (or one through five if the graphical environment is turned off). With a graphical environment running, access a text login prompt on a virtual console by pressing Ctrl+Alt and pressing a function key (F2 through F6). Press Ctrl+Alt+F1 to return to the first virtual console and the graphical desktop.
+
+IMPORTANT
+In the pre-configured virtual images delivered by Red Hat, login prompts have been disabled in the virtual consoles.
+
+NOTE
+In Red Hat Enterprise Linux 5 and earlier, the first six virtual consoles always provided text login prompts. When the graphical environment was launched, it ran on virtual console seven (accessed through Ctrl+Alt+F7).
+
+Shell basics
+Commands entered at the shell prompt have three basic parts:
+
+Command to run
+
+Options to adjust the behavior of the command
+
+Arguments, which are typically targets of the command
+
+The command is the name of the program to run. It may be followed by one or more options, which adjust the behavior of the command or what it will do. Options normally start with one or two dashes (-a or --all, for example) to distinguish them from arguments. Commands may also be followed by one or more arguments, which often indicate a target that the command should operate on.
+
+For example, the command line usermod -L morgan has a command (usermod), an option (-L), and an argument (morgan). The effect of this command is to lock the password on user morgan's account.
+
+To use a command effectively, a user needs to know what options and arguments it takes and in what order it expects them (the syntax of the command). Most commands have a --help option. This causes the command to print a description of what it does, a "usage statement" that describes the command's syntax, and a list of the options it accepts and what they do.
+
+Usage statements may seem complicated and difficult to read. They become much simpler to understand once a user becomes familiar with a few basic conventions:
+
+Square brackets, [], surround optional items.
+
+Anything followed by ... represents an arbitrary-length list of items of that type.
+
+Multiple items separated by pipes, |, means only one of them can be specified.
+
+Text in angle brackets, <>, represents variable data. For example, <filename> means “insert the filename you wish to use here”. Sometimes these variables are simply written in capital letters (e.g., FILENAME).
+
+Consider the first usage statement for the date command:
+
+[student@desktopX ~]$ date --help
+date [OPTION]... [+FORMAT]
+This indicates that date can take an optional list of options ([OPTION]...), followed by an optional format string, prefixed with a plus character, +, that defines how the current date should be displayed ([+FORMAT]). Since both of these are optional, date will work even if it is not given options or arguments (it will print the current date and time using its default format).
+
+NOTE
+The man page for a command has a SYNOPSIS section that provides information about the command's syntax. The man-pages(7) man page describes how to interpret all the square brackets, vertical bars, and so forth that users see in SYNOPSIS or a usage message.
+
+When a user is finished using the shell and wants to quit, there are a couple of ways to end the session. The exit command terminates the current shell session. Another way to finish a session is by pressing Ctrl+d.
+
+REFERENCES
+intro(1), bash(1), console(4), pts(4), and man-pages(7) man pages
+
+Note: Some details of the console(4) man page, involving init(8) and inittab(5), are outdated.
+
+
+
+Quiz: Practice: Local Console Access Terms
+Match the following items to their counterparts in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+Description	Term
+The interpreter that executes commands typed as strings.	
+The visual cue that indicates an interactive shell is waiting for the user to type a command.	
+The name of a program to run.	
+The part of the command line that adjusts the behavior of a command.	
+The part of the command line that specifies the target that the command should operate on.	
+The hardware display and keyboard used to interact with a system.	
+One of multiple logical consoles that can each support an independent login session.	
+An interface that provides a display for output and a keyboard for input to a shell session.	
+

@@ -1,0 +1,104 @@
+Configuring SSH Key-based Authentication
+Utilizing key-based SSH authentication adds additional security to remote systems administration.
+
+Objective
+After completing this section, students should be able to set up SSH to allow secure logins without passwords by using a private authentication key file.
+
+SSH key-based authentication
+Users can authenticate ssh logins without a password by using public key authentication. ssh allows users to authenticate using a private-public key scheme. This means that two keys are generated, a private key and a public key. The private key file is used as the authentication credential, and like a password, must be kept secret and secure. The public key is copied to systems the user wants to log into, and is used to verify the private key. The public key does not need to be secret. An SSH server that has the public key can issue a challenge that can only be answered by a system holding your private key. As a result, you can authenticate using the presence of your key. This allows you to access systems in a way that doesn't require typing a password every time, but is still secure.
+
+Key generation is done using the ssh-keygen command. This generates the private key ~/.ssh/id_rsa and the public key ~/.ssh/id_rsa.pub.
+
+NOTE
+During key generation, there is the option to specify a passphrase which must be provided in order to access your private key. In the event the private key is stolen, it is very difficult for someone other than the issuer to use it when protected with a passphrase. This adds enough of a time buffer to make a new key pair and remove all references to the old keys before the private key can be used by an attacker who has cracked it.
+
+It is always wise to passphrase-protect the private key since the key allows access to other machines. However, this means the passphrase must be entered whenever the key is used, making the authentication process no longer password-less. This can be avoided using ssh-agent, which can be given your passphrase once at the start of the session (using ssh-add), so it can provide the passphrase as needed while you stay logged in.
+
+For additional information on the ssh-agent command, consult the Red Hat System Administration Guide, Chapter 8.2.4.2.: Configuring ssh-agent.
+
+Once the SSH keys have been generated, they are stored by default in the .ssh/ directory of your home directory. Permissions should be 600 on the private key and 644 on the public key.
+
+Before key-based authentication can be used, the public key needs to be copied to the destination system. This can be done with ssh-copy-id.
+
+[student@desktopX ~]$ ssh-copy-id root@desktopY
+When the key is copied to another system using ssh-copy-id, it copies the ~/.ssh/id_rsa.pub file by default.
+
+SSH key demonstration
+
+Use ssh-keygen to create a public-private key pair.
+
+[student@desktopX ~]$ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/student/.ssh/id_rsa): Enter
+Created directory '/home/student/.ssh'.
+Enter passphrase (empty for no passphrase): redhat
+Enter same passphrase again: redhat
+Your identification has been saved in /home/student/.ssh/id_rsa.
+Your public key has been saved in /home/student/.ssh/id_rsa.pub.
+The key fingerprint is:
+a4:49:cf:fb:ac:ab:c8:ce:45:33:f2:ad:69:7b:d2:5a student@desktopX.example.com
+The key's randomart image is:
++--[ RSA 2048]----+
+|                 |
+|                 |
+|      . .        |
+|     . *         |
+|    . * S        |
+|     + + .       |
+|      o.E        |
+|   o oo+oo       |
+|   .=.**ooo      |
++-----------------+
+Use ssh-copy-id to copy the public key to the correct location on a remote system. For example:
+
+[student@desktopX ~]$ ssh-copy-id -i ~/.ssh/id_rsa.pub root@serverX.example.com
+REFERENCES
+Additional information may be available in the chapter on using key-based authentication in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+ssh-keygen(1), ssh-copy-id(1), ssh-agent(1), ssh-add(1) man pages
+
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy
+Red Hat Training Policies
+Terms of Use
+All policies and guidelines
+
+
+
+
+Guided Exercise: Practice: Using SSH Key-based Authentication
+In this lab, you will set up SSH key-based authentication.
+
+Outcomes:
+
+Students will set up SSH user key-based authentication to initiate SSH connections.
+
+Create an SSH key pair as student on desktopX using no passphrase.
+
+[student@desktopX ~]$ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/student/.ssh/id_rsa): Enter
+Created directory '/home/student/.ssh'.
+Enter passphrase (empty for no passphrase): Enter
+Enter same passphrase again: Enter
+Your identification has been saved in /home/student/.ssh/id_rsa.
+Your public key has been saved in /home/student/.ssh/id_rsa.pub.
+...
+Send the SSH public key to the student account on serverX.
+
+[student@desktopX ~]$ ssh-copy-id serverX
+The authenticity of host 'serverX (172.25.X.11)' can't be established.
+ECDSA key fingerprint is 33:fa:a1:3c:98:30:ff:f6:d4:99:00:4e:7f:84:3e:c3.
+Are you sure you want to continue connecting (yes/no)? yes
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+student@serverX's password: student
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'student@serverX'"
+and check to make sure that only the key(s) you wanted were added.
+Run the hostname command by using ssh to display the hostname of the serverX.example.com machine without the need to enter a password.
+
+[student@desktopX ~]$ ssh serverX 'hostname'
+serverX.example.com

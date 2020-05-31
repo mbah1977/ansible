@@ -1,0 +1,103 @@
+iChapter 2. File System Navigation
+The Linux File System Hierarchy
+Quiz: Practice: File System Hierarchy
+Managing Files Using Command-Line Tools
+Guided Exercise: Practice: Command-Line File Management
+Making Links Between Files
+Guided Exercise: Practice: Making Links Between Files
+Abstract
+
+Overview
+Goal	To copy, move, create, delete, link and organize files while working from the Bash shell prompt.
+Objectives	
+Identify the purpose for important directories on a Linux system.
+
+Create, copy, move, and remove files and directories using command-line utilities.
+
+Use hard links and symlinks to make multiple names.
+
+Sections	
+The Linux File System Hierarchy (and Practice)
+
+Managing Files Using Command-Line Tools (and Practice)
+
+Making Links Between Files (and Practice)
+
+The Linux File System Hierarchy
+Identify the purpose for top-level directories in the Linux hierarchy.
+
+Objectives
+After completing this section, students should be able to understand fundamental file system layout, organization, and the location of key file types.
+
+The file system hierarchy
+All files on a Linux system are stored on file systems which are organized into a single inverted tree of directories, known as a file system hierarchy. This tree is inverted because the root of the tree is said to be at the top of the hierarchy, and the branches of directories and subdirectories stretch below the root.
+
+
+Figure 2.1: Significant file system directories in Red Hat Enterprise Linux 7
+The directory / is the root directory at the top of the file system hierarchy. The / character is also used as a directory separator in file names. For example, if etc is a subdirectory of the / directory, we could call that directory /etc. Likewise, if the /etc directory contained a file named issue, we could refer to that file as /etc/issue.
+
+Subdirectories of / are used for standardized purposes to organize files by type and purpose. This makes it easier to find files. For example, in the root directory, the subdirectory /boot is used for storing files needed to boot the system.
+
+NOTE
+The following terms are encountered in describing file system directory contents:
+
+- static is content that remains unchanged until explicitly edited or reconfigured.
+- dynamic or variable is content typically modified or appended by active processes.
+- persistent is content, particularly configuration settings, that remain after a reboot.
+- runtime is process- or system-specific content or attributes cleared during reboot.
+The following table lists some of the most important directories on the system by name and purpose.
+
+Table 2.1. Important Red Hat Enterprise Linux directories
+
+Location	Purpose
+/usr	Installed software, shared libraries, include files, and static read-only program data. Important subdirectories include:
+- /usr/bin: User commands.
+- /usr/sbin: System administration commands.
+- /usr/local: Locally customized software.
+/etc	Configuration files specific to this system.
+/var	Variable data specific to this system that should persist between boots. Files that dynamically change (e.g. databases, cache directories, log files, printer-spooled documents, and website content) may be found under /var.
+/run	Runtime data for processes started since the last boot. This includes process ID files and lock files, among other things. The contents of this directory are recreated on reboot. (This directory consolidates /var/run and /var/lock from older versions of Red Hat Enterprise Linux.)
+/home	Home directories where regular users store their personal data and configuration files.
+/root	Home directory for the administrative superuser, root.
+/tmp	A world-writable space for temporary files. Files which have not been accessed, changed, or modified for 10 days are deleted from this directory automatically. Another temporary directory exists, /var/tmp, in which files that have not been accessed, changed, or modified in more than 30 days are deleted automatically.
+/boot	Files needed in order to start the boot process.
+/dev	Contains special device files which are used by the system to access hardware.
+
+IMPORTANT
+In Red Hat Enterprise Linux 7, four older directories in / now have identical contents as their counterparts located in /usr:
+
+- /bin and /usr/bin.
+- /sbin and /usr/sbin.
+- /lib and /usr/lib.
+- /lib64 and /usr/lib64.
+In older versions of Red Hat Enterprise Linux, these were distinct directories containing different sets of files. In RHEL 7, the directories in / are symbolic links to the matching directories in /usr.
+
+REFERENCES
+hier(7) man page
+
+Filesystem Hierarchy Standard
+
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy
+
+
+Quiz: Practice: File System Hierarchy
+Match the following items to their counterparts in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+Directory purpose	Location
+This directory contains static, persistent system configuration data. /etc	
+This is the system's root directory.	/
+User home directories are located under this directory.	/home
+This is the root account's home directory.	/root
+This directory contains dynamic configuration data, such as FTP and websites.	/var
+Regular user commands and utilities are located here.	/usr/bin
+System administration binaries, for root use, are here.	/usr/sbin
+Temporary files are stored here.	/tmp
+Contains dynamic, non-persistent application runtime data.	/run
+Contains installed software programs and libraries.	/usr
+Red Hat Training + Certification logoRed Hat logo 
+Privacy Policy

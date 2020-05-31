@@ -1,0 +1,242 @@
+Getting Help From Red Hat
+Use redhat-support-tool to look up Red Hat Knowledgebase articles and manage support cases.
+
+Objectives
+After completing this section, students should be able to view Knowledgebase information and manage support cases from the command line.
+
+Red Hat Customer Portal
+Red Hat Customer Portal (https://access.redhat.com) provides customers with access to everything provided with their subscription through one convenient location. Customers can search for solutions, FAQs, and articles through Knowledgebase. Access to official product documentation is provided. Support tickets can be submitted and managed. Subscriptions to Red Hat products can be attached to and detached from registered systems, and software downloads, updates, and evaluations can be obtained. Parts of the site are accessible to everyone, while others are exclusive to customers with active subscriptions. Help with getting access to Customer Portal is available at https://access.redhat.com/help/.
+
+Customers can work with Red Hat Customer Portal through a web browser. This section will introduce a command line tool that can also be used to access Red Hat Customer Portal services, redhat-support-tool.
+
+
+Figure 1.1: Knowledgebase at the Red Hat Customer Portal
+Using redhat-support-tool to search Knowledgebase
+The Red Hat Support Tool utility redhat-support-tool provides a text console interface to the subscription-based Red Hat Access services. Internet access is required to reach the Red Hat Customer Portal. The redhat-support-tool is text-based for use from any terminal or SSH connection; no graphical interface is provided.
+
+The redhat-support-tool command may be used as an interactive shell or invoked as individually executed commands with options and arguments. The tool's available syntax is identical for both methods. By default, the program launches in shell mode. Use the provided help sub-command to see all available commands. Shell mode supports tab completion and the ability to call programs in the parent shell.
+
+[student@desktopX ~]$ redhat-support-tool
+Welcome to the Red Hat Support Tool.
+Command (? for help):
+When first invoked, redhat-support-tool prompts for required Red Hat Access subscriber login information. To avoid repetitively supplying this information, the tool asks to store account information in the user's home directory (~/.redhat-support-tool/redhat-support-tool.conf). If a Red Hat Access account is shared by many users, the --global option can save account information to /etc/redhat-support-tool.conf, along with other systemwide configuration. The tool's config command modifies tool configuration settings.
+
+The redhat-support-tool allows subscribers to search and display the same Knowledgebase content seen when on the Red Hat Customer Portal. Knowledgebase permits keyword searches, similar to the man command. Users can enter error codes, syntax from log files, or any mix of keywords to produce a list of relevant solution documents.
+
+The following is an initial configuration and basic search demonstration:
+
+[student@desktopX ~]$ redhat-support-tool
+Welcome to the Red Hat Support Tool.
+Command (? for help): search How to manage system entitlements with subscription-manager
+Please enter your RHN user ID: subscriber
+Save the user ID in /home/student/.redhat-support-tool/redhat-support-tool.conf (y/n): y
+Please enter the password for subscriber: password
+Save the password for subscriber in /home/student/.redhat-support-tool/redhat-support-tool.conf (y/n): y
+After prompting the user for the required user configuration, the tool continues with the original search request:
+
+Type the number of the solution to view or 'e' to return to the previous menu.
+  1 [ 253273:VER] How to register and subscribe a system to Red Hat Network
+    (RHN) using Red Hat Subscription Manager (RHSM)?
+  2 [  17397:VER] What are Flex Guest Entitlements in Red Hat Network?
+  3 [ 232863:VER] How to register machines and manage subscriptions using Red
+    Hat Subscription Manager through an invisible HTTP proxy / Firewall?
+3 of 43 solutions displayed. Type 'm' to see more, 'r' to start from the beginning again, or '?' for help with the codes displayed in the above output.
+Select a Solution: 
+Specific sections of solution documents may be selected for viewing.
+
+Select a Solution: 1
+
+Type the number of the section to view or 'e' to return to the previous menu.
+ 1 Title
+ 2 Issue
+ 3 Environment
+ 4 Resolution
+ 5 Display all sections
+End of options.
+Section: 1
+
+Title
+===============================================================================
+How to register and subscribe a system to Red Hat Network (RHN) using Red Hat Subscription Manager (RHSM)?
+URL:        https://access.redhat.com/site/solutions/253273
+(END) q
+[student@desktopX ~]$
+Directly access Knowledgebase articles by document ID
+
+Locate online articles directly using the tool's kb command with the Knowledgebase document ID. Returned documents scroll on the screen without pagination, allowing a user to redirect the output using other local commands. This example views the document with the less command:
+
+[student@desktopX ~]$ redhat-support-tool kb 253273 | less
+
+Title:   How to register and subscribe a system to Red Hat Network (RHN) using Red Hat Subscription Manager (RHSM)?
+ID:      253273                                                      
+State:   Verified: This solution has been verified to work by Red Hat Customers and Support Engineers for the specified product version(s).
+URL:     https://access.redhat.com/site/solutions/253273             
+: q
+Documents retrieved in unpaginated format are easy to send to a printer, convert to PDF or other document format, or to redirect to a data entry program for an incident tracking or change management system, using other utilities installed and available in Red Hat Enterprise Linux.
+
+Using redhat-support-tool to manage support cases
+One benefit of a product subscription is access to technical support through Red Hat Customer Portal. Depending on the system's subscription support level, Red Hat may be contacted through on-line tools or by phone. See https://access.redhat.com/site/support/policy/support_process for links to detailed information about the support process.
+
+Preparing a bug report
+
+Before contacting Red Hat Support, gather relevant information for a bug report.
+
+Define the problem. Be able to clearly state the problem and its symptoms. Be as specific as possible. Detail the steps which will reproduce the problem.
+
+Gather background information. Which product and version is affected? Be ready to provide relevant diagnostic information. This can include output of sosreport, discussed later in this section. For kernel problems, this could include the system's kdump crash dump or a digital photo of the kernel backtrace displayed on the monitor of a crashed system.
+
+Determine the severity level. Red Hat uses four severity levels to classify issues. Urgent and High severity problem reports should be followed by a phone call to the relevant local support center (see https://access.redhat.com/site/support/contact/technicalSupport).
+
+Severity	Description
+Urgent (Severity 1)	A problem that severely impacts your use of the software in a production environment (such as loss of production data or in which your production systems are not functioning). The situation halts your business operations and no procedural workaround exists.
+High (Severity 2)	A problem where the software is functioning but your use in a production environment is severely reduced. The situation is causing a high impact to portions of your business operations and no procedural workaround exists.
+Medium (Severity 3)	A problem that involves partial, non-critical loss of use of the software in a production environment or development environment. For production environments, there is a medium-to-low impact on your business, but your business continues to function, including by using a procedural workaround. For development environments, where the situation is causing your project to no longer continue or migrate into production.
+Low (Severity 4)	A general usage question, reporting of a documentation error, or recommendation for a future product enhancement or modification. For production environments, there is low-to-no impact on your business or the performance or functionality of your system. For development environments, there is a medium-to-low impact on your business, but your business continues to function, including by using a procedural workaround.
+Managing a bug report with redhat-support-tool
+
+Subscribers may create, view, modify, and close Red Hat Support cases using redhat-support-tool. When support cases are opened or maintained, users may include files or documentation, such as diagnostic reports (sosreport). The tool uploads and attaches files to online cases. Case details including product, version, summary, description, severity, and case group may be assigned with command options or letting the tool prompt for required information. In the following example, the --product and --version options are specified, but redhat-support-tool would provide a list of choices for those options if the opencase command did not specify them.
+
+[student@desktopX ~]$ redhat-support-tool
+Welcome to the Red Hat Support Tool.
+Command (? for help): opencase --product="Red Hat Enterprise Linux" --version="7.0"
+Please enter a summary (or 'q' to exit): System fails to run without power
+Please enter a description (Ctrl-D on an empty line when complete):
+When the server is unplugged, the operating system fails to continue.
+ 1   Low                                                                        
+ 2   Normal                                                                     
+ 3   High                                                                       
+ 4   Urgent                                                                     
+Please select a severity (or 'q' to exit): 4
+Would you like to assign a case group to this case (y/N)? N
+Would see if there is a solution to this problem before opening a support case? (y/N) N
+-------------------------------------------------------------------------------
+Support case 01034421 has successfully been opened.
+Including diagnostic information by attaching a SoS report archive
+
+Including diagnostic information when a support case is first created contributes to quicker problem resolution. The sosreport command generates a compressed tar archive of diagnostic information gathered from the running system. The redhat-support-tool prompts to include one if an archive has been created previously:
+
+Please attach a SoS report to support case 01034421. Create a SoS report as
+the root user and execute the following command to attach the SoS report
+directly to the case:
+ redhat-support-tool addattachment -c 01034421 path to sosreport
+
+Would you like to attach a file to 01034421 at this time? (y/N) N
+Command (? for help): 
+If a current SoS report is not already prepared, an administrator can generate and attach one later, using the tool's addattachment command as advised previously. This section's practice exercise will provide the steps for creating and viewing a current SoS diagnostic report.
+
+Support cases can also be viewed, modified, and closed by you as the subscriber:
+
+Command (? for help): listcases
+
+Type the number of the case to view or 'e' to return to the previous menu.
+ 1 [Waiting on Red Hat]  System fails to run without power
+No more cases to display
+Select a Case: 1
+
+Type the number of the section to view or 'e' to return to the previous menu.
+ 1 Case Details
+ 2 Modify Case
+ 3 Description
+ 4 Recommendations
+ 5 Get Attachment
+ 6 Add Attachment
+ 7 Add Comment
+End of options.
+Option: q
+
+Select a Case: q
+
+Command (? for help):q
+
+[student@desktopX ~]$ redhat-support-tool modifycase --status=Closed 01034421
+Successfully updated case 01034421
+[student@desktopX ~]$
+The Red Hat Support Tool has advanced application diagnostic and analytic capabilities. Using kernel crash dump core files, redhat-support-tool can create and extract a backtrace, a report of the active stack frames at the point of a crash dump, to provide onsite diagnostics and open a support case.
+
+The tool also provides log file analysis. Using the tool's analyze command, log files of many types, including operating system, JBoss, Python, Tomcat, oVirt, and others, can be parsed to recognize problem symptoms, which can then be viewed and diagnosed individually. Providing preprocessed analysis, as opposed to raw data such as crash dump or log files, allows support cases to be opened and made available to engineers more quickly.
+
+REFERENCES
+sosreport(1) man page
+
+Red Hat Access: Red Hat Support Tool
+
+Red Hat Support Tool First Use
+
+Contacting Red Hat Technical Support
+
+Help - Red Hat Customer Portal
+
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy
+
+
+
+Guided Exercise: Practice: Creating and Viewing an SoS Report
+In this lab, you will use the sosreport command to generate a SoS report, then view the contents of that diagnostic archive.
+
+Outcomes
+
+A compressed tar archive of systemwide diagnostic information.
+
+Perform the following steps on serverX unless directed otherwise.
+
+If currently working as a non-root user, switch to root.
+
+[student@serverX ~]$ su -
+Password: redhat
+Run the sosreport command. This may take many minutes on larger systems.
+
+[root@serverX ~]# sosreport
+
+sosreport (version 3.0)
+
+  This command will collect system configuration and
+diagnostic information from this Red Hat Enterprise Linux
+system. An archive containing the collected information
+will be generated in /var/tmp and may be provided to a Red
+Hat support representative or used for local diagnostic or
+recording purposes.
+
+  Any information provided to Red Hat will be treated in
+strict confidence in accordance with the published support
+policies at:
+
+    https://access.redhat.com/support/
+
+  The generated archive may contain data considered
+sensitive and its content should be reviewed by the
+originating organization before being passed to any third party.
+
+  No changes will be made to system configuration.
+
+Press ENTER to continue, or CTRL-C to quit. ENTER
+
+Please enter your first initial and last name [serverX.example.com]: yourname
+Please enter the case number that you are generating this report for: 01034421
+Press Enter. Provide the requested information. Make up a value for the case number.
+
+Running 17/74: general...
+Creating compressed archive...
+
+Your sosreport has been generated and saved in:
+  /var/tmp/sosreport-yourname.01034421-20140129000049.tar.xz
+
+The checksum is: b2e78125290a4c791162e68da8534887
+
+Please send this file to your support representative.
+Change directory to /var/tmp, and unpack the archive.
+
+[root@serverX ~]# cd /var/tmp
+[root@serverX tmp]# tar -xvJf sosreport-*.tar.xz
+Change directory to the resulting subdirectory and browse the files found there.
+
+[root@serverX tmp]# cd sosreport-yourname.01034421-20140129000049
+[root@serverX sosreport-yourname.01034421-20140129000049]# ls -lR
+Open files, list directories, and continue to browse to become familiar with the information included in SoS reports. In the form of the original archived and compressed file, this is the diagnostic information you would be attaching to a redhat-support-tool support case. When finished, remove the archive directory and files and return to your home directory.
+
+[root@serverX sosreport-yourname.01034421-20140129000049]# cd /var/tmp
+[root@serverX tmp]# rm -rf sosreport*
+[root@serverX tmp]# exit
+[student@serverX ~]$ 
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy
