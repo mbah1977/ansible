@@ -1,0 +1,188 @@
+
+Lab: Configuring Workflow Job Templates, Surveys, and Notifications
+In this review, you will create a Workflow Job Template which uses a survey and sends email notifications.
+
+Outcomes
+
+You should be able to:
+
+Create a Workflow Job Template.
+
+Add a Survey to an existing Workflow Job Template.
+
+Create and activate an email Notification Template.
+
+The previous exercises in this comprehensive review must be completed before starting this exercise.
+
+Instructions
+
+Configure your Ansible Tower server with a Workflow Job Template using your existing Job Templates, a new Survey, and a new Notification Template, based on the following specification:
+
+Create a Workflow Job Template in the Default organization called Full Stack Deployment. Its Description should be Deploy the Full Stack. Define an Extra Variable environment_name with the value "Development".
+
+The Workflow Job Template should include the following steps:
+
+Sync the Inventory, Dynamic Inventory.
+
+Upon success of the previous step, sync the Project, My Full-Stack Project.
+
+Upon success of the previous step, launch a job using the Job Template, Set up Databases.
+
+Upon success of the previous step, launch a job using the Job Template, Set up Web servers.
+
+Upon success of the previous step, launch a job using the Job Template, Set up Load Balancer.
+
+The Devops Team should have the Admin role on the Workflow Job Template.
+
+Add a Survey to the Full Stack Deployment Workflow Job Template. Configure the Survey based on the following specification:
+
+Field	Value
+PROMPT	What environment are you deploying?
+DESCRIPTION	The environment will be displayed at the bottom of the index page
+ANSWER VARIABLE NAME	environment_name
+ANSWER TYPE	Text
+MINIMUM LENGTH	1
+MAXIMUM LENGTH	40
+DEFAULT ANSWER	Development
+REQUIRED	Enabled
+Create an email Notification Template named Notify on Job Success and Failure, based on the following specification:
+
+Field	Value
+NAME	Notify on Job Success and Failure
+DESCRIPTION	Sends an email to notify the status of the Job
+ORGANIZATION	Default
+TYPE	Email
+HOST	localhost
+RECIPIENT LIST	student@localhost
+SENDER EMAIL	system@lab.example.com
+PORT	25
+For the Workflow Job Template, Full Stack Deployment, activate the SUCCESS and the FAILURE Notifications using the Notification Template, Notify on Job Success and Failure.
+
+To create a Workflow Job Template called Full Stack Deployment:
+
+Click Templates in the left quick navigation bar.
+
+Click the + button to add a new Workflow Job Template.
+
+From the drop-down list, select Workflow Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Full Stack Deployment
+DESCRIPTION	Deploy the Full Stack
+ORGANIZATION	Default
+EXTRA VARIABLES	environment_name: "Development"
+Click SAVE to create the new Workflow Job Template.
+
+To configure the Workflow for the Full Stack Deployment Workflow Job Template:
+
+Click WORKFLOW VISUALIZER to open the Workflow VISUALIZER.
+
+Click START to add the first action to be performed. This will display a list of actions to be performed in the right panel.
+
+In the right panel, click INVENTORY SYNC to display the list of Inventories available.
+
+Select Custom Script and click SELECT. This links the START node with a blue line (always perform) to the node for the Dynamic Inventory, Custom Script, in the Workflow VISUALIZER window.
+
+Move your mouse over the new node and click on the green + button to add an action after the Inventory Sync of Custom Script. This displays a list of actions to be performed in the right panel.
+
+In the right panel, click PROJECT SYNC to display the list of Projects available.
+
+Select My Full-Stack Project and click SELECT. In the Workflow VISUALIZER window, this action links the previous node to the node for the Project, My Full-Stack Project, with a green line, indicating that this progression will only be performed if the Inventory Sync step is successful.
+
+Move your mouse over to the new node and click on the green + button to add an action after the Project Sync of My Full-Stack Project. This displays a list of actions to be performed in the right panel.
+
+In the right panel, make sure you are in the JOBS section and select the Set up Databases Job Template.
+
+In the RUN section below, select On Success and click SELECT. In the Workflow VISUALIZER window, this links the node for My Full-Stack Project to the node for the Set up Databases Job Template with a green line, indicating that this progression is only performed if the Project Sync step is successful.
+
+Move your mouse over the new node and click on the green + button to add an action after the Set up Databases Job Template.
+
+In the right panel, make sure you are in the JOBS section and select the Set up Web servers Job Template. In the RUN section, select On Success and click SELECT.
+
+Move your mouse over the new node and click on the green + button to add an action after the Set up Web servers Job Template.
+
+In the right panel, make sure you are in the JOBS section and select the Set up Load Balancer Job Template. In the RUN section, select On Success and click SELECT.
+
+Click SAVE to save the Workflow Job Template.
+
+Grant Devops Team the Admin role on the Workflow Job Template:
+
+Click PERMISSIONS to manage the Workflow Job Template’s permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available Teams.
+
+In the first section, select the box next to Devops Team. This causes the Team to display in the second section, beneath the first one.
+
+In the second section, select the Admin role from the drop-down list.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Workflow Job Template, Full Stack Deployment, which now shows that all members of the Devops Team are assigned the Admin role on the Workflow Job Template.
+
+Add a Survey to the Full Stack Deployment Workflow Job Template:
+
+Click the DETAILS button to return to the Template details screen.
+
+Click the ADD SURVEY button to add a Survey.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+PROMPT	What environment are you deploying?
+DESCRIPTION	The environment will be displayed at the bottom of the index page
+ANSWER VARIABLE NAME	environment_name
+ANSWER TYPE	Text
+MINIMUM LENGTH	1
+MAXIMUM LENGTH	40
+DEFAULT ANSWER	Development
+REQUIRED	Enabled
+Click +ADD to add the Survey Prompt to the Survey. This displays a preview of your Survey on the right.
+
+IMPORTANT
+Before saving, make sure that the ON/OFF switch, located at the top of the Survey editor window, is set to ON.
+
+Click SAVE to add the Survey to the Job Template.
+
+To create an email Notification Template called Notify on Job Success and Failure:
+
+Click Notifications in the left quick navigation bar, to manage Notification Templates.
+
+Click + to add a Notification Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Notify on Job Success and Failure
+DESCRIPTION	Sends an email to notify the status of the Job
+ORGANIZATION	Default
+TYPE	Email
+HOST	localhost
+RECIPIENT LIST	student@localhost
+SENDER EMAIL	system@lab.example.com
+PORT	25
+Leave all the other fields untouched and click SAVE to save the Notification Template. You are then redirected to the list of Notification Templates.
+
+To activate both the SUCCESS and FAILURE Notifications for the Full Stack Deployment Workflow Job Template:
+
+Click Templates in the left quick navigation bar.
+
+Click the link for the Full Stack Deployment Workflow Job Template.
+
+Click NOTIFICATIONS to manage notifications for the Full Stack Deployment Workflow Job Template.
+
+On the same line as the Notification Template, Notify on Job Success and Failure, set both ON/OFF switches for SUCCESS and FAILURE to ON.
+
+Evaluation
+
+Use the Ansible Tower interface to confirm that everything is configured as specified.
+
+NOTE
+The next activity in this chapter will instruct you to launch the Workflow Job Template.
+
+There is a grading script that you will run at the end of the all comprehensive review labs. That script evaluates your work in this lab.
+
+This concludes the lab.
+
+

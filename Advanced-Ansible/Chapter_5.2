@@ -1,0 +1,532 @@
+Managing Rolling Updates
+Objectives
+After completing this section, you should be able to tune behavior of the serial directive when batching hosts for execution, abort the play if too many hosts fail, and create tasks that run only once for each batch or for all hosts in the inventory.
+
+Overview
+Ansible has several features that enable rolling updates, a strategy that staggers deployments to batches of servers. With this strategy, infrastructure updates are deployed with zero downtime.
+
+When an unforeseen problem occurs, Ansible can halt the deployment and any errors can be limited to only those servers in a particular batch. With tests and monitoring in place, you can configure playbook tasks to:
+
+Rollback configuration for hosts in the affected batch.
+
+Quarantine affected hosts to enable analysis of the failed deployment.
+
+Send notifications of the deployment to stakeholders.
+
+Controlling Batch Size
+By default, Ansible runs a play by running one task for all hosts in the play before starting execution of the next task. If a task fails, then all hosts will be only partway through the task. This could mean that none of your hosts are working correctly, which could lead to an outage.
+
+Ideally, you could process some of your hosts all the way through the play before starting the next batch of hosts. If too many hosts fail, then you can abort the entire play. In the following paragraphs, you configure your play to do this.
+
+Setting a Fixed Batch Size
+
+To process hosts through a play in batches, use the serial keyword in your play. The serial keyword specifies how many hosts should be in each batch. Ansible will process each batch of hosts all the way through the play before starting the next batch. If all hosts in the current batch fail, the entire play is aborted and Ansible does not start the next batch.
+
+Consider the beginning portion of the following play:
+
+---
+- name: Update Webservers
+  hosts: web_servers
+  serial: 2
+In this example, the serial keyword instructs Ansible to process hosts in the web_servers host group in batches of two hosts. If the play executes without error, the play is repeated again with a new batch.
+
+This process continues until all of the hosts in the play are processed. As a result, the last batch may contain fewer hosts than the indicated value of the serial keyword, if the total number of hosts in the play is not divisible by the batch size. In the previous example, the last batch contains one host if the total number of web servers is an odd value.
+
+Remember, if you use an integer with the serial keyword, then as the number of hosts in the play increases, the number of batches needed to complete the play also increases. With a serial value of 2, a host group with 200 hosts will require 100 batches to complete, while a host group of 20 hosts will require 10 batches to complete.
+
+Setting Batch Size as a Percentage
+
+You can also specify a percentage for the value of the serial keyword:
+
+---
+- name: Update Webservers
+  hosts: web_servers
+  serial: 25%
+If you specify a percentage, that percentage of the hosts in the play will be processed in each batch. If the value of serial is 25%, then four batches are required to complete the play for all hosts, regardless of whether the web_servers group contains 20 hosts, or 200 hosts.
+
+Ansible applies the percentage to the total number of hosts in the host group. If that resulting value is not an integer number of hosts, then the value is truncated (rounded down) to the nearest integer. The remaining hosts are run in a final, smaller batch. The batch size can not be zero hosts. If the truncated value is zero, Ansible changes the batch size to one host.
+
+Description	Host Group 1	Host Group 2	Host Group 3
+Number of Hosts	3	13	19
+serial value	25%	25%	25%
+Percentage Applied	0.75	3.25	4.25
+Truncated Percentage	0	3	4
+Batch Size	1	3	4
+Number of Batches	3	5	5
+Size of Last Batch	1	1	3
+Setting Batch Sizes to Change
+
+You can change the batch size as the play runs. For example, you could test a play on a batch of one host, and if that host fails, then the entire play aborts. However, if the play is successful on one host, you could increase the batch size to ten percent of your hosts, then fifty percent of the managed hosts, and then the remainder of the managed hosts.
+
+You can gradually change the batch size by setting the serial keyword to a list of values. This list can contain any combination of integers and percentages, and resets the size of each batch in sequence. If the value is a percentage, then Ansible computes the batch size based the total size of the host group, and not the size of the group of unprocessed hosts.
+
+Consider the following example:
+
+---
+- name: Update Webservers
+  hosts: web_servers
+  serial:
+    - 1
+    - 10%
+    - 100%
+The first batch contains just a single host.
+
+The second batch contains 10% of the total number of hosts in the web_servers host group. Ansible computes the actual value according to the previously discussed rules.
+
+The third batch contains all the remaining unprocessed hosts in the play. This allows Ansible to efficiently process all the remaining hosts.
+
+If there are unprocessed hosts remaining after the last batch corresponding to the last entry of the serial keyword, the last batch size is repeated until all hosts are processed. Consider the following play, which executes against a web_servers host group with 100 hosts:
+
+---
+- name: Update Webservers
+  hosts: web_servers
+  serial:
+    - 1
+    - 10%
+    - 25%
+The first batch contains one host, while the second batch contains 10 hosts (10% of 100). The third batch processes 25 hosts (25% of 100), leaving 64 unprocessed hosts (1 + 10 + 25 processed). Ansible continues executing the play in batch sizes of 25 hosts (25% of 100), until there are fewer than 25 unprocessed hosts remaining. In this example, the remaining 14 hosts are processed in the final batch (1 + 10 + 25 + 25 + 25 + 14 = 100).
+
+Aborting the Play
+Now that you know how to gradually increase the batch size, you must learn how to abort the play if too many hosts fail.
+
+By default, Ansible tries to get as many hosts to complete a play as possible. If a task fails for a host, then it is dropped from the play, but Ansible will continue to run the remaining tasks in the play for other hosts. The play only stops if all hosts fail.
+
+However, if you organize hosts into batches using the serial keyword, then if all hosts in the current batch fail, Ansible will stop the play for all remaining hosts, not just those remaining hosts in the current batch. If the execution of the play is stopped due to a failure of all hosts in a batch, then the next batch will not be started.
+
+Ansible keeps a list of the active servers for each batch in the ansible_play_batch variable. Any host that fails a task is removed from the ansible_play_batch list. Ansible updates this list after every task.
+
+Consider the following hypothetical playbook, which executes against a web_servers host group with 100 hosts:
+
+---
+- name: Update Webservers
+  hosts: web_servers
+  tasks:
+    - name: Step One
+      shell: /usr/bin/some_command
+    - name: Step Two
+      shell: /usr/bin/some_other_command
+If ninety nine of the web servers fail the first task, but one host succeeds, Ansible continues to the second task. When Ansible executes the second task, Ansible only executes the task for the one host that previously succeeded.
+
+If you use the serial keyword, playbook execution continues only as long as there are hosts remaining in the current batch with no failures. Consider this modification to the hypothetical playbook:
+
+---
+- name: Update Webservers
+  hosts: web_servers
+  serial: 2
+  tasks:
+    - name: Step One
+      shell: /usr/bin/some_command
+    - name: Step Two
+      shell: /usr/bin/some_other_command
+If the first batch of two contains a host that succeeds and a host that fails, then the batch completes and Ansible moves on to the second batch of two. If both hosts in the second batch fail on a task in the play, then Ansible aborts the entire play and starts no more batches.
+
+In this scenario, after the playbook executes:
+
+One host successfully completes the play.
+
+Three hosts might be in an error state.
+
+The rest of the hosts remain unaltered.
+
+Specifying Failure Tolerance
+
+By default, Ansible only halts play execution when all hosts in a batch experience a failure. However, you might want a play to abort if more than a certain percentage of hosts in the inventory have failed, even if no entire batch has failed. It is also possible to "fail fast" and abort the play if any tasks fail.
+
+Alter Ansible's failure behavior by adding the max_fail_percentage keyword to a play. When the number of failed hosts in a batch exceed this percentage, Ansible halts playbook execution.
+
+Consider the following hypothetical playbook, which executes against the web_servers host group that contains 100 hosts:
+
+---
+- name: Update Webservers
+  hosts: web_servers
+  max_fail_percentage: 30%
+  serial:
+    - 2
+    - 10%
+    - 100%
+  tasks:
+    - name: Step One
+      shell: /usr/bin/some_command
+    - name: Step Two
+      shell: /usr/bin/some_other_command
+The first batch contains two hosts. Because 30% of 2 is 0.6, a single host failure causes execution to stop.
+
+If both hosts in the first batch succeed, then Ansible continues with the second batch of 10 hosts. Because 30% of 10 is 3, more that 3 host failures must occur to cause Ansible to stop playbook execution. If three or fewer hosts experience errors in the second batch, Ansible continues with the third batch.
+
+To implement a "fail fast" strategy, set the max_fail_percentage to a value of zero.
+
+IMPORTANT
+To summarize Ansible's failure behavior:
+
+If the serial keyword and the max_fail_percentage value are not set, all hosts are run through the play in one batch. If all hosts fail, then the play fails.
+
+If the serial keyword is set, then hosts are run through the play in multiple batches and the play fails if all hosts in any one batch fail.
+
+If max_fail_percentage keyword is set, then the play fails if more than that percentage of hosts in a batch fail.
+
+If a play fails, all remaining plays in the playbook are aborted.
+
+Running a Task Once
+In certain scenarios, you may only need to run a task once for an entire batch of hosts, rather than once for each host in the batch. To do so, add the run_once keyword to the task with a Boolean true (or yes) value.
+
+Consider the following hypothetical task:
+
+- name: Reactivate Hosts
+  shell: /sbin/activate.sh {{ active_hosts_string }}
+  run_once: yes
+  delegate_to: monitor.example.com
+  vars:
+    active_hosts_string: "{{ ansible_play_batch | join(' ')}}"
+This task runs once and executes on the monitor.example.com host. The task uses the active_hosts_string variable to pass a list of active hosts as command-line arguments to an activation script. The variable contains only those hosts in the current batch that have succeeded for all previous tasks.
+
+NOTE
+Setting the run_once: yes keyword causes a task to run once for each batch. If you only need to run a task once for all hosts in a play, and the play has multiple batches, then you can add the following conditional to the task:
+
+when: inventory_hostname == ansible_play_hosts[0]
+This conditional runs the task only for the first host in the play.
+
+REFERENCES
+Delegation, Rolling Updates, and Local Actions — Ansible Documentation
+
+
+
+Guided Exercise: Managing Rolling Updates
+In this exercise, you will run a playbook that uses unequal batch sizes with the serial keyword, aborts if too many hosts fail, and runs a specific task once per batch.
+
+Outcomes
+
+You should be able to control the update process of an existing haproxy cluster by controlling the update with the serial directive, which determines the size of the batch to use.
+
+Log in as the student user on the workstation machine, and run the lab update-management start command.
+
+[student@workstation ~]$ lab update-management start
+Clone the Git repository http://git.lab.example.com:8081/git/update-management.git in the /home/student/git-repos directory.
+
+From a terminal, create the directory /home/student/git-repos, if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+Change to this directory:
+
+[student@workstation ~]$ cd git-repos/
+Clone the repository:
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/update-management.git
+Cloning into 'update-management'...
+...output omitted...
+[student@workstation git-repos]$ cd update-management
+[student@workstation update-management]$ 
+Execute the site.yml playbook to deploy a front-end load balancer and a set of back-end web servers.
+
+[student@workstation update-management]$ ansible-playbook site.yml
+...output omitted...
+PLAY RECAP *******************************************************************
+servera.lab.example.com  : ok=7    changed=6   ...  failed=0  skipped=2  ...
+serverb.lab.example.com  : ok=16   changed=11  ...  failed=0  skipped=2  ...
+serverc.lab.example.com  : ok=14   changed=9   ...  failed=0  skipped=2  ...
+serverd.lab.example.com  : ok=14   changed=9   ...  failed=0  skipped=2  ...
+servere.lab.example.com  : ok=14   changed=9   ...  failed=0  skipped=2  ...
+serverf.lab.example.com  : ok=14   changed=9   ...  failed=0  skipped=2  ...
+Review the issue_requests.sh script.
+
+In a different terminal tab, execute the issue_requests.sh script. The script continually sends periodic requests to the load balancer, displaying the response. The script output indicates five servers are providing version v1.0 of the web application.
+
+You stop the execution of this script in a later step.
+
+Review the issue_requests.sh script:
+
+#!/bin/bash
+SERVER=servera.lab.example.com
+WAIT_TIME_SECS=0.5
+LOG_FILE=curl_output.log
+
+rm -f $LOG_FILE
+
+while true; do
+  #Print curl response to stdout and also write to log file.
+  curl -s $SERVER | tee -a $LOG_FILE
+
+  sleep $WAIT_TIME_SECS
+done
+The script executes a curl servera.lab.example.com command every 0.5 seconds, and logs the response to the terminal screen and to the curl_output.log log file.
+
+In a different terminal, make the issue_requests.sh script executable and execute it:
+
+[student@workstation ~]$ cd ~/git-repos/update-management
+[student@workstation update-management]$ chmod +x issue_requests.sh
+[student@workstation update-management]$ ./issue_requests.sh
+This is serverb. (version v1.0)
+This is serverc. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverf. (version v1.0)
+This is serverb. (version v1.0)
+This is serverc. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverf. (version v1.0)
+...output omitted...
+The load balancer rotates requests to all five web servers, and back-end servers are serving version v1.0 of the web application.
+
+The update_webapp.yml playbook performs a rolling update of the web application hosted on back-end web servers. Review the update_webapp.yml playbook and the use of the serial keyword.
+
+Review the top section of the playbook:
+
+---
+- hosts: web_servers
+  serial:
+    - 1
+    - 25%
+    - 100%
+The update_webapp.yml playbook acts on all hosts in the web_servers host group. The serial keyword specifies that tasks in the play are processed in three batches.
+
+The first batch contains 1 host. After this batch finishes, four hosts still require processing.
+
+The second batch contains 1 host, because 25% of the host group size is 1.25 and that truncates to 1.
+
+The third batch contains 3 hosts, because 100% of the hosts group size is 5 but only 3 hosts remain unprocessed.
+
+Review the pre_tasks section of the play:
+
+  pre_tasks:
+    - name: Remove web server from service during the update
+      haproxy:
+        state: disabled
+        backend: app
+        host: "{{ inventory_hostname }}"
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups['lb_servers'] }}"
+Before the playbook updates the web application on each server, the haproxy module disables the server in all load balancers. With this task, external clients are not exposed to errors discovered after application deployment.
+
+Review the roles section of the play:
+
+  roles:
+  - role: webapp
+The webapp role deploys a web application that is hosted in a Git repository. The webapp_repo variable specifies the URL of the web application Git repository. The webapp_version variable specifies a branch or version tag in the application's repository. These variables are defined in the group_vars/web_servers/webapp.yml file.
+
+[student@workstation update-management]$ cat group_vars/web_servers/webapp.yml
+
+webapp_repo: http://git.lab.example.com:8081/git/simple-webapp.git
+webapp_version: v1.0
+Review the post_tasks section of the play:
+
+  post_tasks:
+    # Firewall rules dictate that requests to backend web
+    # servers must originate from a load balancer.
+    - name: Smoke Test - Ensure HTTP 200 OK
+      uri:
+        url: "http://{{ inventory_hostname }}:{{ apache_port }}"
+        status_code: 200
+      delegate_to: "{{ groups['lb_servers'][0] }}"
+      become: no
+
+    # If the test fails, servers are not re-enabled
+    # in the load balancers, and the update process halts.
+    - name: Enable healthy server in load balancers
+      haproxy:
+        state: enabled
+        backend: app
+        host: "{{ inventory_hostname }}"
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups['lb_servers'] }}"
+After the playbook deploys the web application, a smoke test ensures that each back-end web server is responds with a 200 HTTP status code. The firewall rules on each web server only allow web requests from a load balancer, so all smoke tests are delegated to a load balancer.
+
+If the smoke test fails for a server, then further processing of that server halts and the web server is not re-enabled in the load balancer.
+
+When the smoke test passes, the second task enables the server in the load balancer.
+
+Use the update_webapp.yml playbook to deploy version v1.1.0 of the web application. This version of the web application is a PHP application, instead of basic HTML pages.
+
+As the playbook executes, monitor the output of the issue_requests.sh script in the other terminal tab. Deployment of the web application fails, but the load balancer continues to provide access to the web application service.
+
+Execute the update_webapp.yml playbook with the -e webapp_version=v1.1.0 option:
+
+[student@workstation update-management]$ ansible-playbook update_webapp.yml \
+> -e webapp_version=v1.1.0
+
+PLAY [web_servers] ***********************************************************
+
+TASK [Gathering Facts] *******************************************************
+ok: [serverb.lab.example.com]
+...output omitted...
+The playbook will fail, but do not wait for it to finish and proceed to the next step.
+
+Monitor the output of the issue_requests.sh script during the execution of the update_webapp.yml playbook.
+
+This is serverf. (version v1.0)
+This is serverb. (version v1.0)
+This is serverc. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverf. (version v1.0)
+This is serverc. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverf. (version v1.0)
+This is serverc. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverf. (version v1.0)
+...output omitted...
+From an external client perspective, the load balancer continues to provide responses from version v1.0 of the web application. However, responses from one of the servers, serverb, stop appearing in the output.
+
+Return to the output from the execution of the update_webapp.yml playbook. Verify that the smoke test fails for serverb when you deploy version v1.1.0 of the web application.
+
+...output omitted...
+TASK [Smoke Test - Ensure HTTP 200 OK] ***************************************
+fatal: [serverb.lab.example.com]: FAILED! => {"changed": false, "connection": "close", "content": "", "content_length": "0", "content_type": "text/html; charset=UTF-8", "date": "Fri, 31 May 2019 04:17:04 GMT", "elapsed": 0, "msg": "Status code was 500 and not [200]: HTTP Error 500: Internal Server Error", "redirected": false, "server": "Apache/2.4.37 (Red Hat Enterprise Linux)", "status": 500, "url": "http://serverb.lab.example.com:8008", "x_powered_by": "PHP/7.2.11"}
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com  : ok=9  changed=5  unreachable=0  failed=1  ...   
+The new application deployment results in a 500 HTTP status code, known as an Internal Server Error.
+
+Optional. Clone the web application source code repository at http://git.lab.example.com:8081/git/simple-webapp.git in the /home/student/git-repos directory. Check out version v1.1.0 of the application, and determine the cause of the error:
+
+[student@workstation update-management]$ cd ~/git-repos
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/simple-webapp.git
+[student@workstation git-repos]$ cd simple-webapp
+[student@workstation simple-webapp]$ git checkout v1.1.0
+...output omitted...
+[student@workstation simple-webapp]$ ls
+index.php
+This version of the application uses PHP. The PHP code contains syntax errors:
+
+[student@workstation simple-webapp]$ cat index.php
+<?php
+This is {{ ansible_hostname }}. (version {{ webapp_version}})
+?>
+Do not fix the code. The correct PHP code is:
+
+<?php
+echo "This is {{ ansible_hostname }}. (version {{ webapp_version}})\n";
+?>
+Return to the ~/git-repos/update-management directory:
+
+[student@workstation simple-webapp]$ cd ~/git-repos
+[student@workstation git-repos]$ cd update-management
+[student@workstation update-management]$ 
+After diagnosing the deployment errors with version v1.1.0, the web development team pushes a fix for the web application.
+
+Use the update_webapp.yml playbook to deploy the patched web application, version v1.1.1.
+
+As the playbook executes, monitor the output of the issue_requests.sh script in the other terminal tab. The output indicates that the back-end servers gradually switch over to the new version of the application.
+
+Execute the update_webapp.yml playbook with the -e webapp_version=v1.1.1 option:
+
+[student@workstation update-management]$ ansible-playbook update_webapp.yml \
+> -e webapp_version=v1.1.1
+
+PLAY [web_servers] ***********************************************************
+
+TASK [Gathering Facts] *******************************************************
+ok: [serverb.lab.example.com]
+...output omitted...
+Do not wait for the playbook to complete; proceed to the next step.
+
+Monitor the output of the issue_requests.sh script during the execution of the update_webapp.yml playbook. Verify that the playbook removes the web servers from the load balancer service in batches defined with the serial keyword, upgrades the web application, and returns the web servers to the load balancer.
+
+Initially, responses cycle through the 4 hosts remaining in service after the failed upgrade to version v1.1.0.
+
+...output omitted...
+This is serverc. (version v1.0)
+This is serverf. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverc. (version v1.0)
+This is serverf. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+...output omitted...
+Eventually, the smoke test passes for the new application and serverb is put back into service with an updated version:
+
+...output omitted...
+This is serverc. (version v1.0)
+This is serverf. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverc. (version v1.0)
+This is serverb. (version v1.1.1)
+This is serverf. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+...output omitted...
+The playbook processes the next batch, which only contains serverc.
+
+The playbook removes serverc from service:
+
+...output omitted...
+This is servere. (version v1.0)
+This is serverb. (version v1.1.1)
+This is serverf. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverb. (version v1.1.1)
+This is serverf. (version v1.0)
+This is serverd. (version v1.0)
+...output omitted...
+Eventually, the smoke test passes for serverc and the server is put back into service:
+
+...output omitted...
+This is servere. (version v1.0)
+This is serverb. (version v1.1.1)
+This is serverf. (version v1.0)
+This is serverd. (version v1.0)
+This is servere. (version v1.0)
+This is serverc. (version v1.1.1)
+This is serverb. (version v1.1.1)
+This is serverf. (version v1.0)
+...output omitted...
+The last batch processes all remaining web servers. The playbook first disables all three of these servers, leaving only serverb and serverc to handle requests:
+
+...output omitted...
+This is serverf. (version v1.0)
+This is serverd. (version v1.0)
+This is serverc. (version v1.1.1)
+This is serverb. (version v1.1.1)
+This is serverc. (version v1.1.1)
+This is serverb. (version v1.1.1)
+This is serverc. (version v1.1.1)
+This is serverb. (version v1.1.1)
+...output omitted...
+Eventually, each server passes the smoke test and is put back into service:
+
+...output omitted...
+This is serverb. (version v1.1.1)
+This is servere. (version v1.1.1)
+This is serverf. (version v1.1.1)
+This is serverd. (version v1.1.1)
+This is serverc. (version v1.1.1)
+This is serverb. (version v1.1.1)
+This is servere. (version v1.1.1)
+This is serverf. (version v1.1.1)
+This is serverd. (version v1.1.1)
+This is serverc. (version v1.1.1)
+...output omitted...
+Press Ctrl+C to stop the execution of the issue_requests.sh script.
+
+This is servere. (version v1.1.1)
+This is serverf. (version v1.1.1)
+This is serverd. (version v1.1.1)
+This is serverc. (version v1.1.1)
+^C
+[student@workstation update-management]$ 
+Return to the terminal that contains the playbook output. Verify that the playbook completes without any errors.
+
+...output omitted...
+TASK [Smoke Test - Ensure HTTP 200 OK] ***************************************
+ok: [serverd.lab.example.com]
+ok: [servere.lab.example.com]
+ok: [serverf.lab.example.com]
+
+TASK [Enable healthy server in load balancers] *******************************
+changed: [serverd.lab.example.com] => (item=servera.lab.example.com)
+changed: [servere.lab.example.com] => (item=servera.lab.example.com)
+changed: [serverf.lab.example.com] => (item=servera.lab.example.com)
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com  : ok=10  changed=4  unreachable=0  failed=0  ...
+serverc.lab.example.com  : ok=11  changed=6  unreachable=0  failed=0  ...
+serverd.lab.example.com  : ok=11  changed=6  unreachable=0  failed=0  ...
+servere.lab.example.com  : ok=9   changed=4  unreachable=0  failed=0  ...
+serverf.lab.example.com  : ok=9   changed=4  unreachable=0  failed=0  ...

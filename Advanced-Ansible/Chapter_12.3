@@ -1,0 +1,130 @@
+Filtering Hosts with Smart Inventories
+Objectives
+After completing this section, students should be able to create a smart inventory that is dynamically constructed from the other inventories on your Ansible Tower server using a filter.
+
+Configuring Smart Inventories
+So far, you have learned several ways to manage static and dynamic inventories in Red Hat Ansible Tower:
+
+You can manually create a static inventory in the web UI.
+
+You can import a static inventory file into Ansible Tower and then manage it in the web UI.
+
+You can configure Ansible Tower to use a Project to get the inventory from files stored in version control, and manage it in the version control system.
+
+You can configure a dynamic inventory to get host information from an external service or by using a custom inventory script.
+
+Red Hat Ansible Tower 3.2 added a way to dynamically construct a new inventory from inventories already existing in Ansible Tower. A smart inventory generates information by applying a host filter to the union of all static and dynamic inventories configured on the Ansible Tower server. This host filter usually checks if a particular Ansible fact has a particular value for each host. Hosts that match the host filter are included in the smart inventory. This provides more flexibility to manage a subset of the hosts defined by the static and dynamic inventories.
+
+Smart inventories use Ansible Tower's fact cache to apply the smart host filter. This means that you need to periodically populate the fact cache with a Job Template that is configured with the Use Fact Cache checkbox selected and that gathers facts. You can do this by running a normal playbook that has gather_facts: yes enabled (this setting is normally set implicitly by default), or that runs the setup module as a task. A minimal playbook to do this could read:
+
+- name: Refresh fact cache
+  hosts: all
+  gather_facts: yes
+
+Figure 12.8: Enabling "Use Fact Cache" in a job template
+To create a smart inventory, go to Inventories in the left navigation bar of the Ansible Tower Web UI. Click the + button, and select Smart Inventory to open the New Smart Inventory page. On that page, you must specify a name for the smart inventory, assign it to an organization, and specify the smart host filter for the smart inventory.
+
+
+Figure 12.9: New Smart Inventory page
+Defining Smart Host Filters
+
+To define the host filter for the smart inventory, click the magnifying glass icon next to the SMART HOST FILTER field on the New Smart Inventory page. If no smart filter is set, all hosts are part of the smart inventory.
+
+When you click on the icon, a new DYNAMIC HOSTS window opens. Enter your host filter or filters in the search field, and then click on the magnifying glass next to the field to apply the filter. The hosts matching the filter will be displayed at the bottom of the window.
+
+The syntax for defining a host filter based on an Ansible fact can be a bit confusing. The filter should start with the string ansible_facts, followed by the name of the Ansible fact in the old format (fact injected as a variable name), a colon, and then the exact value that you want to match. There must be no space after the colon and before the value.
+
+For example, to match hosts that have the value RedHat for the fact ansible_distribution, you would use the host filter ansible_facts.ansible_distribution:RedHat.
+
+You can also create host filters based on group membership, or by host name and host description, instead of using facts. For more information, see "host_filter Search" in the Ansible Tower User Guide.
+
+IMPORTANT
+The current syntax for host filters is potentially confusing, because it appears to refer to a fact namespaced under ansible_facts, but that is not not the case. The ansible_facts string in the host filter indicates that you want to match a fact, not a host name or something else.
+
+Until Ansible 2.5, all facts were "injected as variables" into the same namespace as other variables. Starting with Ansible 2.5, they were instead defined under the ansible_facts variable. For example, the old ansible_distribution fact is now officially referred to by the name ansible_facts.distribution. For backward compatibility, the "injected" names are still available if Ansible has the configuration setting inject_facts_as_vars: true set. This is currently the default setting in Ansible 2.8, but is subject to change.
+
+Host filters for smart inventories do not yet support the modern naming for facts, and worse yet look like a modern fact name in the filter. So, you must say ansible_facts.ansible_distribution and not ansible_facts.ansible_facts.distribution (or even ansible_facts.distribution).
+
+The other challenge with host filter syntax is that there must be no whitespace between the colon and the value that you want to match. This is easy to forget and somewhat non-intuitive.
+
+
+Figure 12.10: Configuring a smart host filter
+REFERENCES
+Ansible Tower User Guide
+
+
+
+
+Guided Exercise: Filtering Hosts with Smart Inventories
+In this exercise, you will create a smart inventory and explore how smart inventories work.
+
+Outcomes
+
+You should be able to create a smart inventory and automatically add more hosts to it.
+
+Ensure that the workstation and tower virtual machines are started.
+
+Log in to workstation as student using student as the password.
+
+From workstation, run lab advinventory-smart start, which verifies that Ansible Tower services are running and all the required resources are available.
+
+[student@workstation ~]$ lab advinventory-smart start
+Log in to the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Verify that the facts for servera and serverb in the Dev host group are available in the Ansible Tower's cache. These two systems' facts are available in Ansible Tower's cache because in a previous exercise we executed a job on those managed hosts with a job template that had fact caching enabled.
+
+Click Inventories in the left navigation bar.
+
+Click on the link for the Dev host group, and go to HOSTS.
+
+Click on the link for servera.lab.example.com, and go to FACTS.
+
+Verify that the facts for servera.lab.example.com are available.
+
+Repeat the same steps to verify that the facts for serverb.lab.example.com are also available in Ansible Tower's cache.
+
+Create a smart inventory, named Smart, which includes the Red Hat Enterprise Linux-based systems available in the Dev host group. The ansible_distribution fact will have the value RedHat for those systems.
+
+Click Inventories in the left navigation bar.
+
+Click +, and select Smart Inventory to create a new smart inventory.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Smart
+DESCRIPTION	Smart Inventory
+ORGANIZATION	Default
+SMART HOST FILTER	ansible_facts.​ansible_distribution:​RedHat
+NOTE
+To enter the smart host filter, click the magnifying glass icon in SMART HOST FILTER. In the new window, enter the filter value in the top search box, and then click the magnifying glass icon again. This filter displays both servera.lab.example.com and serverb.lab.example.com systems in the Dev host group. Click SAVE to set the smart host filter.
+
+Click SAVE to create the smart inventory.
+
+Click HOSTS, and then verify that both servera.lab.example.com and serverb.lab.example.com are available.
+
+Confirm that the host list for the Smart smart inventory matches more hosts when Ansible Tower adds facts for new hosts that match the host filter to its fact cache.
+
+Click Templates in the left navigation bar.
+
+Click on the link for the TEST webservers setup job template.
+
+Verify that you have selected the Use Fact Cache checkbox. Click LAUNCH to launch a job based on this job template. When the job runs, it retrieves facts for the hosts serverc.lab.example.com and serverd.lab.example.com.
+
+Wait until the job's status is Successful, and then click Inventories in the left navigation bar.
+
+Click on the link for the Test inventory, and click the HOSTS button.
+
+Click on the link for serverc.lab.example.com. Go to FACTS and verify that the facts for that host are available. You can also verify that the value for the ansible_distribution fact is RedHat for that host.
+
+Repeat the previous step to verify that the facts for serverd.lab.example.com are available, and check that the value for the ansible_distribution fact is RedHat.
+
+Click Inventories in the left navigation bar, then click on the link for the Smart inventory.
+
+Go to HOSTS, and verify that both serverc.lab.example.com and serverd.lab.example.com are now available in this smart inventory. These hosts are now available because they meet the smart host filter condition.
+
+Log out from Ansible Tower.
+
+This concludes the guided exercise.
+
+

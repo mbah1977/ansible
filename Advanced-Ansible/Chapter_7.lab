@@ -1,0 +1,104 @@
+Lab: Managing Access with Users and Teams
+Performance Checklist
+
+In this lab, you will create users and organize them into teams.
+
+Outcomes
+
+You have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Open a terminal on workstation as the student user and run the following command:
+
+[student@workstation ~]$ lab org-review start
+This script configures the environment to use the tower-cli tool.
+
+Add two users as Normal Users to the Default organization with the following information:
+
+User 1	User 2
+FIRST NAME	Oliver	Ophelia
+LAST NAME	Stone	Dunham
+ORGANIZATION	Default	Default
+EMAIL	oliver@lab.example.com	ophelia@lab.example.com
+USERNAME	oliver	ophelia
+PASSWORD	redhat123	redhat123
+CONFIRM PASSWORD	redhat123	redhat123
+Log in to the Tower web interface as the admin user with the redhat password.
+
+Click Users in the left navigation bar to manage users.
+
+Click the + button to add a new user.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Oliver
+LAST NAME	Stone
+ORGANIZATION	Default
+EMAIL	oliver@lab.example.com
+USERNAME	oliver
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	Normal User
+Click SAVE to create the new user.
+
+Scroll down the next screen and click the + button to add another user.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Ophelia
+LAST NAME	Dunham
+ORGANIZATION	Default
+EMAIL	ophelia@lab.example.com
+USERNAME	ophelia
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	Normal User
+Click SAVE to create the new user.
+
+Create a Team called Operations in the Default Organization.
+
+Click Teams in the left navigation bar to manage Teams.
+
+Click the + button to add a new team.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Operations
+DESCRIPTION	Ops Team
+ORGANIZATION	Default
+Click SAVE to create the Operations Team.
+
+Add Oliver as a Member to the Operations Team.
+
+On the Operations team editor screen, click USERS to manage the Team's users.
+
+Click the + button to add a new user to the Team.
+
+Check the box next to oliver to select that user.
+
+Click SAVE.
+
+You can verify on the next screen that oliver has been assigned the role of Member.
+
+Add Ophelia as an Admin to the Operations Team.
+
+Open a terminal, and use the tower-cli tool to assign the ophelia user the admin role for the Operations Team.
+
+[student@workstation ~]$ tower-cli role grant --user 'ophelia' \
+> --target-team 'Operations' --type 'admin'
+== ==== ===== ===========
+id user type  target_team
+== ==== ===== ===========
+41    9 admin N/A
+== ==== ===== ===========
+In the previous output, N/A is expected in the target_team column.
+
+Back in to the Tower web interface, refresh the web page to update the list of users for the Operations Team, and verify that ophelia has the admin role associated.
+
+Click the Log Out icon to log out of the Tower web interface.
+
+Run the command lab org-review grade on workstation to grade your exercise.
+
+[student@workstation ~]$ lab org-review grade

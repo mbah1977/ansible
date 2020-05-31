@@ -1,0 +1,112 @@
+
+Lab: Adding Users and Teams
+In this review, you will create new users and a new team.
+
+Outcomes
+
+You should be able to:
+
+Create normal users.
+
+Create a new team.
+
+Add users to a team.
+
+You must have completed the preceding exercise, which restored a specific Ansible Tower backup on your server.
+
+Instructions
+
+Configure your Ansible Tower system at tower.lab.example.com based on the following specification:
+
+Add a Normal User to the Default organization. Use the following information:
+
+Field	Value
+FIRST NAME	Anny
+LAST NAME	Mage
+EMAIL	anny@lab.example.com
+USERNAME	anny
+PASSWORD	redhat123
+Add a second Normal User to the Default organization. Use the following information:
+
+Field	Value
+FIRST NAME	Robert
+LAST NAME	Farnham
+EMAIL	robert@lab.example.com
+USERNAME	robert
+PASSWORD	redhat123
+Within the Default organization, create a Team called Devops. Give the team a description of Devops Team.
+
+Add anny and robert as Members of the Devops Team.
+
+Log in to the Tower web interface as the admin user with a password of redhat, and then click Users in the left navigation bar.
+
+Click the + button to add a new User.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Anny
+LAST NAME	Mage
+EMAIL	anny@lab.example.com
+USERNAME	anny
+ORGANIZATION	Default
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	Normal User
+Click SAVE to create the new User.
+
+Scroll down the next screen and click the + button on the right to add another User.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Robert
+LAST NAME	Farnham
+EMAIL	robert@lab.example.com
+USERNAME	robert
+ORGANIZATION	Default
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	Normal User
+Click SAVE to create the new User.
+
+To create the Devops Team:
+
+Click Teams in the left navigation bar to manage Teams.
+
+Click + to add a new Team.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Devops
+DESCRIPTION	Devops Team
+ORGANIZATION	Default
+Click SAVE to create the new Team.
+
+To add Users to the Devops Team:
+
+Click Teams in the left navigation bar to manage Teams.
+
+Click the link for the Devops Team you created previously.
+
+Click USERS to manage the Team's Users.
+
+Click + to add a new User to the Team.
+
+In the first section on the screen, check the box next to anny and robert to select those Users.
+
+Click SAVE to save the changes.
+
+Verify on the next screen that anny and robert are displayed in the list as a members of the team.
+
+Evaluation
+
+Use the Tower interface to verify that the users are correctly configured.
+
+NOTE
+There is a grading script that you will run at the end of all the comprehensive review labs. That script evaluates your work in this lab.
+
+This concludes the lab.
+
+

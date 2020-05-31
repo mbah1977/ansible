@@ -1,0 +1,274 @@
+Creating and Updating Dynamic Inventories
+Objectives
+After completing this section, students should be able to create a dynamic inventory that uses a custom inventory script to set hosts and host groups.
+
+Dynamic Inventories
+When Ansible runs a playbook, it uses an inventory to help determine against which hosts the plays should be run. Both Ansible and Ansible Tower make it easy to set up a static inventory of hosts, which are explicitly specified in the inventory by the administrator.
+
+However, these static lists require manual administration to keep them up to date. This can be inconvenient or challenging, especially when an organization wants to run the playbooks against hosts which are dynamically created in a virtualization or cloud computing environment.
+
+In that scenario, it is useful to use a dynamic inventory. Dynamic inventories are scripts that, when run, dynamically determine which hosts and host groups should be in the inventory based on information from some external source. These can include the API for cloud providers, Cobbler, LDAP directories, or other third party CMDB software. Using a dynamic inventory is a recommended practice in a large and fast-changing IT environment, where systems are frequently deployed, tested and then removed.
+
+By default, Ansible Tower comes with built-in dynamic inventory support for a number of external inventory sources (or cloud inventory sources), including:
+
+Amazon Web Services EC2
+
+Google Compute Engine
+
+Microsoft Azure Resource Manager
+
+VMware vCenter
+
+Red Hat Satellite 6
+
+Red Hat CloudForms
+
+Red Hat Virtualization
+
+OpenStack
+
+In addition, it is possible to use custom dynamic inventory scripts in Ansible Tower to access inventory information from other sources. Ansible Tower also allows retrieving those scripts from a project which uses a repository like Git as a source.
+
+The remainder of this section looks at three examples of dynamic inventory configuration in Ansible Tower. The first example looks at the built-in support for OpenStack. The second example briefly examines the built-in support for getting information from a Red Hat Satellite 6 server. The third example investigates how custom dynamic inventory scripts can be used.
+
+OpenStack Dynamic Inventories
+Cloud technologies like OpenStack bring many changes to the server life cycle. Hosts come and go over time, and they can be created and started by external applications. Maintaining an accurate static inventory file is challenging over any length of time. Therefore, having the inventory update dynamically, based on information provided directly from OpenStack, is very helpful.
+
+The basic process for configuring dynamic inventories using any of the built-in cloud sources is similar for each of them:
+
+Create a credential to authenticate to the cloud data source you intend to use, using a credential type matching the source
+
+Create a new inventory to provide dynamic inventory information.
+
+In that new inventory, create a Source with one of the built-in dynamic inventory sources (instead of Manual). It should also use the new Credential to authenticate to that source. You may also want to set other options, like having it automatically Update on Launch.
+
+Update the source in the inventory for the first time.
+
+This process works for OpenStack dynamic inventories. The following is an example of how to create credentials for use by an OpenStack dynamic inventory:
+
+
+Figure 12.3: Cloud credentials creation
+As you can see in this screenshot, there are a number of items you need to provide. You have used some of these with other objects in Ansible Tower: Name, Description and Organization. The only new item is the Credential Type. You must choose the appropriate credential type for the product you are using. In this example, the product is OpenStack.
+
+An OpenStack Credential needs some additional information:
+
+Username
+The user who can access the required resources
+
+Password
+For that user, or API key
+
+Host
+The authentication URL of the host to authenticate with, for example https://demo.lab.example.com/v2.0/
+
+Project
+The name of the project (tenant) that you want to use
+
+Domain Name
+Needed only with Keystone v3, defines administrative boundaries
+
+Those newly created credentials will be used by the Ansible Tower Inventory synchronization mechanism. After creating the credentials, you can switch to the Inventories link in the left navigation bar. As you can see in the example below, you need to create a new Inventory:
+
+
+Figure 12.4: Cloud inventory creation
+That new inventory needs a unique NAME and you must assign it to an existing ORGANIZATION. When the new inventory configuration is saved, go to SOURCES within the inventory to create a new source for the inventory. Ansible Tower uses that source in conjunction with the existing OpenStack scripts and the previously created credentials. The screenshot below shows an example of such a source:
+
+
+Figure 12.5: Cloud group creation
+This new source uses the built-in Ansible Tower support for OpenStack as SOURCE and the new credentials for your OpenStack environment as CREDENTIAL. There are three UPDATE OPTIONS from which to choose:
+
+Overwrite
+When this option is activated, the inventory update process deletes all child groups and hosts from the local inventory, not found on the external source. By default it is not active, it means that all child hosts and groups not found on the external source remain untouched.
+
+Overwrite Variables
+When not activated, a merge combining local variables with those found on the external source, is performed. Otherwise, when activated all variables not found on the external source are removed.
+
+Update on Launch
+When activated, each time a job runs using this inventory, a refresh of this inventory from the external source is performed, before the job tasks are executed.
+
+In the source list for the inventory, the small cloud icon to the left of the source name shows the status of the dynamic inventory synchronization for that source. When it is gray, no status is available. To start the synchronization process, click the two-arrows icon. When the synchronization finishes, the status of the cloud icon changes to green if synchronization has been successful, or red if it failed.
+
+After a successful synchronization with the external source, review the child groups and hosts which have been created in Tower using the information from the external source. The child groups contain the hosts visible on the HOSTS lists. You can review each child group by clicking on the group name to display the contents of that group, giving you a list of the hosts associated with the group. This inventory is updated every time you synchronize it with the external source. Synchronization can be performed manually, scheduled using the Tower mechanisms, or performed automatically each time a job runs using that inventory.
+
+Red Hat Satellite 6 Dynamic Inventories
+Another example of a built-in dynamic inventory uses information about hosts that are registered with a Red Hat Satellite 6 server. Workflow for deployment and configuration of a new bare-metal server using Red Hat Satellite 6 in conjunction with Ansible Tower might look like this:
+
+The new server uses some combination of PXE, DHCP, and TFTP to boot from the network or a boot ISO to prepare for either an unattended installation from the Satellite server or installation through Satellite's Discovery service.
+
+The new server performs a Kickstart installation from materials provided by the Satellite server and registers itself to the Satellite server.
+
+After it is registered, the new server appears in the dynamic inventory generated from Red Hat Satellite information. Ansible Tower can now be used to launch various jobs using that inventory to ensure that the new server is provisioned correctly.
+
+NOTE
+The Provisioning Callbacks feature of Ansible Tower is particularly useful for triggering initial provisioning jobs when a new server is deployed. More information on this feature is available in the documentation at http://docs.ansible.com/ansible-tower/latest/html/userguide/job_templates.html#provisioning-callbacks/.
+
+Configuration of an Ansible Tower dynamic inventory using Red Hat Satellite 6 is very similar to the OpenStack scenario.
+
+The first step is to create a new credential. The Type of the credential in this case will be Red Hat Satellite 6. Three pieces of additional information are required:
+
+Satellite 6 URL
+The URL for the Satellite server, such as https://satellite.example.com
+
+Username
+For a user on the Satellite server
+
+Password
+Password for the Satellite user
+
+Next, create a source in an inventory to synchronize inventory data from the Satellite server. The source should be set to Red Hat Satellite 6. The source's credential should be set to the credential you just created for Satellite. Just like the OpenStack dynamic inventory configuration, the three UPDATE OPTIONS (Overwrite, Overwrite Variables, and Update on Launch) may be selected as desired.
+
+The final step is to synchronize the source with the Red Hat Satellite inventory source, in exactly the same way as discussed in the section on the OpenStack inventory source. When the synchronization finishes, all information gathered from the external source is visible in Ansible Tower web interface as groups in the inventory, and hosts associated with those groups.
+
+Custom Dynamic Inventory Scripts
+Ansible allows you to write custom scripts to generate a dynamic inventory. While Ansible Tower offers built-in support for a number of dynamic inventory sources, custom dynamic inventory scripts can still be used with Ansible Tower.
+
+Writing or Obtaining Custom Inventory Scripts
+
+Ansible Tower supports custom inventory scripts written in any dynamic language installed on the Ansible Tower server. This should include Python and Bash at a minimum. These scripts run as the awx user and have limited access to the Tower server. The script must start with an appropriate shebang line (for example, #!/usr/bin/python for a Python script).
+
+Many examples of custom inventory scripts for use with various external sources have been contributed by the community the Git repository for Ansible at https://github.com/ansible/ansible/tree/devel/contrib/inventory/.
+
+If you want to write your own custom inventory script, information is available at Developing Dynamic Inventory Sources in the Ansible Developer Guide. When the dynamic inventory script is called with the --list option, it must output the inventory in JSON format.
+
+This is example output from a custom dynamic inventory script:
+
+{
+   "databases" : {
+      "vars" : {
+         "example_db" : true
+      },
+      "hosts" : [
+         "db1.demo.example.com",
+         "db2.demo.example.com"
+      ]
+   },
+   "webservers" : [
+      "web1.demo.example.com",
+      "web2.demo.example.com"
+   ],
+   "boston" : {
+      "children" : [
+         "backup",
+         "ipa"
+      ],
+      "vars" : {
+         "example_host" : false
+      },
+      "hosts" : [
+         "server1.demo.example.com",
+         "server2.demo.example.com",
+         "server3.demo.example.com"
+      ]
+   },
+   "backup" : [
+      "server4.demo.example.com"
+   ],
+   "ipa" : [
+      "server5.demo.example.com"
+   ]
+}
+As you can see in the preceding example, each group may contain a list of hosts, potential child groups, possible group variables, or a list of hosts.
+
+NOTE
+When called with the option --host hostname, the script must print a JSON hash/dictionary of the variables for the specified host (potentially an empty JSON hash or dictionary if there are no variables provided).
+
+Optionally, if the --list option returns a top-level element called _meta, it is possible to return all host variables in one script call, which improves script performance. In that case, --host calls will not be made.
+
+See the previously referenced documentation in the Developing Dynamic Inventory Sources section of the Ansible Developer Guide for more information.
+
+Using Custom Inventory Scripts in Ansible Tower
+
+When you have created or downloaded the appropriate custom inventory script, you need to import it into Ansible Tower and configure the inventory. Below is a procedure how to accomplish this task:
+
+To upload a custom inventory script into Tower, go to Inventories Scripts in the left navigation bar on the Ansible Tower web interface. Click the + button to add a new custom inventory script.
+
+
+Figure 12.6: Ansible Tower Inventory Script
+Define a new name for the custom inventory script in the NAME field, select an organization in the ORGANIZATION field, and copy and paste the actual script into the CUSTOM SCRIPT text box. Click the SAVE button.
+
+After importing and defining the dynamic inventory script in Ansible Tower, configure it just like any of the built-in dynamic inventories:
+
+Create a new source in an existing inventory for the dynamic inventory. Set the SOURCE to Custom Script, and CUSTOM INVENTORY SCRIPT to the name you set for the custom script that you just imported into Ansible Tower.
+
+Synchronize the source with the inventory source, as discussed for the OpenStack and Red Hat Satellite 6 dynamic inventory sources.
+
+
+Figure 12.7: Adding new Inventory Group for custom dynamic inventory
+REFERENCES
+Ansible Tower User Guide
+
+Ansible Tower Administration Guide
+
+
+
+
+Guided Exercise: Creating and Updating Dynamic Inventories
+In this exercise, you will add a custom inventory script and use it to manage a Dynamic Inventory managed on an IdM server.
+
+Outcomes
+
+You should be able to add a custom inventory script and use it to populate a Dynamic Inventory in Tower.
+
+You should have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab advinventory-dynamic start. This setup script prepares the IdM server for this exercise.
+
+[student@workstation ~]$ lab advinventory-dynamic start
+Log in to the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Add the ldap-freeipa.py custom inventory script to Tower.
+
+Click Inventory Scripts in the left navigation bar.
+
+Click the + button to add a new custom inventory script.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	ldap-freeipa.py
+DESCRIPTION	Dynamic Inventory for IdM Server
+ORGANIZATION	Default
+Copy the contents of the ldap-freeipa.py script located at http://materials.example.com/classroom/ansible/ipa-setup/ldap-freeipa.py into the CUSTOM SCRIPT field.
+
+Click SAVE to add the custom inventory script.
+
+Create a new Inventory called Dynamic Inventory.
+
+Click Inventories in the left navigation bar.
+
+Click the + button to add a new inventory, and select Inventory in the drop-down menu.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Dynamic Inventory
+DESCRIPTION	Dynamic Inventory from IPA server
+ORGANIZATION	Default
+Click SAVE to create the Inventory.
+
+Add the ldap-freeipa.py script as a new source for the Inventory.
+
+Click SOURCES in the top bar for the Inventory details pane.
+
+Click the + button to add a new source.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Custom Script
+DESCRIPTION	Custom Script for Dynamic Inventory
+SOURCE	Custom Script
+CUSTOM INVENTORY SCRIPT	ldap-freeipa.py
+Under the UPDATE OPTIONS section, select the checkbox next to the OVERWRITE option.
+
+Click SAVE to create the Source.
+
+Update the Dynamic Inventory.
+
+Scroll down to the lower pane and click the double-arrow button in the row for Custom Script, and then wait until the cloud becomes green and static.
+
+Click GROUPS, and then observe that this inventory now contains four Groups: development, ipaservers, production, and testing. Each of these groups contains hosts.
+
+This concludes the guided exercise.
+
+

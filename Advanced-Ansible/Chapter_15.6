@@ -1,0 +1,244 @@
+
+Lab: Configuring Job Templates
+In this review, you will configure several Job Templates, as well as a supporting Project and Source Control credentials.
+
+Outcomes
+
+You should be able to:
+
+Create a Source Control credential.
+
+Create a Project.
+
+Create a Job Template.
+
+The previous exercises in this comprehensive review chapter must be completed before starting this exercise.
+
+Instructions
+
+Configure your Ansible Tower server with three new Job Templates and supporting materials, based on the following specification:
+
+Create a new SCM Credential to download the Ansible materials for the Project that the new Job Templates will use, based on the following information:
+
+Field	Value
+NAME	student-git
+DESCRIPTION	Student Git Credential
+ORGANIZATION	Default
+CREDENTIAL TYPE	Source Control
+USERNAME	git
+SCM PRIVATE KEY	Copy the contents of the /home/student/.ssh/lab_rsa private key file on the workstation machine into this field
+Create a new Project based on the following information:
+
+Field	Value
+NAME	My Full-Stack Project
+DESCRIPTION	Full Stack Project
+ORGANIZATION	Default
+SCM TYPE	Git
+SCM URL	ssh://git.lab.example.com/var/opt/gitlab/git-data/repositories/git/full-stack-setup.git
+SCM CREDENTIAL	student-git
+Create a new Job Template called Set up Databases with the following configuration:
+
+Field	Value
+NAME	Set up Databases
+DESCRIPTION	Set up all databases
+JOB TYPE	Run
+INVENTORY	Dynamic Inventory
+PROJECT	My Full-Stack Project
+PLAYBOOK	database-setup.yml
+CREDENTIAL	Devops
+Create a new Job Template called Set up Web servers with the following configuration:
+
+Field	Value
+NAME	Set up Web servers
+DESCRIPTION	Set up all web servers
+JOB TYPE	Run
+INVENTORY	Dynamic Inventory
+PROJECT	My Full-Stack Project
+PLAYBOOK	webserver-setup.yml
+CREDENTIAL	Devops
+Create a new Job Template called Set up Load Balancer with the following configuration:
+
+Field	Value
+NAME	Set up Load Balancer
+DESCRIPTION	Set up all load balancers
+JOB TYPE	Run
+INVENTORY	Dynamic Inventory
+PROJECT	My Full-Stack Project
+PLAYBOOK	lb-setup.yml
+CREDENTIAL	Devops
+The Devops Team should have Admin role on all three Job Templates (Set up Databases, Set up Web servers, and Set up Load Balancer) and on the Project (My Full-Stack Project).
+
+Steps to create the new Source Control Credential:
+
+Click Credentials in the left navigation bar, to manage Credentials.
+
+Click the + button to add a new Credential.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	student-git
+DESCRIPTION	Student Git Credential
+ORGANIZATION	Default
+CREDENTIAL TYPE	Source Control
+USERNAME	git
+SCM PRIVATE KEY	Copy the contents of the /home/student/.ssh/lab_rsa private key file on workstation into this field
+Leave the other fields untouched and click SAVE to create the new Credential.
+
+To create the new Project:
+
+Click Projects in the left quick navigation bar.
+
+Click the + button to add a new Project.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	My Full-Stack Project
+DESCRIPTION	Full Stack Project
+ORGANIZATION	Default
+SCM TYPE	Git
+SCM URL	ssh://git.lab.example.com/var/opt/gitlab/git-data/repositories/git/full-stack-setup.git
+SCM CREDENTIAL	student-git
+Click SAVE to create the new Project. This automatically triggers the SCM update of the Project. Ansible Tower uses the values provided in the SCM URL and SCM CREDENTIAL fields to pull down a local copy of that repository.
+
+Verify the success of the My Full-Stack Project automatic SCM update:
+
+Scroll down the page and wait a couple of seconds. In the list of Projects, there is a status icon to the left of My Full-Stack Project. This icon is white at the start, red with an exclamation mark when it fails, and green when it succeeds.
+
+Click on the status icon to show the detailed status page of the SCM update job. As you can see in the DETAIL window, the SCM update job runs like any other Ansible Playbook.
+
+Verify that the STATUS of the job in the DETAILS section shows Successful.
+
+To give the Devops Team the Admin role on the new Project:
+
+Click Projects in the left navigation bar.
+
+Click My Full-Stack Project to edit the Project.
+
+On the next page, click PERMISSIONS to manage the Project's permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available Teams.
+
+In the first section, check the box next to the Devops Team. This causes the Team to display in the second section, beneath the first one.
+
+In the second section, select the Admin role from the drop-down list.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Project, My Full-Stack Project, which now shows that all members of the Devops Team are assigned the Admin role on the Project.
+
+To create new Job Template called Set up Databases:
+
+Click Templates in the left navigation bar.
+
+Click the + button to add a new Job Template.
+
+From the drop-down list, select Job Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Set up Databases
+DESCRIPTION	Set up all databases
+JOB TYPE	Run
+INVENTORY	Dynamic Inventory
+PROJECT	My Full-Stack Project
+PLAYBOOK	database-setup.yml
+CREDENTIAL	Devops
+Leave the other fields untouched and click SAVE to create the new Job Template.
+
+Grant the Devops Team an Admin role on the Set up Databases Job Template:
+
+Click PERMISSIONS to manage the Job Template's permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available Teams.
+
+In the first section, select the box next to Devops Team. This causes the Team to display in the second section, beneath the first one.
+
+In the second section below, select the Admin role from the drop-down list.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Job Template, Set up Databases, which now shows that all members of the Devops Team are assigned the Admin role on the Job Template.
+
+Create new Job Template called Set up Web servers:
+
+Click Templates in the left navigation bar.
+
+Click the + button to add a new Job Template.
+
+From the drop-down list, select Job Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Set up Web servers
+DESCRIPTION	Set up all Web servers
+JOB TYPE	Run
+INVENTORY	Dynamic Inventory
+PROJECT	My Full-Stack Project
+PLAYBOOK	webserver-setup.yml
+CREDENTIAL	Devops
+Leave the other fields untouched and click SAVE to create the new Job Template.
+
+Grant the Devops Team the Admin role on the Set up Web servers Job Template:
+
+Click PERMISSIONS to manage the Job Template's permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available Teams.
+
+In the first section, check the box next to Devops Team. This causes the Team to display in the second section underneath the first one.
+
+In the second section below, select the Admin role from the drop-down list.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Job Template, Set up Web servers, which now shows that all members of the Devops Team are assigned the Admin role on the Job Template.
+
+To create new Job Template called Set up Load Balancer:
+
+Click Templates in the left navigation bar.
+
+Click the + button to add a new Job Template.
+
+From the drop-down list, select Job Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Set up Load Balancer
+DESCRIPTION	Set up all load balancers
+JOB TYPE	Run
+INVENTORY	Dynamic Inventory
+PROJECT	My Full-Stack Project
+PLAYBOOK	lb-setup.yml
+CREDENTIAL	Devops
+Leave the other fields untouched and click SAVE to create the new Job Template.
+
+Grant the Devops Team the Admin role on the Set up Load Balancer Job Template:
+
+Click PERMISSIONS to manage the Job Template's permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available Teams.
+
+In the first section, check the box next to Devops Team. This causes the Team to display in the second section, beneath the first one.
+
+In the second section, select the Admin role from the drop-down list.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Job Template, Set up Load Balancer, which now shows that all members of the Devops Team are assigned the Admin role on the Job Template.
+
+Evaluation
+
+Use the Ansible Tower interface to verify that the project materials update and that your Job Templates are configured correctly.
+
+NOTE
+You will use these templates to launch jobs in an upcoming lab.
+
+There is a grading script that you will run at the end of the all comprehensive review labs. That script evaluates your work in this lab.
+
+This concludes the lab.
+
+

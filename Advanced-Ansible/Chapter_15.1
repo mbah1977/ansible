@@ -1,0 +1,203 @@
+
+Lab: Refactoring Inventories and Projects
+In this review, you will refactor a plain project to the recommended structure. You will also convert a Red Hat Ansible Engine inventory file from INI format to YAML format.
+
+Outcomes
+
+You should be able to:
+
+Refactor a plain project to the recommended structure.
+
+Convert an inventory file from the INI format to the YAML format.
+
+Set up your computers for this exercise by logging in to the workstation machine as the student user, and running the following command:
+
+[student@workstation ~]$ lab review-cr1 start
+Instructions
+
+The project-comp-review Git repository contains a site.yml playbook that configures a front end load balancer and a pool of back-end web servers.
+
+As the student user on the workstation machine, change to the ~/git-repos directory. Clone the Git repository at http://git.lab.example.com:8081/git/project-comp-review.git into that directory.
+
+Review the project playbooks and the inventory file, and refactor the project according the following specifications:
+
+Modify the inventory file by converting it to YAML syntax. The resulting file should contain two host groups.
+
+In the inventory file, rename the host group mylocal_servers to web_servers.
+
+Modify the playbooks deploy_apache.yml and deploy_webapp.yml to use the host group web_servers instead of mylocal_server for all plays.
+
+In the webapp role, change the variable msg to webapp_message. Update any references to this variable in the project files.
+
+In the webapp role, change the variable vers to webapp_version. Update any references to this variable in the project files.
+
+Verify that the playbook site.yml executes with no errors.
+
+After successful execution, commit your changes to Git with a message of Refactoring of the review project and push them to the remote repository.
+
+Clone the Git repository.
+
+On the workstation machine, open a terminal. Create the git-repos directory in your home directory.
+
+[student@workstation ~]$ mkdir -p ~/git-repos
+Change to the git-repos directory and use the git command to clone the Git repository located at http://git.lab.example.com:8081/git/project-comp-review.git.
+
+[student@workstation ~]$ cd git-repos
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/project-comp-review.git
+Cloning into 'project-comp-review'...
+remote: Enumerating objects: 53, done.
+remote: Counting objects: 100% (53/53), done.
+remote: Compressing objects: 100% (35/35), done.
+remote: Total 53 (delta 5), reused 0 (delta 0)
+Unpacking objects: 100% (53/53), done.
+Review the files in the project. The project contains the main inventory, inventory, a site.yml playbook that invokes a set of three playbooks, and a set of roles. The playbooks invoke roles that configure the load balancer, the web servers, and the web application.
+
+[student@workstation git-repos]$ tree project-comp-review/
+project-comp-review/
+├── ansible.cfg
+├── deploy_apache.yml
+├── deploy_haproxy.yml
+├── deploy_webapp.yml
+├── group_vars
+│   └── lb_servers.yml
+├── inventory
+├── roles
+... output omitted ...
+Convert the inventory to YAML. Rename the host group from mylocal_servers to web_servers.
+
+Open the ~/git-repos/project-comp-review/inventory file in a text editor. The inventory contains two host groups, lb_servers and mylocal_servers.
+
+The host group lb_servers contains servera.lab.example.com. The host group mylocal_servers (to be renamed web_servers) contains serverb.lab.example.com and serverc.lab.example.com.
+
+Rename the inventory file to inventory.yml and convert it from INI to YAML format. In that file, rename the host group mylocal_servers to web_servers.
+
+[student@workstation git-repos]$ cd project-comp-review/
+[student@workstation project-comp-review]$ mv inventory inventory.yml
+[student@workstation project-comp-review]$ vim inventory.yml
+The resulting file should contain two host groups. When updated, the inventory should match the following content:
+
+NOTE
+Do not forget to add the hosts entry and colons to each line.
+
+lb_servers:
+  hosts:
+    servera.lab.example.com:
+
+web_servers:
+  hosts:
+    server[b:c].lab.example.com:
+In the playbooks, update references to the mylocal_servers host group to use web_servers.
+
+Both the deploy_apache.yml playbook, and the deploy_webapp.yml playbook mention the mylocal_servers host group.
+
+Use a text editor to edit deploy_apache.yml. Locate the hosts entry that point to the host group. Update the value of the variable with web_servers.
+
+The file should read as follows:
+
+- name: Ensure Apache is deployed
+  hosts: web_servers
+  force_handlers: True
+  gather_facts: no
+... output omitted ...
+Repeat the same operation for deploy_webapp.yml. Update the hosts variable with a value of web_servers. After updating the file, it should read as follows:
+
+- name: Ensure the web application is deployed
+  hosts: web_servers
+  gather_facts: no
+... output omitted ...
+In the role webapp, rename the role variable msg to webapp_message. Rename the role variable vers to webapp_version.
+
+The webapp role contains two variables, msg and vers. Rename msg variable to webapp_message and rename the vers variable to webapp_version.
+
+Start by editing the role main playbook located in the roles directory. The path relative to the project-comp-review is roles/webapp/tasks/main.yml. Rename both the msg and vers variables in the content line. After update, the file should read as the following:
+
+---
+# tasks file for webapp
+
+- name: Ensure placeholder content is deployed
+  copy:
+    content: "{{ webapp_message }} (version {{ webapp_version }})\n"
+    dest: /var/www/html/index.html
+These two variables are defined in the role's default variables file declared in the defaults directory. Use your favorite editor to edit the main.yml playbook, in the defaults directory.
+
+Rename the vers variable to webapp_version and the msg variable to webapp_message. After updating the file it should contain the following:
+
+webapp_version: v1.0
+webapp_message: "This is {{ inventory_hostname }}."
+Run the site.yml playbook.
+
+Make sure you are in the ~/git-repos/project-comp-review directory and verify that the site.yml playbook executes with no errors.
+
+Use the ansible-playbook command against the site.yml playbook. Use the -i inventory.yml option to specify the local inventory.
+
+[student@workstation project-comp-review]$ ansible-playbook -i inventory.yml \
+> site.yml
+PLAY [Ensure HAProxy is deployed] **************************************
+
+TASK [firewall : Ensure Firewall Sources Configuration] ****************
+ok: [servera.lab.example.com] => (item={'port': '80/tcp'})
+
+TASK [haproxy : Ensure haproxy packages are present] *******************
+ok: [servera.lab.example.com]
+
+TASK [haproxy : Ensure haproxy is started and enabled] *****************
+ok: [servera.lab.example.com]
+... output omitted ...
+
+PLAY RECAP *************************************************************
+servera.lab.example.com    : ok=4    changed=0    unreachable=0    ...
+serverb.lab.example.com    : ok=5    changed=1    unreachable=0    ...
+serverc.lab.example.com    : ok=5    changed=1    unreachable=0    ...
+Commit your changes and push them to the remote repository.
+
+Use git status to review the list of changes.
+
+[student@workstation project-comp-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes not staged for commit:
+(use "git add/rm <file>..." to update what will be committed)
+(use "git checkout -- <file>..." to discard changes in working directory)
+
+modified:   deploy_apache.yml
+modified:   deploy_webapp.yml
+deleted:    inventory
+modified:   roles/webapp/defaults/main.yml
+modified:   roles/webapp/tasks/main.yml
+
+Untracked files:
+ (use "git add <file>..." to include in what will be committed)
+
+  inventory.yml
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Add all the files to the staging area.
+
+[student@workstation project-comp-review]$ git add --all
+Run the git commit -m command to add your changes to the index and to commit your changes. Use a commit message of Refactoring of the review project.
+
+[student@workstation project-comp-review]$ git commit -m \
+> "Refactoring of the review project"
+[master dc81638] Refactoring of the review project
+ 5 files changed, 11 insertions(+), 11 deletions(-)
+Push your changes to the remote repository.
+
+[student@workstation project-comp-review]$ git push
+Enumerating objects: 21, done.
+Counting objects: 100% (21/21), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (9/9), done.
+Writing objects: 100% (11/11), 928 bytes | 464.00 KiB/s, done.
+Total 11 (delta 5), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/project-comp-review.git
+   3e3fcdd..dc81638  master -> master
+Evaluation
+
+Grade your work by running the lab review-cr1 grade command from your workstation machine. Correct any reported failures in your local Git repository, and then commit and push the changes. After changes are pushed to the remote repository, rerun the script. Repeat this process until you receive a passing score for all criteria.
+
+[student@workstation ~]$ lab review-cr1 grade
+This concludes the lab.
+
+

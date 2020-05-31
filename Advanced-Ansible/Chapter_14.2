@@ -1,0 +1,130 @@
+Configuring TLS/SSL for Ansible Tower
+Objectives
+After completing this section, students should be able to:
+
+Replace the default TLS certificate for Ansible Tower with an updated certificate obtained from a certificate authority.
+
+Nginx Web Server on Ansible Tower
+The Ansible Tower web UI is provided by an Nginx web server running on the Tower server. When installed, Ansible Tower creates a self-signed TLS certificate and matching private key file which Nginx uses for HTTPS communication.
+
+The main configuration files for Nginx are in the /etc/nginx directory, the most important of which is /etc/nginx/nginx.conf. Access logs for the Nginx web server hosting the Ansible Tower web UI are located in /var/log/nginx/access.log and error logs are in /var/log/nginx/error.log. Both log files are periodically rotated, and gzip compressed archives of older versions of those files may be found in the /var/log directory.
+
+In general, no changes should be necessary to the /etc/nginx/nginx.conf configuration file. However, one scenario in which changes might be useful is if the server's default HTTPS configuration needs adjustment.
+
+Default TLS Configuration
+There are two reasons an administrator might need to know how to find the TLS configuration on Ansible Tower's TLS service. The first is to locate the TLS certificate and private key so that they can be replaced with versions signed by a Certificate Authority trusted by the browsers accessing Ansible Tower. The second would be if customization of the TLS configuration becomes necessary, particularly removing ciphers if vulnerabilities in their algorithms are found.
+
+The TLS configuration for the Nginx web server is defined in the /etc/nginx/nginx.conf Nginx configuration file. The server block, which listens for SSL connections on port 443, contains the relevant configuration directives. In particular, this shows that the TLS certificate is /etc/tower/tower.cert and the matching private key is /etc/tower/tower.key:
+
+server {
+    listen 443 default_server ssl;
+    listen 127.0.0.1:80 default_server;
+    listen [::1]:80 default_server;
+
+    # If you have a domain name, this is where to add it
+    server_name _;
+    keepalive_timeout 65;
+
+    ssl_certificate /etc/tower/tower.cert;
+    ssl_certificate_key /etc/tower/tower.key;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # intermediate configuration
+    ssl_protocols TLSv1.2;
+    ssl_ciphers 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256';
+    ssl_prefer_server_ciphers on;
+Replacing the TLS Certificate and Key
+Most organizations will want to replace the Ansible Tower self-signed certificate with one signed by a TLS Certificate Authority (CA) that is trusted by the organization's web browsers. This might be a public CA, or an internal corporate CA.
+
+In each case, you need to obtain a TLS certificate for the server, correctly signed by a CA, and a matching private key, both in PEM format. Use these to replace the existing self-signed certificate and key:
+
+Save the CA-signed TLS certificate in PEM format to /etc/tower/tower.cert.
+
+Save the matching private key in PEM format to /etc/tower/tower.key.
+
+Both files must be readable and writable only by the awx user (the Ansible Tower user), and must also be owned by the awx group:
+
+[root@tower tower]# ls -l /etc/tower/tower.*
+-rw-------. 1 awx awx 1281 Mar 31 23:32 tower.cert
+-rw-------. 1 awx awx 1704 Mar 31 23:32 tower.key
+      
+Use the ansible-tower-service restart command to restart Ansible Tower.
+
+Test the connection from a browser that trusts the CA used to sign the Ansible Tower server's certificate. Review the certificate details presented by your browser and whether your browser considers the connection secure. The details on how to do this will vary depending on which web browser you use.
+
+IMPORTANT
+In the lab, you will use the classroom FreeIPA server as the CA. This allows you to use ipa-getcert to request a TLS certificate, which will be automatically renewed by the certmonger daemon when it expires.
+
+However, Ansible Tower 3.3.1 labels all files in /etc/tower with the SELinux type etc_t. Both tower.cert and tower.key need to be labeled cert_t for the files to be managed correctly by the FreeIPA tools. Fortunately, Nginx can read TLS certificates labeled cert_t correctly.
+
+To persistently set the SELinux type on these two files, you need to make sure the semanage command is available. It is provided by the policycoreutils-python package. Run the semanage fcontext -a -t cert_t "/etc/tower/tower.(.*)" command to set the default context for those files in the system policy. Finally, run restorecon -FvvR /etc/tower/ to correct the SELinux contexts in that directory based on the current policy settings.
+
+REFERENCES
+Ansible Tower Administration Guide
+
+
+
+Guided Exercise: Configuring TLS/SSL for Ansible Tower
+In this exercise, you will replace the existing TLS/SSL certificate with a valid one provided by the utility server.
+
+Outcomes
+
+You will be able to:
+
+Replace the default TLS/SSL certificate used by Ansible Tower with a provided certificate appropriate for the server's host name.
+
+Ensure that the workstation, tower, and utility virtual machines are started.
+
+Log in to workstation as student using student as the password.
+
+On workstation, run lab admin-cert start, which verifies that the Ansible Tower services are running and all the required resources are available.
+
+[student@workstation ~]$ lab admin-cert start
+Open a terminal on workstation and use ssh to log in to the tower server as root. In the following steps, you will replace the Ansible Tower TLS/SSL certificate with a provided certificate appropriate for the server's host name.
+
+[student@workstation ~]$ ssh root@tower
+Add a new rule to the SELinux policy to set the type to cert_t on the /etc/tower/tower.cert and /etc/tower/tower.key files. Run restorecon on those files to make sure that the SELinux type is set on those files. This is needed for certmonger to write to those files when requested by ipa-getcert in the next step.
+
+[root@tower ~]# semanage fcontext -a -t cert_t "/etc/tower(/.*)?"
+[root@tower ~]# restorecon -FvvR /etc/tower/
+Back up then remove the existing /etc/tower/tower.cert and /etc/tower/tower.key files.
+
+[root@tower ~]# cp /etc/tower/tower.* /root
+[root@tower ~]# rm /etc/tower/tower.*
+rm: remove regular file ‘/etc/tower/tower.cert’? y
+rm: remove regular file ‘/etc/tower/tower.key’? y
+Using the ipa-getcert command, get a certificate for tower.lab.example.com that is signed by the organization's FreeIPA-based CA on utility.lab.example.com.
+
+[root@tower ~]# ipa-getcert request -f /etc/tower/tower.cert \
+> -k /etc/tower/tower.key
+New signing request "20181121155831" added.
+NOTE
+Do not worry too much about why this works if you are not familiar with FreeIPA. The important part of this step is that you have a CA-signed TLS certificate and key for tower.lab.example.com that have been copied into the right locations on your Ansible Tower server.
+
+Use the ansible-tower-service command to restart the Ansible Tower infrastructure and then exit the console session on the tower system.
+
+[root@tower ~]# ansible-tower-service restart
+Restarting Tower
+Redirecting to /bin/systemctl stop postgresql.service
+Redirecting to /bin/systemctl stop rabbitmq-server.service
+Redirecting to /bin/systemctl stop nginx.service
+Redirecting to /bin/systemctl stop supervisord.service
+Redirecting to /bin/systemctl start postgresql.service
+Redirecting to /bin/systemctl start rabbitmq-server.service
+Redirecting to /bin/systemctl start nginx.service
+Redirecting to /bin/systemctl start supervisord.service
+[root@tower ~]# exit
+Open Firefox and connect to the Ansible Tower web UI at https://tower.lab.example.com.
+
+The new SSL certificate is signed by a trusted CA, which is why you do not receive any SSL certificate warnings. To review the new certificate details, click the padlock symbol in the browser address bar. The new TLS/SSL certificate includes the tower.lab.example.com hostname and the LAB.EXAMPLE.COM organization.
+
+Finish
+
+On workstation, run the lab admin-cert finish script to clean up this exercise.
+
+[student@workstation ~]$ lab admin-cert finish
+This concludes the guided exercise.
+
+

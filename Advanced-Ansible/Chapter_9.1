@@ -1,0 +1,317 @@
+Chapter 9. Managing Projects and Launching Ansible Jobs
+Creating a Project for Ansible Playbooks
+Guided Exercise: Creating a Project for Ansible Playbooks
+Creating Job Templates and Launching Jobs
+Guided Exercise: Creating Job Templates and Launching Jobs
+Lab: Managing Projects and Launching Ansible Jobs
+Summary
+Abstract
+
+Goal	Create projects and job templates in the web UI, using them to launch Ansible Playbooks that are stored in Git repositories in order to automate tasks on managed hosts.
+Objectives	
+Create and manage a project in Ansible Tower that gets playbooks and other project materials from an existing Git repository.
+
+Create and manage a job template that specifies a project and playbook, an inventory, and credentials that you can use to launch Ansible jobs on managed hosts.
+
+Sections	
+Creating a Project for Ansible Playbooks (and Guided Exercise)
+
+Creating Job Templates and Launching Jobs (and Guided Exercise)
+
+Lab	
+Managing Projects and Launching Ansible Jobs
+
+Creating a Project for Ansible Playbooks
+Objectives
+After completing this section, students should be able to create and manage a project in Ansible Tower that gets playbooks and other project materials from an existing Git repository.
+
+Projects
+An Ansible project represents at least one playbook and its associated collection of related playbooks and roles. Whether or not Ansible Tower is being used, it is a good practice for these materials to be managed together in a version control system. The design of Ansible Tower assumes that most Ansible projects are managed in a version control system, and can automatically retrieve updated materials for a project from several commonly used version control systems.
+
+In the Ansible Tower web interface, each Ansible project is represented by a Project resource. The Project is configured to retrieve these materials from a version control system (also referred to by Ansible Tower as a source control management or SCM system). Ansible Tower supports the ability to download and automatically get updates of project materials from SCMs using Git, Subversion, or Mercurial.
+
+NOTE
+It is possible to simply copy projects to the Ansible Tower server in a location known as the Project Base Path. Configured by /etc/tower/settings.py, this directory is located by default at /var/lib/awx/projects.
+
+However, this is not a recommended practice. Updating such projects requires manual intervention outside Ansible Tower interfaces. It also requires that project administrators have direct access to make changes in the operating system environment on the Ansible Tower, which reduces the security of the Ansible Tower server. It is better to have Ansible Tower get project materials from an SCM system.
+
+Creating a Project
+The following is the procedure for creating a Project to share a collection of Ansible Playbooks and roles managed in an existing Git repository. The hands-on exercise following this section covers this in more detail.
+
+Log in to the Ansible Tower web interface as a user with Admin role on an Organization.
+
+Click Projects in the left quick navigation bar to go to the Projects management screen.
+
+Click the + button to create the new Project.
+
+Enter a unique name for the Project in the NAME field.
+
+Optionally, enter a description for the Project in the DESCRIPTION field.
+
+Click the magnifying glass icon next to the ORGANIZATION field to display a list of Organizations within Ansible Tower. Select an Organization from the list and click SELECT.
+
+In the SCM TYPE drop-down menu, select the Git option.
+
+Under the SOURCE DETAILS section, enter the location of the Git repository in the SCM URL field.
+
+Optionally, in the SCM BRANCH/TAG/COMMIT field, specify the branch, tag or commit of the repository to obtain the contents from.
+
+If authentication is required to access the Git repository, click the magnifying glass icon next to the SCM CREDENTIAL field to display a list of available SCM Credentials. Select an SCM Credential from the list and click SELECT. The creation of SCM Credentials is discussed later in this section.
+
+Lastly, select the desired action to be taken to update the Project against its SCM source. Available options are Clean, Delete on Update, and Update Revision on Launch. These three options are discussed in further detail at the end of this section.
+
+Click SAVE to finalize the creation of the Project.
+
+
+Figure 9.1: New project
+Project Roles
+Users are granted permissions to Project resources through assigned roles on the Project resource. Users can be directly assigned roles, or they can be assigned. As always, assignment of roles can be made directly to a user or indirectly through a team. For example, in order for a user to gain permissions on a specific Project, they must be assigned or inherit a role for that Project.
+
+The following are the list of available project roles:
+
+Admin
+The Admin role grants users full access to a Project. When granted this role on a Project, a user can delete the Project and modify its properties, permissions included. In addition, this role also grants users the Use, Update, and Read roles, which are discussed later in this section.
+
+Use
+The Use role grants users the ability to use a Project in a Template resource. Use of a Project in a Template resource will be discussed in detail in a later section. This role also grants users the permissions associated with the Project Read role.
+
+Update
+The Update role grants users the ability to manually update or schedule an update of a Project's materials from its SCM source. This role also grants users the permissions associated with the Project Read role.
+
+Read
+The Read role grants users the ability to view the details, permissions, and notifications associated with a Project.
+
+Managing Project Access
+When a Project is first created, it is only accessible by users with the Admin or Auditor role in the Project's Organization.
+
+Other access by users must be specifically configured. Roles cannot be assigned when the Project is created, but must be added by editing the Project.
+
+Roles are assigned in the PERMISSIONS section of the Project editor screen. The following procedure details the steps to set roles for a Project:
+
+Log in as a user with Admin role for the Organization in which the Project was created.
+
+Click Projects in the left quick navigation bar to display the list of Projects.
+
+Click the pencil icon for the Project to edit to enter the Project editor screen.
+
+On the Project editor screen, click the PERMISSIONS button to enter the permissions editor.
+
+Click the + button to add permissions.
+
+In the user and team selection screen, click either USERS or TEAMS and then select the users or teams to be granted permissions.
+
+Click KEY to display the list of Project roles and their definitions.
+
+Click the SELECT ROLES drop-down menu and select the desired Project role for each user or team.
+
+Click SAVE to finalize the changes to permissions.
+
+
+Figure 9.2: Assigning Project roles to a user
+NOTE
+Roles for Projects can also be added through either the user or team management screens.
+
+Creating SCM Credentials
+In a previous section of this course, you learned how to use Machine Credentials, which store the authentication information playbooks need to connect to managed hosts and perform authentication tasks on them. Source Control Credentials, also called SCM Credentials, store authentication information that Ansible Tower can use to access project materials stored in a version control system like Git. SCM Credentials store the user name, and the password or private key (and private key passphrase, if any) needed to authenticate access to the source control repository.
+
+This is an outline of the procedure you would use to create an SCM Credential so that Ansible Tower can retrieve playbooks, roles, or other materials from a Git repository for a Project. Do not do this now. The hands-on exercise following this section covers this in more detail.
+
+Log in as a user with the appropriate role assignment:
+
+If creating a private SCM Credential, then there are no specific role requirements.
+
+If creating an SCM Credential belonging to an Organization, then log in as a user with Admin role for the Organization.
+
+Click Credentials in the left quick navigation bar to enter the Credentials management interface.
+
+On the CREDENTIAL screen, click + to create a new Credential.
+
+On the CREATE CREDENTIAL screen, enter the required information for the new Credential.
+
+Enter a unique name for the Credential in the NAME field.
+
+If creating an Organization Credential, click the magnifying glass next to the ORGANIZATION field, select the Organization to create the Credential in, and then click SELECT. Skip this step if creating a private Credential.
+
+Click the CREDENTIAL TYPE drop-down menu and select the Source Control Credential type, and then click SELECT.
+
+Once a Source Control Credential type is selected in the previous step, the appropriate fields display in the TYPE DETAILS section.
+
+Enter authentication data into their respective fields. For example, you may need to specify a USERNAME. If a password is needed, you must enter that in the PASSWORD field. If you are using an SSH private key to authenticate, either copy and paste or drag and drop your private key into the SCM PRIVATE KEY field. That key can be a passphrase encrypted SSH private key, in which case you can provide the passphrase to Ansible Tower in the PRIVATE KEY PASSPHRASE field.
+
+Click the SAVE button to finalize the creation of the new SCM Credential.
+
+
+Figure 9.3: New SCM Credential
+SCM Credential Roles
+Just like Machine Credentials, private SCM Credentials are only usable by their creators and System Administrator and System Auditor users. SCM Credentials assigned to an Organization can be shared with other users by assigning either users or teams the appropriate roles for that credential.
+
+The following is the list of roles available for providing Users access to SCM Credentials:
+
+Admin
+The Admin role grants users full permissions over an SCM Credential. These permissions include deletion and modification of the SCM Credential. This role also grants Users permissions associated with the Credential Use and Read roles.
+
+Use
+The Use role grants Users the ability to associate an SCM Credential with a Project resource. This role also grants users the permissions associated with the Credential Read role.
+
+The Use role does not control whether a user can themselves use the SCM Credential to update a Project, only whether they can assign that SCM Credential so that it can then be used by someone who has the Update role on the Project.
+
+For example, if an SCM Credential is associated with a Project, any user assigned the Update role on the Project can use the associated SCM Credential without being granted Use role on the Credential.
+
+Read
+The Read role grants users the ability to view the details of an SCM Credential.
+
+Managing Access to SCM Credentials
+When an Organization SCM Credential is first created, it is only accessible by users with either the Admin or Auditor role in the Organization to which the Credential is assigned. Additional access for other users must be specifically configured.
+
+The assignment of SCM Credential roles to users or teams dictates who has permissions to an SCM Credential belonging to an Organization. These permissions cannot be assigned at the time of the SCM Credential's creation. They are adjusted after its creation by editing the Credential.
+
+Roles are assigned through the PERMISSIONS section of the Credential editor screen. The following procedure details the steps for granting permissions to an SCM Credential that has been assigned to an Organization, after the credential's creation.
+
+Log in as a user with Admin role on the Organization that the SCM Credential belongs to.
+
+Click Credentials in the left quick navigation bar to enter the Credentials management interface.
+
+Click the name of the SCM Credential to edit in order to enter the Credential editor screen.
+
+On the Credential editor screen, click the PERMISSIONS button to enter the permissions editor.
+
+Click the + button to add permissions.
+
+In the user and team selection screen, click either USERS or TEAMS and then select the users or teams to be granted permissions.
+
+Click KEY to display the list of Credential roles and their definitions.
+
+Click the SELECT ROLES drop-down menu and select the desired Credential role for each user or team.
+
+Click SAVE to finalize the changes to permissions.
+
+
+Figure 9.4: Assigning an SCM Credential role to a user
+IMPORTANT
+Permissions for SCM Credentials can also be added through either the user or team management screens under Ansible Tower's Settings interface.
+
+Updating Projects
+An SCM Project resource in Ansible Tower represents a copy of playbooks and roles obtained from an SCM source. Since modifications to the contents of these playbooks and roles are managed in an external SCM system, their respective counterparts in a Ansible Tower Project must be updated routinely from the SCM source to reflect new changes.
+
+There are several ways to update SCM Project resources in Ansible Tower. As previously mentioned, Projects can be configured to update from their SCM sources by choosing one of three SCM update options in the Project's detail screen.
+
+Clean
+
+This SCM update option removes local modifications before getting the latest revision from the source control repository.
+
+Delete on Update
+
+This SCM update option completely removes the local Project repository on Ansible Tower before getting the latest revision from the source control repository. This takes longer than Clean for large repositories.
+
+Update on Launch
+
+This SCM update option updates the Project from the source control repository each time the Project is used to launch a job. The update itself is tracked as a separate job by Ansible Tower.
+
+You can manually update a Project to the latest version in the source control repository, if you do not want to use these automatic settings. The following procedure outlines the steps needed to manually update an Project from its SCM source:
+
+Log in as a user with Update role on the Project.
+
+Click the Projects in the left quick navigation bar to enter the Projects management interface.
+
+In the table of Projects, a double arrow icon appears under the ACTIONS column if the user has the Update role for a given Project.
+
+To trigger a manual, immediate update on a Project, click on its double-arrow icon to initiate an update of its contents against its SCM source.
+
+
+Figure 9.5: Updating an SCM project
+IMPORTANT
+The Update role only dictates whether a user can manually trigger an update of a Project against its SCM source. It does not impact the update behavior configured by the Project's SCM update option. For example, a Project configured with an Update on Launch SCM update option still performs updates even when the Project is used by a user who has not been granted the Update role on the Project.
+
+Support for Ansible Roles
+Projects may specify external Ansible roles that are stored in Ansible Galaxy or other source control repositories as dependencies. At the end of a Project update, if a project's repository includes a roles directory that contains a valid requirements.yml file, Red Hat Ansible Tower will automatically run ansible-galaxy to install the roles:
+
+    ansible-galaxy install -r roles/requirements.yml -p ./roles/ --force
+  
+For more information and syntax examples of the requirements.yml file, refer to the Installing multiple roles from a file section of the Ansible Galaxy guide at https://docs.ansible.com/ansible/latest/reference_appendices/galaxy.html#installing-multiple-roles-from-a-file
+
+REFERENCES
+Ansible Tower User Guide
+
+
+
+
+
+Guided Exercise: Creating a Project for Ansible Playbooks
+In this exercise, you will create a new Source Control credential, a new project, and assign a role to one of your teams allowing team members to use that project.
+
+Outcomes
+
+You will be able to create a Project which will allow Ansible Tower to leverage an external Git repository containing a playbook.
+
+You have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab provision-project start. This setup script ensures that the workstation and tower virtual machines are started.
+
+[student@workstation ~]$ lab provision-project start
+Log into the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Create the new Source Control Credential needed to create a new Project.
+
+In the left navigation bar, click Credentials to manage Credentials.
+
+Click the + button to add a new Credential.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	student-git
+DESCRIPTION	Student Git Credential
+ORGANIZATION	Default
+TYPE	Source Control
+USERNAME	git
+SCM PRIVATE KEY	Copy the contents of the /home/student/.ssh/lab_rsa private key file on workstation into this field
+Click SAVE to create the new Credential.
+
+Create a new Project called My Webservers DEV.
+
+In the left navigation bar, click the Projects quick navigation link.
+
+Click the + button to add a new Project.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	My Webservers DEV
+DESCRIPTION	Development Webservers Project
+ORGANIZATION	Default
+SCM TYPE	Git
+SCM URL	ssh://git.lab.example.com/var/opt/gitlab/git-data/repositories/git/my_webservers_DEV.git
+SCM CREDENTIAL	student-git
+Click SAVE to create the new Project. This automatically triggers the SCM update of the Project. Ansible Tower uses the values provided in the SCM URL and SCM CREDENTIAL fields to pull down a local copy of that repository.
+
+Observe the automatic SCM update of the project My Webservers DEV.
+
+Scroll down the page and wait a couple of seconds. In the list of Projects, there is a status icon left of the Project, My Webservers DEV. This icon is white at the start, red with an exclamation mark when it fails, and green when it succeeds.
+
+Click on the status icon to show the detailed status page of the SCM update job. As you can see in the DETAILS window, the SCM update job runs like any other Ansible Playbook.
+
+Verify that the STATUS of the job in the DETAILS section shows Successful.
+
+Give the Developers Team Admin role on the Project, My Webservers DEV.
+
+In the left navigation bar, click the Projects quick navigation link.
+
+Click My Webservers DEV to edit the Project settings.
+
+On the next page, click PERMISSIONS to manage the Project's permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, check the box next to the Developers team. This causes the team to display in the second section underneath the first one.
+
+In the second section below, select the Admin role from the drop-down list.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Project, My Webservers DEV, which now shows that all members of the Developers team are assigned the Admin role on the Project.
+
+Click the Log Out icon to exit the Tower web interface.
+
+This concludes the guided exercise.
+
+

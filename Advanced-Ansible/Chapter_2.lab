@@ -1,0 +1,238 @@
+
+Lab: Managing Inventories
+Performance Checklist
+
+In this lab, you will convert an INI-style inventory file to YAML format and configure group variable files for two new host groups.
+
+Outcomes
+
+You should be able to:
+
+Organize playbook variables in a directory structure.
+
+Write an inventory file in YAML format.
+
+Assign arbitrary host names for remote hosts in an inventory.
+
+Log in as the student user on workstation and run lab inventory-review start. This script initializes the remote Git repository that you need for this lab.
+
+[student@workstation ~]$ lab inventory-review start
+The Git repository contains a site.yml playbook that configures a front end load balancer and a pool of backend web servers. The back server pool is partitioned into two groups, A and B. Each pool partition deploys an independent version of the web application.
+
+Clone the Git repository http://git.lab.example.com:8081/git/inventory-review.git in the /home/student/git-repos directory. Review the project playbooks and the inventory file and then execute the site.yml playbook. Make several web requests to servera to verify that the same version of the web application is deployed to all back end web servers.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+From a terminal, create the directory /home/student/git-repos if it does not already exist. Then, change to this directory and clone the repository:
+
+[student@workstation ~]$ cd git-repos/
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/inventory-review.git
+Cloning into 'inventory-review'...
+remote: Enumerating objects: 56, done.
+remote: Counting objects: 100% (56/56), done.
+remote: Compressing objects: 100% (42/42), done.
+remote: Total 56 (delta 5), reused 0 (delta 0)
+Unpacking objects: 100% (56/56), done.
+[student@workstation git-repos]$ cd inventory-review
+Review the inventory file.
+
+[lb_servers]
+servera.lab.example.com
+
+[web_servers]
+
+[web_servers:children]
+a_web_servers
+b_web_servers
+
+
+# Group "A" of Web Servers
+[a_web_servers]
+serverb.lab.example.com
+
+
+# Group "B" of Web Servers
+[b_web_servers]
+serverc.lab.example.com
+In this project, the web_servers host group is composed of two other groups: a_web_servers and b_web_servers.
+
+Execute the site.yml playbook
+
+[student@workstation inventory-review]$ ansible-playbook site.yml
+
+PLAY [Ensure HAProxy is deployed] ********************************************
+
+...output omitted...
+
+PLAY RECAP *******************************************************************
+servera.lab.example.com    : ok=7    changed=6    unreachable=0    ...
+serverb.lab.example.com    : ok=8    changed=6    unreachable=0    ...
+serverc.lab.example.com    : ok=8    changed=6    unreachable=0    ...
+Verify that the same version of the web application is deployed to all back end web servers.
+
+[student@workstation inventory-review]$ curl servera
+Hello from serverb.lab.example.com. (version v1.1)
+[student@workstation inventory-review]$ curl servera
+Hello from serverc.lab.example.com. (version v1.1)
+Create a variable file for the a_web_servers host group to set the webapp_version variable to the value v1.1a. Ensure the variable file is saved in the appropriate directory with the name webapp.yml.
+
+Create a similar variable file for the b_web_servers host group, but set the value of the webapp_version variable to v1.1b.
+
+Create directories to hold group variable files for the a_web_servers and b_web_servers host groups.
+
+[student@workstation inventory-review]$ mkdir -pv group_vars/{a,b}_web_servers
+mkdir: created directory 'group_vars/a_web_servers'
+mkdir: created directory 'group_vars/b_web_servers'
+Create the webapp.yml variable file for the a_web_servers group. Use it to set the value of the webapp_version variable to v1.1a.
+
+[student@workstation inventory-review]$ echo "webapp_version: v1.1a" > \
+> group_vars/a_web_servers/webapp.yml
+Create the webapp.yml variable file for the b_web_servers group. Use it to set the value of the webapp_version variable to v1.1b.
+
+[student@workstation inventory-review]$ echo "webapp_version: v1.1b" > \
+> group_vars/b_web_servers/webapp.yml
+Execute the deploy_webapp.yml playbook. Use curl or a web browser to confirm that requests for web pages sent to servera produce two different versions of the web application.
+
+Commit these changes to your local repository.
+
+Execute the deploy_webapp.yml playbook:
+
+[student@workstation inventory-review]$ ansible-playbook deploy_webapp.yml
+
+PLAY [Ensure Web App is deployed] ********************************************
+...output omitted...
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com  : ok=2   changed=1   unreachable=0    ...
+serverc.lab.example.com  : ok=2   changed=1   unreachable=0    ...   
+Verify that requests to servera produce two different versions of the web application.
+
+[student@workstation inventory-review]$ curl servera
+Hello from serverb.lab.example.com. (version v1.1a)
+[student@workstation inventory-review]$ curl servera
+Hello from serverc.lab.example.com. (version v1.1b)
+Commit these changes to your local repository.
+
+[student@workstation inventory-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+
+  group_vars/a_web_servers/
+  group_vars/b_web_servers/
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+[student@workstation inventory-review]$ git add \
+> group_vars/{a,b}_web_servers
+[student@workstation inventory-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+  new file:   group_vars/a_web_servers/webapp.yml
+  new file:   group_vars/b_web_servers/webapp.yml
+[student@workstation inventory-review]$ git commit \
+> -m "Created variable files for the A and B groups."
+Create a new YAML-formatted inventory file named inventory.yml. Ensure that this file contains the same inventory data as the INI-formatted inventory file. To test the YAML inventory file you created, execute the site.yml file using this inventory file.
+
+When complete, the project contains both an inventory and inventory.yml file.
+
+Create a new YAML-formatted inventory file, inventory.yml, that contains the same data as the INI-formatted inventory file:
+
+lb_servers:
+  hosts:
+    servera.lab.example.com:
+web_servers:
+  children:
+    a_web_servers:
+      hosts:
+        serverb.lab.example.com:
+    b_web_servers:
+      hosts:
+        serverc.lab.example.com:
+Test the new inventory file.
+
+[student@workstation inventory-review]$ ansible-playbook site.yml -i \
+> inventory.yml
+
+PLAY [Ensure HAProxy is deployed] ********************************************
+
+...output omitted...
+
+PLAY RECAP *******************************************************************
+servera.lab.example.com  : ok=5   changed=0   unreachable=0    ...
+serverb.lab.example.com  : ok=7   changed=0   unreachable=0    ...
+serverc.lab.example.com  : ok=7   changed=0   unreachable=0    ...
+Use ansible_host variables to configure the real host names that are used for connections when Ansible manages these hosts. Modify the inventory.yml file so that the managed hosts are referred to in the inventory using the following naming convention:
+
+Managed hosts in the lb_servers host group have an inventory name matching loadbalancer_N, where N is assigned sequentially to servers starting at 1.
+
+The web_servers host group has two child groups, a_web_servers and b_web_servers.
+
+Hosts in the a_web_servers host group follow a similar numbered naming scheme of the form: backend_aN.
+
+Hosts in the b_web_servers host group also follow a similar numbered naming scheme of the form backend_bN.
+
+Modify the inventory.yml so that each server follows its naming convention:
+
+lb_servers:
+  hosts:
+    loadbalancer_1:
+      ansible_host: servera.lab.example.com
+
+web_servers:
+  children:
+    a_web_servers:
+      hosts:
+        backend_a1:
+          ansible_host: serverb.lab.example.com
+    b_web_servers:
+      hosts:
+        backend_b1:
+          ansible_host: serverc.lab.example.com
+Verify that the site.yml playbook executes without errors when you use the inventory.yml inventory file. Also verify that the playbook output contains inventory host names that follow the stated naming conventions.
+
+After the playbook executes without error, commit the new inventory.yml file to the local repository. Verify that all project changes are committed, and push all local commits to the remote repository.
+
+Verify that the site.yml playbook executes without errors, and that playbook output contains inventory host names that follow the naming conventions.
+
+[student@workstation inventory-review]$ ansible-playbook site.yml -i \
+> inventory.yml
+
+PLAY [Ensure HAProxy is deployed] ********************************************
+
+...output omitted...
+
+PLAY RECAP *******************************************************************
+backend_a1             : ok=7    changed=1    unreachable=0    ...
+backend_b1             : ok=7    changed=1    unreachable=0    ...
+loadbalancer_1        : ok=5    changed=0    unreachable=0    ...
+Commit the new inventory.yml file.
+
+[student@workstation inventory-review]$ git add inventory.yml
+[student@workstation inventory-review]$ git commit -m "Added YAML inventory"
+Verify that all project changes are committed, and push all local commits to the remote repository.
+
+[student@workstation inventory-review]$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 2 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean
+[student@workstation inventory-review]$ git push
+Enumerating objects: 12, done.
+Counting objects: 100% (12/12), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (6/6), done.
+Writing objects: 100% (10/10), 904 bytes | 301.00 KiB/s, done.
+Total 10 (delta 2), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/inventory-review.git
+   eb2c922..0564e9a  master -> master
+

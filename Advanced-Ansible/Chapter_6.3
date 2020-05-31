@@ -1,0 +1,268 @@
+Navigating Red Hat Ansible Tower
+Objectives
+After completing this section, you should be able to navigate and describe the Red Hat Ansible Tower web UI, and successfully launch a job using the provided job template, project, credentials, and inventory.
+
+Using the Ansible Tower Web User Interface
+This section provides an overview of how to use the Ansible Tower web UI to launch a job using an example Ansible Playbook, an inventory, and access credentials for the machines in the inventory. It also provides an orientation to the web UI itself.
+
+Ansible Tower is configured with a number of Ansible projects that contain playbooks. It is also configured with a number of Ansible inventories, and the necessary machine credentials to log in to inventory hosts and escalate privileges. A job template is set up by an administrator and specifies which playbook, from which project, should be run on the hosts in a particular inventory using particular machine credentials. A job is performed when a user runs a playbook on an inventory by launching a job template.
+
+The Ansible Tower Dashboard
+When you log in to the web UI, the Ansible Tower Dashboard displays. The Dashboard is the main control center for Ansible Tower.
+
+
+Figure 6.2: The Ansible Tower Dashboard
+The Dashboard is composed of four reporting sections:
+
+Summary
+
+Across the top of the Dashboard is a summary report of the status of managed hosts, inventories, and Ansible projects. Click a cell in the summary section to view the detailed Dashboard page for the reported metric.
+
+Job Status
+
+A job is an attempted run of a playbook by Ansible Tower. This section provides a graphical display of the number of successful and failed jobs over time. This graph can be adjusted in several ways:
+
+Use the PERIOD menu to change the time window for the plotted graph.
+
+Use the JOB TYPE menu to select which job types to include on the graph.
+
+Use the VIEW menu to choose between graphing the status of all jobs, only failed jobs, or only successful jobs.
+
+Recently Used Templates
+
+This section displays a list of job templates that were recently used for the execution of jobs.
+
+For each job template used, the results of each associated job run are indicated under the ACTIVITY column by a small colored square, with green indicating success and red indicating failure. Mouse over a colored square to display the job ID number and when it was run. Click a square to open the Job Details view for that job. Monitoring job template activity is discussed in more detail later in this section.
+
+Under the ACTIONS column are controls for using the job template.
+
+Click the VIEW ALL link to display all job templates, and not just those that have recently been used for job execution.
+
+Recent Job Runs
+
+This section displays a list of recently executed jobs and the date and time they were executed. Each job run is preceded by a colored dot which represents the outcome of the run. A green dot represents a successful run; a red dot represents a failed run. Click a job run to display the Job Details view for that job.
+
+Navigation Bar
+In the left portion of the Ansible Tower web UI is a collection of navigation links to commonly used Ansible Tower resources. The Ansible Tower icon takes you to the Ansible Tower Dashboard. The other links provide access to the administrative page for each of the Ansible Tower resources. These resources are described below.
+
+Jobs
+A job represents a single run of an Ansible Playbook by Ansible Tower against an inventory of hosts.
+
+Templates
+A template defines parameters to use to launch a job (to run an Ansible Playbook) with Ansible Tower.
+
+Credentials
+Use this interface to manage credentials. Credentials are authentication data used by Ansible Tower to log in to managed hosts to run plays, decrypt Ansible Vault files, synchronize inventory data from external sources, download updated project materials from version control systems, and similar tasks.
+
+Projects
+In Ansible Tower, a project represents a collection of related Ansible Playbooks.
+
+Inventories
+Inventories contain a collection of hosts to be managed.
+
+Inventory Scripts
+Use this interface to manage scripts that generate and update dynamic inventories from external sources, such as cloud providers and configuration management databases (CMDBs).
+
+Organizations
+Use this interface to manage organization entities within Ansible Tower. An organization represents a logical collection of Ansible Tower resources, such as Teams, Projects, and Inventories. Organizations are often used for departmental separation within an enterprise. An organization is the highest level at which the Ansible Tower role-based access control system can be applied.
+
+Users
+Use this interface to manage Ansible Tower users. Users are granted access to Ansible Tower and then assigned roles which determine their access to Ansible Tower resources.
+
+Teams
+Use this interface to administer Ansible Tower teams. Teams represent a group of Ansible Tower users. Like users, teams can also be assigned roles for access to Ansible Tower resources.
+
+Notifications
+Use this interface to manage notification templates. These templates define the set of configuration parameters needed to generate notifications using a variety of message delivery tools, such as email, IRC, and HipChat.
+
+Management Jobs
+Use this interface to manage system jobs, which clean up old data from Ansible Tower operations. This includes job history, and activity streams. Use this playbook to control the amount of storage used for this information on your Ansible Tower server, or to comply with your organization's data retention requirements.
+
+Administration Tool Links
+The upper-right portion of the Ansible Tower web UI contains links to various Ansible Tower administration tools.
+
+
+Figure 6.3: Administration tool links
+Account Configuration
+The current user account name is displayed as a link. You can click the account name to access the account configuration page.
+
+About
+The information icon displays the installed version of Ansible Tower, and the version of Ansible it is using.
+
+View Documentation
+Click the book icon to display the Ansible Tower documentation website in a new window.
+
+Log Out
+Use the power icon to log out of the Ansible Tower web UI.
+
+Ansible Tower Settings
+Click Settings in the left navigation bar to access the Ansible Tower Settings page. Use the buttons at the top of the page to switch between different categories of settings.
+
+
+Figure 6.4: The Settings page in Ansible Tower
+The different categories available on the Settings page are described below.
+
+Authentication
+The Authentication category contains settings used to configure simplified authentication for user accounts in Ansible Tower using third-party login information, such as LDAP, Azure Active Directory, GitHub, or Google OAuth2. Select the type of login information to configure from the SUB CATEGORY menu.
+
+Jobs
+The Jobs category contains advanced settings used to configure job execution. Use these settings to control how many scheduled jobs may be set up by users, the Ansible modules allowed for ad hoc jobs launched by Ansible Tower, and timeouts for project updates, fact caching, and job runs.
+
+System
+The System category contains advanced settings that you can use to configure log aggregation, activity stream settings, and other miscellaneous Ansible Tower options.
+
+User Interface
+The User Interface category allows you to configure analytics reporting, and to set a custom logo or custom login messages for the Ansible Tower server.
+
+License
+This interface provides details of the installed license and can also be used to perform administrative licensing tasks, such as license installation and upgrade.
+
+General Controls
+In addition to the navigational and administrative controls previously outlined, some additional controls are used throughout the Ansible Tower web UI.
+
+
+Figure 6.5: Breadcrumb Navigation and activity stream links in teams
+Breadcrumb Navigation Links
+
+As you navigate through the Ansible Tower web UI, a "breadcrumb" trail is created in the upper-left corner of the page. This trail clearly identifies the path to each page, and also provides a quick way to return to previous pages.
+
+Activity Streams
+
+Under the Logout icon in the upper-right corner of most pages in the Ansible Tower web UI, you can see the View Activity Stream icon. It appears as a circular icon containing a small graph. Click this icon to display a report of activities related to the current page. For example, clicking the View Activity Stream icon on the Projects page displays a list of project-related events, including the event time and the user who initiated it.
+
+Search Fields
+
+Search fields that can be used to search or filter through data sets are present throughout the Ansible Tower web UI.
+
+Click the Key button next to each search field to display a guide that describes the correct syntax and specific criteria for each field. You can also use the Key button to define the options provided by other input fields within Ansible Tower.
+
+Configuring Job Templates
+Ansible Tower is preconfigured with a demonstration job template. You can use this template as an example of how a job template is constructed and to test the operation of Ansible Tower. The following discussion examines the components that make up this example template. The exercise that follows this section provides a more detailed hands-on walk-through of the example job template.
+
+Under Inventories in the left navigation bar, an inventory called Demo Inventory has been configured. This is a static inventory with no host groups and one host, called localhost. Clicking on that host in the inventory reveals that the inventory variable ansible_connection: local is set.
+
+
+Figure 6.6: Details of Demo Inventory
+Under Credentials in the left navigation bar, a machine credential named Demo Credential has been created. This credential contains information that could be used to authenticate access to machines in an inventory.
+
+
+Figure 6.7: Details of Demo Credential
+Under Projects in the left navigation bar, a project called Demo Project has been configured. This project is configured to get Ansible project materials, including playbooks, from a local directory on the Ansible Tower system.
+
+
+Figure 6.8: Details of Demo Project
+Under Templates in the left navigation bar, a template called Demo Job Template has been configured. This job template is configured as a normal playbook run (Job Type is Run), using the hello_world.yml playbook from Demo Project.
+
+This job template runs on the machines in Demo Inventory, using Demo Credential to authenticate to those machines. Privilege escalation is not enabled because hello_world.yml does not need it. Were it needed, the Demo Credential option would need to provide the information necessary to authenticate. Notice that because the job template is not using privilege escalation, and is running only on machines using ansible_connection: local, there is very little information needed in Demo Credential.
+
+No extra variables are set (analogous to the -e or --extra-vars option of an ansible-playbook command).
+
+
+Figure 6.9: Demo Job Template
+Launching a Job
+After creating and configuring a job template, you can use it to repeatedly launch jobs using the same parameters. A job template is like a saved ansible-playbook command complete with options and arguments. When you launch a job template, it is like repeating an ansible-playbook command from your shell history.
+
+The following discussion examines what happens when you use Demo Job Template to launch a job. This is covered in more detail in an upcoming exercise.
+
+Under Templates in the left navigation bar, the Demo Job Template should be listed. Across from the name of the job template is a rocket icon ("Start a job using this template"). Clicking this icon launches the job using the settings in the job template.
+
+
+Figure 6.10: Launching a job
+As the job runs, a new status page opens that provides real-time information about the progress of the job. The DETAILS pane provides basic information about the job being run: when it was launched, who launched it, what job template, project, and inventory were used, and so on. While running, the job status is Pending.
+
+As the job executes, the status page displays the output from the job run in a job output pane. The job run output resembles the output generated when you use the ansible-playbook command to run an Ansible Playbook. This output can be used for troubleshooting purposes. In the following example, the play and tasks in the playbook ran successfully.
+
+
+Figure 6.11: Example job output
+After the job completes, the Ansible Tower Dashboard provides a link to the status page for the job run under RECENT JOB RUNS. The other statistics on the Ansible Tower Dashboard are also updated.
+
+Under Jobs in the left navigation bar, all the jobs that have run on Ansible Tower are listed. You can click the name of a job listed on this page to display the status page logged for that job.
+
+
+Figure 6.12: Example jobs page
+REFERENCES
+Ansible Tower Quick Setup Guide
+
+Ansible Tower User Guide
+
+Ansible Tower Administration Guide
+
+
+
+
+
+
+Guided Exercise: Accessing Red Hat Ansible Tower
+In this exercise, you will navigate through the Red Hat Ansible Tower web UI and launch a job.
+
+Outcomes
+
+You should be able to browse through and interact with the project, inventory, credential, and template pages in the Red Hat Ansible Tower web UI to successfully launch a job.
+
+You should have a Red Hat Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab tower-webui start. This setup script configures the tower virtual machine for the exercise.
+
+[student@workstation ~]$ lab tower-webui start
+Log in to the Red Hat Ansible Tower web UI running on tower as admin using redhat as the password.
+
+Identify the project that was created by the script and determine its source.
+
+Click Projects in the left navigation bar to display the list of projects. You should see a project named Demo Project, which was created during the Ansible Tower installation.
+
+Click the Demo Project link to view the details of the project.
+
+Look at the values of the SCM TYPE, PROJECT BASE PATH, and PLAYBOOK DIRECTORY fields to determine the origin of the project. You should see that Demo Project was obtained from the /var/lib/awx/projects/_4__demo_project directory on the Ansible Tower system.
+
+Browse the inventory that was created during the Ansible Tower installation and determine its managed hosts.
+
+Click Inventories in the left navigation bar to display the list of known inventories. You should see an inventory named Demo Inventory, which was created during the Ansible Tower installation.
+
+Click the Demo Inventory link to view the details of the inventory. Click HOSTS and notice that the inventory includes just one host: localhost.
+
+View the details of the credential that was created during the Ansible Tower installation.
+
+Click Credentials in the left navigation bar to display the list of credentials.
+
+Click the Demo Credential link to view the details of the credential. You should see that the credential is a machine credential that uses the username admin.
+
+NOTE
+Even though there is no admin Linux user, the job can still work because it is a localhost job.
+
+Identify the job template that was created during the Ansible Tower installation. Click Templates in the left navigation bar to display the list of existing job templates. You should see a job template named Demo Job Template, which was created during the Ansible Tower installation.
+
+Determine the inventory, project, and credential used by the job template, Demo Job Template.
+
+Click the Demo Job Template link to view the details of the job template.
+
+Look at the INVENTORY field. You should see that the job template uses the Demo Inventory inventory.
+
+Look at the PROJECT field. You should see that the job template uses the Demo Project project.
+
+Look at the PLAYBOOK field. You should see that the job template executes a hello_world.yml playbook.
+
+Look at the CREDENTIAL field. You should see that the job template uses the Demo Credential credential.
+
+Launch a job using the Demo Job Template job template.
+
+Click Templates in the left navigation bar to exit the template details view.
+
+Click the rocket icon in the same row as the Demo Job Template template. This launches a job using the parameters configured in the Demo Job Template template and redirects you to the job details page. As the job executes, the details of the job execution and output are displayed.
+
+Determine the outcome of the job execution.
+
+When the job has completed successfully, the STATUS value changes to Successful.
+
+Review the output of the job execution to determine which tasks were executed. You should see that the msg module was used to successfully display a Hello World! message.
+
+Review the changes to the Dashboard reflecting the job execution.
+
+Click TOWER in the upper-left corner of the page to return to the Dashboard.
+
+Review the JOB STATUS graph. The green line on the graph indicates the number of recent successful job executions.
+
+Review the RECENT JOB RUNS section. This section provides a list of the jobs recently executed, as well as their results. The Demo Job Template entry indicates that the job template was used to execute a job. The green dot at the beginning of the entry indicates the successful completion of the executed job.
+
+This concludes the guided exercise.
+
+

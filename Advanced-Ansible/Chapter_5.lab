@@ -1,0 +1,149 @@
+Lab: Coordinating Rolling Updates
+Performance Checklist
+
+In this lab, you will modify a playbook to implement Rolling Updates.
+
+Outcomes
+
+You should be able to delegate tasks to other hosts, implement deployment batches with the serial keyword, and limit failures with the max_fail_percentage keyword.
+
+Log in as the student user on the workstation machine, and run lab update-review start.
+
+[student@workstation ~]$ lab update-review start
+This script initializes the remote Git repository you need for this lab: http://git.lab.example.com:8081/git/update-review.git. The Git repository contains playbooks that configure a front-end load balancer and a pool of back-end web servers.
+
+Clone the repository. Execute the site.yml playbook to deploy the web application infrastructure.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+Change to this directory:
+
+[student@workstation ~]$ cd /home/student/git-repos/
+Clone the repository:
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/update-review.git
+Cloning into 'update-review'...
+remote: Enumerating objects: 85, done.
+remote: Counting objects: 100% (85/85), done.
+remote: Compressing objects: 100% (58/58), done.
+remote: Total 85 (delta 5), reused 0 (delta 0)
+Unpacking objects: 100% (85/85), done.
+[student@workstation update-review]$ cd update-review
+Use the ansible-playbook command to run the site.yml playbook.
+
+[student@workstation update-review]$ ansible-playbook site.yml
+
+PLAY [Ensure HAProxy is deployed] ******************************************...
+
+...output omitted...
+
+PLAY RECAP *****************************************************************...
+servera.lab.example.com    : ok=27   changed=14   unreachable=0    failed=0 ...
+serverb.lab.example.com    : ok=16   changed=8    unreachable=0    failed=0 ...
+serverc.lab.example.com    : ok=16   changed=8    unreachable=0    failed=0 ...
+serverd.lab.example.com    : ok=16   changed=8    unreachable=0    failed=0 ...
+servere.lab.example.com    : ok=16   changed=8    unreachable=0    failed=0 ...
+serverf.lab.example.com    : ok=16   changed=8    unreachable=0    failed=0 ...
+Add a pre_task task to disable the web servers from the HAProxy load balancer to the update_webapp.yml playbook. Without this task, external clients may experience problems due unforeseen deployment issues with the web application.
+
+Configure the new task as follows:
+
+Use the haproxy module.
+
+Disable the host, using the inventory_hostname variable in the app back end.
+
+Delegate each action to the only load balancer. The {{ groups['lb_servers'][0] }} Jinja2 expression provides the name of this load balancer.
+
+Edit the update_webapp.yml file with your favorite editor:
+
+[student@workstation update-review]$ vi update_webapp.yml
+Add the pre_task task to disable the web server in the load balancer:
+
+  pre_tasks:
+    - name: Remove web server from service during the update
+      haproxy:
+        state: disabled
+        backend: app
+        host: "{{ inventory_hostname }}"
+      delegate_to: "{{ groups['lb_servers'][0] }}"
+In the update_webapp.yml playbook, the first task in the post_tasks section is a smoke test. That task verifies that the web application on each web server responds to requests that originate from that same server. This is not a realistic test, as requests to the web server only originate from the load balancer. If you only test the response of a web server from the web server itself, you do not test any network-related functions.
+
+Using delegation, modify the smoke test task so that each request to a web server originates from the load balancer. Use the inventory_hostname to connect to each web server.
+
+Add the directive delegate_to to the smoke test task pointing to the load balancer. Change the testing URL to point to the inventory_hostname:
+
+- name: Smoke Test - Ensure HTTP 200 OK
+  uri:
+    url: "http://{{ inventory_hostname }}:{{ apache_port }}"
+    status_code: 200
+  become: no
+  delegate_to: "{{ groups['lb_servers'][0] }}"
+Add a post_task task after the smoke test to re-enable each web server in the HAProxy load balancer. This task is similar in structure to the haproxy task in the pre_tasks section.
+
+Add the task after the smoke test with the state: enable directive.
+
+- name: Enable healthy server in load balancers
+  haproxy:
+    state: enabled
+    backend: app
+    host: "{{ inventory_hostname }}"
+  delegate_to: "{{ groups['lb_servers'][0] }}"
+Configure the update_webapp.yml playbook to use batches, to mitigate the effects of unforeseen deployment errors. Ensure that the playbook uses no more that 3 batches to complete the upgrade of all web server hosts. Set the first batch to contain 5% of the hosts, and the second batch 35% of the hosts.
+
+Add an appropriate keyword to the play to ensure that playbook execution stops if any host fails a task during the upgrade.
+
+Add the max_fail_percentage directive and set the value to 0, to stop the execution at any failure. Add the serial directive and the value to a list of three elements: 5%, 35% and 100% to ensure that all servers are updated in the last batch. The beginning of the play should look like:
+
+- name: Upgrade Web Application
+  hosts: web_servers
+  max_fail_percentage: 0
+  serial:
+    - 5%
+    - 35%
+    - 100%
+Run the udpate_webapp.yml playbook to perform the rolling update.
+
+Use the ansible-playbook command to run the update_webapp.yml playbook.
+
+[student@workstation update-review]$ ansible-playbook update_webapp.yml
+...output omitted...
+
+PLAY RECAP *****************************************************************...
+servera.lab.example.com    : ok=10   changed=4    unreachable=0    failed=0 ...
+serverb.lab.example.com    : ok=10   changed=4    unreachable=0    failed=0 ...
+serverc.lab.example.com    : ok=8    changed=2    unreachable=0    failed=0 ...
+serverd.lab.example.com    : ok=10   changed=4    unreachable=0    failed=0 ...
+servere.lab.example.com    : ok=8    changed=2    unreachable=0    failed=0 ...
+serverf.lab.example.com    : ok=8    changed=2    unreachable=0    failed=0 ...
+Commit and push your changes back to the remote Git repository.
+
+Add the changed files, commit the changes, and push them to the Git repository.
+
+[student@workstation update-review]$ git add .
+[student@workstation update-review]$ git commit -m "Rolling updates"
+[master 8d38803] Rolling updates
+ 1 files changed, 26 insertions(+), 12 deletions(-)
+[student@workstation update-review]$ git push
+Enumerating objects: 13, done.
+Counting objects: 100% (13/13), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (6/6), done.
+Writing objects: 100% (7/7), 931 bytes | 931.00 KiB/s, done.
+Total 7 (delta 3), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/update-review.git
+   a36da15..5feb08e  master -> master
+Evaluation
+
+Grade your work by running the lab update-review grade command from your workstation machine. Correct any reported failures and rerun the script until successful.
+
+NOTE
+Make sure to commit and push your changes to the Git repository before rerunning the script.
+
+[student@workstation ~]$ lab update-review grade
+Finish
+
+From the workstation machine, run the lab update-review finish command to complete this lab.
+
+[student@workstation ~]$ lab update-review finish

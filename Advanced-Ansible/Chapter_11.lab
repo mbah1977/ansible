@@ -1,0 +1,127 @@
+
+Lab: Communicating with APIs using Ansible
+Performance Checklist
+
+In this lab, you will fix a simple playbook to interact with the REST API of Ansible Tower to ensure that particular resources exist.
+
+Outcomes
+
+You should be able to use the provided playbooks to create and modify resources in Ansible Tower using the Ansible uri module.
+
+Log in as the student user on the workstation machine, and run the lab api-review start command.
+
+[student@workstation ~]$ lab api-review start
+This script initializes the remote Git repository you need for this lab, http://git.lab.example.com:8081/git/api-review.git. The Git repository contains playbooks that you must fix in order to use the Ansible Tower REST API.
+
+Clone the playbook project repository.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos
+[student@workstation ~]$ cd /home/student/git-repos
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/api-review.git
+...output omitted...
+[student@workstation git-repos]$ cd api-review
+[student@workstation api-review]$ 
+Using Ansible uri module, create a copy of the existing New template Job Template using the Ansible Tower REST API. To create the playbooks, use variables, filters, and any other applicable Ansible best practices from this course.
+
+Use the following names and locations to modify the existing playbooks and inventories. Notice that the names are case sensitive.
+
+The name of the Job Template to copy is New template .
+
+Name the copied Job Template Review template .
+
+For all operations, use the Ansible Tower user simon .
+
+Use the REST API URL https://TOWER_NAME/api/v2/job_templates/TEMPLATE_NAME | FILTER/copy/
+
+Start with modifications to the provided inventory.yml file. Modify the file content by replacing the variable values with the appropriate values. Then, modify the contents of the copy_template.yml playbook to use these variables.
+
+Modify the content of the inventory.yml file.
+
+[student@workstation api-review]$ vi inventory.yml
+tower:
+  hosts:
+    tower.lab.example.com:
+  vars:
+    template_name:  New template
+    copy_template_name: Review template
+    tower_fqdn: tower.lab.example.com
+    tower_user: simon
+    tower_password: redhat123
+Modify the provided copy_template.yml playbook to add a task to copy the existing job template. Use the POST method to call the proper Ansible Tower API and variables from the inventory file.
+
+[student@workstation api-review]$ vi copy_template.yml
+The first task in the playbook calls the Tower API to copy a template. The URL for this action is /api/v2/job_templates/<template-name>/copy/. The task should look like:
+
+- name: Copy the existing New template using the uri module
+  uri:
+    url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ template_name | urlencode }}/copy/"
+    validate_certs: no
+    method: POST
+    return_content: yes
+    force_basic_auth: yes
+    user: "{{ tower_user }}"
+    password: "{{ tower_password }}"
+    status_code: [201, 202]
+    body:
+      name: "{{ copy_template_name }}"
+    body_format: json
+Copy the Job Template using that modified playbook.
+
+[student@workstation api-review]$ ansible-playbook copy_template.yml
+
+PLAY [Using the uri module to connect to tower] *****************************...
+
+TASK [Copy the existing New template using the uri module] ******************...
+ok: [tower.lab.example.com]
+
+PLAY RECAP ******************************************************************...
+tower.lab.example.com      : ok=1    changed=0    unreachable=0    failed=0  ...
+Modify the provided template_cleanup.yml playbook to delete the original New template template. Use the DELETE method.
+
+Edit the provided template_cleanup.yml playbook.
+
+Add a task to the playbook that deletes the original template. The task should look like:
+
+- name: Delete an existing Ansible Tower Job Template using the uri module
+  uri:
+    url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ template_name | urlencode }}/"
+    validate_certs: no
+    method: DELETE
+    return_content: yes
+    force_basic_auth: yes
+    user: "{{ tower_user }}"
+    password: "{{ tower_password }}"
+    status_code: 204
+Use the modified playbook to remove the original Job Template.
+
+[student@workstation api-review]$ ansible-playbook template_cleanup.yml
+
+PLAY [Using the uri module to delete a Job Template] ***********************...
+
+TASK [Delete an existing Ansible Tower Job Template using the uri module] **...
+ok: [tower.lab.example.com]
+
+PLAY RECAP *****************************************************************...
+tower.lab.example.com      : ok=1    changed=0    unreachable=0    failed=0 ...
+Save, commit, and push your changes to the remote repository.
+
+[student@workstation data-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+  modified:   copy_template.yml
+  modified:   inventory.yml
+  modified:   template_cleanup.yml
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[student@workstation data-review]$ git add --all
+[student@workstation data-review]$ git commit -m "Updated review playbooks"
+...output omitted...
+[student@workstation data-review]$ git push
+...output omitted...
+

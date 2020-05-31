@@ -1,0 +1,588 @@
+Chapter 13. Creating a Simple CI/CD Pipeline with Ansible Tower
+Creating a Simple CI/CD Pipeline with Ansible Tower
+Guided Exercise: Integrating a GitLab CI/CD Pipeline with Ansible Tower
+Summary
+Abstract
+
+Goal	Build and operate a proof-of-concept CI/CD pipeline based on Ansible automation and integrating Red Hat Ansible Tower.
+Objectives	
+Integrate Ansible Tower with a web-based Git repository system such as GitLab or GitHub to build a simple pipeline to automatically deploy playbooks when changes are committed.
+
+Sections	
+Integrating CI/CD with Ansible Tower (and Guided Exercise)
+
+Creating a Simple CI/CD Pipeline with Ansible Tower
+Objectives
+After completing this section, you should be able to create a CI/CD Pipeline in GitLab to call an Ansible Tower Job Template.
+
+Continuous Integration
+Continuous Integration is the DevOps practice of using automation to integrate individual developer contributions into a shared code repository. Continuous Delivery focuses on executing processes more quickly and more frequently, by bringing and executing them together.
+
+This practice encourages committing small changes more often, versus committing large changes infrequently.
+
+
+Figure 13.1: Release often to keep your customers happy.
+Automated routines are grouped together in jobs, which are placed in a pipeline. The pipeline defines the order in which the jobs are executed.
+
+There are no rules for the contents of your pipeline, but the basic premise is that pipelines facilitate automated quality control. This automation eliminates the need for human intervention in a reliably repeatable way.
+
+Some examples of what the jobs in your pipeline may do include:
+
+Syntax checking to ensure that code does not contain any syntax errors that prevents code compilation.
+
+"Linting" (running a program to analyze your code) to detect behaviors and practices that could potentially be improved.
+
+Calling the necessary steps to build code to produce a deployable artifact.
+
+Deploying and installing code to a server.
+
+"Smoke testing" in the form of cursory, limited tests to ensure that the most important functions work.
+
+Unit testing to verify that an individual unit of code (function) works as expected.
+
+Integration testing to verify that the individual units of code (functions) work together as expected.
+
+Regression testing to verify that new, or recently modified code does not adversely affect existing features (functions).
+
+This practice has a number of benefits:
+
+Fast feedback about the operational status of the code once it is committed.
+
+End-to-end testing of code is automated when code is checked in, resulting in a faster feedback loop between developers working on the code.
+
+Facilitates integrating code from different developers.
+
+Greater visibility for developers collaborating on code.
+
+Developers and testers are able to fail faster, within the same sprint, further reducing the feedback loop.
+
+Reduced debugging sessions at the end of long sprints.
+
+In order to get started with CI/CD pipelines, you need:
+
+Access to a distributed version control service
+
+Tests for your code
+
+Access to a CI/CD service to run your tests
+
+NOTE
+You can integrate Red Hat Ansible Tower with a variety of CI/CD platforms to create a pipeline for Ansible Playbook projects. In this course, we use a classroom instance of GitLab that can provide both repository management and CI/CD platform services. Other alternatives are possible and might have different advantages, but this configuration provides a good example.
+
+Building CI/CD Pipelines with GitLab
+In the CI/CD pipeline, GitLab uses runners to run jobs inside of the pipeline. Runners provide the environment in which your pipeline is executed. A runner can be specific to a project or can be shared across all projects.
+
+Runners executors to execute commands inside of your jobs.
+
+Executors can be:
+
+Containers
+
+Virtual Machines
+
+Local shells (jobs execute in a shell on the GitLab machine itself)
+
+SSH to connect to a different machine to execute jobs
+
+Ideally a runner executes the code defined in the pipeline independently of any connected systems.
+
+
+Figure 13.2: Pipeline with jobs
+CI/CD and Red Hat Ansible Tower
+Use a CI/CD pipeline, integrated with Red Hat Ansible Tower, to perform automated routines with each commit to an Ansible Playbook project. A typical pipeline performs the following steps:
+
+Pulls the latest version of the playbook from the dev branch.
+
+Performs syntax checking to ensure sanity of the code, and linting to ensure that it adheres to a set of best practices rules.
+
+Synchronizes the playbook from the dev branch to a Project in Ansible Tower.
+
+Executes the Job Template against the Dev Inventory in Ansible Tower, using the code in the dev branch.
+
+Verifies the functionality of a critical component in the form of a unit test for the hosts in the Dev Inventory.
+
+Merges the dev branch to the master branch.
+
+Synchronizes the playbook from the master branch to a Project in Ansible Tower.
+
+Executes the Job Template against the Prod Inventory in Ansible Tower, using code from the master branch.
+
+Verifies the functionality of a critical component in the form of a unit test for hosts in the Prod Inventory.
+
+Sends a notification to inform the developers of the status of the job.
+
+This pipeline automates processes that would otherwise have to be performed manually. Automation allows developers to focus on creating and editing playbooks using their tool of choice. Developers can simply commit their work, knowing that automation with a CI pipeline is integrated with Red Hat Ansible Tower.
+
+Ansible Lint
+Ansible Lint is a command-line tool to detect errors, bugs, suspicious code constructs, and stylistic errors that could potentially be improved.
+
+It is used by the Ansible Galaxy project to lint and calculate quality scores for content contributed to the Galaxy Hub.
+
+IMPORTANT
+The ansible-lint command is not currently shipped with Red Hat Ansible Automation or officially supported by Red Hat, but is developed by the Ansible community upstream.
+
+This command is included in EPEL for Red Hat Enterprise Linux 7 and current releases of Fedora. Instructions for installation on other operating systems is available at https://docs.ansible.com/ansible-lint/.
+
+Ansible Lint uses rules from ${PYTHON_PATH}/site-packages/ansiblelint/rules/ in the form of Python modules which may be used as is, or edited to suit your own needs. Additional user-defined rules may be created and used with the default rules, as follows:
+
+Consider the following example of a badly written playbook.
+
+[student@demo examples]$ cat playbook.yml
+---
+- name: A bad play
+  hosts: demo.lab.example.com
+
+tasks:
+- command: systemctl mask iptables.service
+...
+Syntactically, the playbook is free of any errors, and the ansible-playbook playbook.yml --syntax-check command will state the same.
+
+[student@demo examples]$  ansible-playbook playbook.yml --syntax-check
+
+
+playbook: playbook.yml
+ansible-lint reveals that this is not a well written playbook.
+
+[student@demo examples]$  ansible-lint playbook.yml
+[301] Commands should not change things if nothing needs doing 1
+playbook.yml:6 2
+Task/Handler: command systemctl mask iptables.service 3
+
+[303] systemctl used in place of systemd module
+playbook.yml:6
+Task/Handler: command systemctl mask iptables.service
+
+[502] All tasks should be named
+playbook.yml:6
+Task/Handler: command systemctl mask iptables.service
+1
+
+The numbers in square brackets tell us which linting rules (tags) were matched, along with a short description of the issue.
+
+2
+
+The filename and the line numbers where the issues were found.
+
+3
+
+The names of the problematic tasks.
+
+Rules in ansible-lint are implemented as Python modules, and are stored in ${PYTHON_PATH}/site-packages/ansiblelint/rules/.
+
+Remediating these issues is simplified as a result of ansible-lint.
+
+[student@demo examples]$ cat playbook.yml
+---
+- name: A better play
+  hosts: demo.lab.example.com
+
+  tasks:
+    - name: Mask iptables.service
+      systemd:
+        name: iptables.service
+        masked: true
+...
+
+[student@demo examples]$ ansible-lint playbook.yml
+[student@demo examples]$ echo $?
+0
+NOTE
+The ansible-lint command is more capable of verifying the sanity of a playbook when compared to the ansible-playbook --syntax-check command. Thus, there is no need to use ansible-playbook --syntax-check when using the ansible-lint command.
+
+Many organizations implement a Style Guide, which defines the standards for writing playbooks. For example, the way that Booleans are declared can vary: True vs true vs Yes vs yes vs 1. While all these values mean the same thing, consistent use of styles assists in the readability of a playbook, which further aids in troubleshooting playbooks with errors.
+
+
+Figure 13.3: Ansible Lint
+The ansible-lint command implements rules as Python modules, and your own rules may be used in addition to the default ones.
+
+[student@demo ~]$ ansible-lint -R ~/ansible-lint/custom_rules/ playbook.yml
+To override the default rules in ${PYTHON_PATH}/site-packages/ansiblelint/rules/, and instead use only your custom rules, use the ansible-lint command as follows:
+
+[student@demo ~]$ ansible-lint -r ~/ansible-lint/custom_rules/ playbook.yml
+
+Figure 13.4: Example Ansible Lint rule checking for spaces before and after variable names.
+REFERENCES
+Continuous Integration
+
+GitLab Continuous Integration & Delivery
+
+Ansible Continuous Delivery
+
+Ansible Lint
+
+lint (software)
+
+
+
+
+
+
+Guided Exercise: Integrating a GitLab CI/CD Pipeline with Ansible Tower
+In this exercise, you will build and operate a proof-of-concept CI/CD pipeline in GitLab CE, based on Ansible automation and integrating Red Hat Ansible Tower.
+
+Outcomes
+
+You should be able to trigger a job in Ansible Tower via a CI/CD pipeline in GitLab.
+
+Open a terminal on the workstation machine as the student user, and run the following command:
+
+[student@workstation ~]$ lab cicd-tower start
+Clone the http://git.lab.example.com:8081/git/cicd-tower.git repository, which contains the Ansible Playbook project you use in this exercise.
+
+Change to the /home/student/git-repos directory. Create the directory if it does not exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos
+[student@workstation ~]$ cd /home/student/git-repos
+Clone the repository.
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/cicd-tower.git
+Review the files in the master and dev branches of the repository.
+
+Change to the cicd-tower directory.
+
+[student@workstation git-repos]$ cd cicd-tower
+Display the current branch.
+
+[student@workstation cicd-tower]$ git branch
+* master
+List the files in the master branch.
+
+[student@workstation cicd-tower]$ ls -l
+total 8
+-rw-rw-r--. 1 student student 609 May 20 13:50 playbook.yml
+-rw-rw-r--. 1 student student  19 May 20 13:50 README.md
+List all the branches.
+
+[student@workstation cicd-tower]$ git branch -a
+* master
+remotes/origin/HEAD -> origin/master
+remotes/origin/dev
+remotes/origin/master
+Checkout the dev branch.
+
+[student@workstation cicd-tower]$ git checkout dev
+Branch 'dev' set up to track remote branch 'dev' from 'origin'.
+Switched to a new branch 'dev'
+Display the current branch.
+
+[student@workstation cicd-tower]$ git branch
+* dev
+  master
+List the files in the dev branch.
+
+[student@workstation cicd-tower]$ ls -la
+total 12
+drwxrwxr-x. 3 student student   77 May 20 20:56 .
+drwxrwxr-x. 3 student student   24 May 20 20:55 ..
+drwxrwxr-x. 8 student student  163 May 20 20:56 .git
+-rw-rw-r--. 1 student student 1167 May 20 20:56 .gitlab-ci.yml
+-rw-rw-r--. 1 student student  869 May 20 20:56 playbook.yml
+-rw-rw-r--. 1 student student   19 May 20 20:55 README.md
+Use the ansible-lint command to identify any issues with the playbook.yml file in the Git repository. You use this playbook to deploy both test and production web servers.
+
+The ansible-lint command performs syntax checks in the same way as the ansible-playbook --syntax-check command.
+
+[student@workstation cicd-tower]$ ansible-lint playbook.yml
+Couldn't parse task at playbook.yml:21 (no action detected in task. This often indicates a misspelled module name, or incorrect module path.
+
+The error appears to be in <unicode string>: line 21, column 7, but may
+be elsewhere in the file depending on the exact syntax problem.
+
+(could not open file to display line))
+{ 'firewall': { '__file__': 'playbook.yml',
+        '__line__': 22,
+        'immediate': True,
+        'permanent': True,
+        'service': 'http',
+        'state': 'enabled'},
+  'name': 'Open the port in the firewall'}
+The output indicates there is an error with the Open the port in the firewall task in playbook.yml playbook.
+
+There is no module called firewall, the correct module name is firewalld. Edit the third task in the playbook.yml file and correct the module name.
+
+[student@workstation cicd-tower]$ cat playbook.yml
+...output omitted...
+  - name: Open the port in the firewall
+    firewalld:
+            service: http
+            state: enabled
+            immediate: true 
+            permanent: true
+...output omitted...
+The ansible-lint command does more than syntax checking. It validates that your playbook is developed according to best practices.
+
+Check the playbook.yml file again using the ansible-lint command:
+
+[student@workstation cicd-tower]$ ansible-lint playbook.yml
+[206] Variables should have spaces before and after: {{ var_name }}
+playbook.yml:12
+name: "{{packages}}"
+
+[502] All tasks should be named
+playbook.yml:28
+Task/Handler: copy content=Hello world
+dest=/var/www/html/index.html __line__=28 __file__=playbook.yml
+The ansible-lint command identifies two issues, one on line 12 and one on line 28. The numeric code in brackets represents a linting category, followed by a description of the issue. To see all linting rules use the ansible-lint -L command. 
+
+Using your editor, make the following changes:
+
+On line 12, introduce a space before and after the packages variable.
+
+On line 28, provide the task a name of Install sample web content.
+
+When you finish correcting these two issues, the content of the playbook.yml file is the following:
+
+[student@workstation cicd-tower]$ cat playbook.yml
+---
+- name: Implement a basic webserver
+  hosts: webservers
+  vars:
+    packages:
+      - httpd
+      - httpd-devel
+
+  tasks:
+    - name: Install the webserver software
+      yum:
+        name: "{{ packages }}"
+        state: installed
+
+    - name: Start and persistently enable httpd
+      service:
+        name: httpd
+        enabled: yes
+        state: started
+
+    - name: Open the port in the firewall
+      firewalld:
+        service: http
+        state: enabled
+        immediate: true
+        permanent: true
+
+    - name: Install sample web content
+      copy:
+        content: "Hello world\n"
+        dest: /var/www/html/index.html
+
+    - name: Smoke Test
+      uri:
+        url: "http://{{ inventory_hostname }}"
+        return_content: yes
+        status_code: 200
+      register: response
+      delegate_to: localhost
+      become: no
+      failed_when: '"Hello World" not in response.content'
+
+...
+Verify that the ansible-lint command does not identify any other issues. The ansible-lint command does not return any output when there are no issues or errors with a playbook.
+
+You can also examine the return code of the ansible-lint command to verify that playbook passes all linting tests.
+
+[student@workstation cicd-tower]$ ansible-lint playbook.yml
+...output omitted...
+[student@workstation cicd-tower]$ echo $?
+0
+If a GitLab project contains a .gitlab-ci.yml file, GitLab creates a CI/CD pipeline for the project.
+
+This file defines a sequence of stages, and each stage executes one or more jobs. Stages control the order of job execution. If a particular job fails, subsequent stages and jobs do not execute.
+
+GitLab pipeline jobs execute on an available GitLab Runner instance. You can configure a GitLab Runner to execute your CI/CD pipelines on any machine. Configuring GitLab Runners is beyond the scope of the course.
+
+In the classroom environment, a GitLab Runner instance is configured on the GitLab server. Use this runner to execute simple bash commands to implement CI/CD pipelines.
+
+Review the .gitlab-ci.yml file that defines the CI/CD pipeline for this project:
+
+[student@workstation cicd-tower]$ cat .gitlab-ci.yml
+variables:
+  LAUNCH_TOWER_JOB: tower-cli job launch --monitor --insecure
+  TOWER_CREDENTIALS: -u admin -p redhat -h tower.lab.example.com
+  GIT_REPO: http://git:redhat321@git.lab.example.com:8081/git/cicd-tower.git
+
+stages:
+  - lint
+  - deploy
+  - auto_merge
+
+# First stage; all branches
+syntax check and linting:
+  stage: lint
+  script:
+    - if ls *.yml; then true; else echo "No playbooks found!"; exit 1; fi
+    - ansible-lint *.yml
+
+#Second stage; only dev branch
+launch test job:
+  stage: deploy
+  script:
+    - tower-cli config verify_ssl false
+    - $LAUNCH_TOWER_JOB $TOWER_CREDENTIALS -J "Deploy Test WebServers"
+    - echo $?
+  only:
+    - dev
+
+#Second stage; only the master branch
+launch prod job:
+  stage: deploy
+  script:
+    - tower-cli config verify_ssl false
+    - $LAUNCH_TOWER_JOB $TOWER_CREDENTIALS -J "Deploy Prod WebServers"
+    - echo $?
+  only:
+    - master
+
+#Third stage; only applies to the dev branch
+push to master:
+  stage: auto_merge
+  script:
+    - git remote set-url origin $GIT_REPO
+    - git checkout dev && git pull
+    - git checkout master && git pull
+    - git merge --no-ff dev
+    - git push origin master
+  only:
+    - dev
+This pipeline configuration file defines a pipeline with three stages: lint, deploy, and auto_merge.
+
+The lint stage contains a single job, with a name of syntax check and linting. This job executes the ansible-lint command against every YAML file. If no YAML files exist in the repository, then the job fails.
+
+The deploy stage triggers the execution of an Ansible Tower job template. For the dev branch, the Deploy Test Web Servers job template executes, while the Deploy Prod Web Servers template executes for the master branch.
+
+The auto_merge stage only defines a job for the dev branch. This job merges the changes in the dev branch into the master branch, and pushes to the remote repository.
+
+Explore the Test resources in Ansible Tower.
+
+From a new window or tab in Firefox, login to Ansible Tower at https://tower.lab.example.com as the admin user with the password redhat.
+
+On the left, select Templates then select Deploy Test WebServers.
+
+
+Figure 13.5: Test Web Servers Job Template
+The launch test job stage in the GitLab pipeline calls the Deploy Test WebServers job template in Ansible Tower, which uses the following resources:
+
+An Inventory called CI/CD Test Inventory.
+
+A Project called CI/CD Test Project that uses a playbook called playbook.yml.
+
+A Credential called webservers machine credential that is used to execute tasks on the inventory hosts.
+
+On the left, select Inventories, then select CI/CD Test Inventory, and then select the HOSTS tab.
+
+
+Figure 13.6: CI/CD Test Inventory Hosts
+When an Ansible Tower job template uses the CI/CD Test Inventory, it can execute jobs against the hosts serverc.lab.example.com and serverd.lab.example.com, which are grouped in the webservers group.
+
+On the left, select Projects and then select CI/CD Test Project.
+
+
+Figure 13.7: CI/CD Test Project
+The CI/CD Test Project uses a credential called gitlab credential to pull resources from the dev branch of the git repository located at http://git.lab.example.com:8081/git/cicd-tower.git.
+
+On the left, select Credentials, and then explore the credentials used. In your environment, the gitlab credential is used to pull files from the GitLab Project called cicd-tower. Similarly, the webservers machine credential is used to login to your inventory hosts.
+
+Similar resources exist for the Prod objects. The playbook is first tested against our test inventory, and if the smoke test passes, the playbook is merged from the dev branch to the master branch. This branch is used by the CI/CD Prod Project to execute playbook.yml against hosts in the CI/CD Prod Inventory, which are servera.lab.example.com and serverb.lab.example.com. This process protects our production servers from being negatively impacted by errors found in playbooks, by performing tests in your pipeline.
+
+Commit your local changes to the playbook.yml file to the dev branch. Push the committed changes to the remote repository. When you push changes to GitLab, you trigger an execution of the CI/CD pipeline that is defined in the .gitlab-ci.yml file.
+
+[student@workstation cicd-tower]$ git add .
+[student@workstation cicd-tower]$ git commit -m "Implemented CI pipeline"
+[student@workstation cicd-tower]$ git push
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 353 bytes | 353.00 KiB/s, done.
+...output omitted...
+Review the recent pipeline execution that was triggered because of changes you pushed to the dev branch in the previous step. The pipeline fails in the second stage. Identify the error that causes the pipeline to fail.
+
+From a new Window or Tab in Firefox, login to your GitLab instance at http://git.lab.example.com:8081, as the git user with the password redhat321.
+
+Select the cicd-tower project.
+
+From the menu on the left, click CI/CD (or the rocket icon, if the menu is collapsed) and then click Pipelines. The most recent pipeline execution appears at the top of the resulting page:
+
+
+Figure 13.8: GitLab CI/CD pipeline status
+Note that the pipeline has three stages called in order: lint, deploy, then auto_merge.
+
+To see what happens at each stage, click on the icon for that stage. At stage 1, you lint the playbook and check syntax. At stage 2, you trigger the Deploy Test Webservers job template. At stage 3, you merge the code from the dev branch into the master branch, and then push the merged changes to the remote repository. This triggers another CI/CD pipeline for the master branch.
+
+When you see that your pipeline job completes, the second stage has a status of failed.
+
+
+Figure 13.9: GitLab CI/CD pipeline failure
+As a result, the third stage does not execute and code is not automatically merged into the master branch from the dev branch. Click the icon of the failed stage to see the name of the failed job. Click launch_test_job to open a new Firefox tab that displays output from the job.
+
+
+Figure 13.10: GitLab Job summary page
+The test environment web servers fail the smoke test. According to the smoke test, the content on the test server is not correctly capitalized. The message on the web server should be Hello World, not Hello world. This means that the Ansible Tower Job Template called Deploy Prod WebServers was never called from the pipeline.
+
+[student@workstation ~]$ curl http://servera
+This is a test message RedHat 8.0 <br>
+Current Host: servera <br>
+Server list: <br>
+servera.lab.example.com <br>
+serverb.lab.example.com <br>
+[student@workstation ~]$ curl http://serverb
+This is a test message RedHat 8.0 <br>
+Current Host: serverb <br>
+Server list: <br>
+servera.lab.example.com <br>
+serverb.lab.example.com <br>
+[student@workstation ~]$ curl http://serverc
+Hello world
+[student@workstation ~]$ curl http://serverd
+Hello world
+Return to the web browser session where you are logged in to Ansible Tower. From the menu on the left, select Jobs to verify that the Deploy Test WebServers job template executed with an error, and that the Deploy Prod WebServers job template did not execute.
+
+
+Figure 13.11: Ansible Tower Jobs after the pipeline failed
+Correct the content that the playbook.yml playbook deploys to each web server. Commit and push the changes. Verify that your code changes to the dev branch are integrated into the master branch, and that production servers are updated with these changes.
+
+From your terminal window, return to the /home/student/git-repos/cicd-tower directory. Correct the fourth task in the playbook.yml playbook with the correctly capitalized content. When you finish, the content of the fourth task is:
+
+    - name: Install sample web content
+      copy:
+        content: "Hello World\n"
+        dest: /var/www/html/index.html
+Commit your changes to the dev branch, and push to the remote repository:
+
+[student@workstation cicd-tower]$ git branch
+* dev
+  master
+[student@workstation cicd-tower]$ git add .
+[student@workstation cicd-tower]$ git commit \
+> -m "Fixes content error."
+[student@workstation cicd-tower]$ git push
+Verify that the recent push to the repository triggers two pipeline executions, resulting in an update to production servers.
+
+Go back to the web browser where you have a GitLab session, and return to the Pipelines summary page for the cicd-tower project.
+
+
+Figure 13.12: GitLab CI/CD pipeline passes all stages
+A new pipeline execution for the dev branch is visible. After the pipeline finishes, it has a status of passed.
+
+Because the 3rd stage of this pipeline pushes a new merge commit to the master branch, a new pipeline execution starts.
+
+The pipeline for the master branch only defines two stages: lint and deploy.
+
+Verify that the production web servers now respond with the correct content:
+
+[student@workstation cicd-tower]$ curl servera
+Hello World
+[student@workstation cicd-tower]$ curl serverb
+Hello World
+Return to the web browser session where you are logged into Ansible Tower and from the menu on the left, select Jobs, and verify that the Deploy Prod WebServers successfully.
+
+
+Figure 13.13: Deploy Prod Web Servers Job executes successfully
+Finish
+
+On the workstation machine, run the lab cicd-tower finish script to complete this lab.
+
+[student@workstation $ lab cicd-tower finish 
+This concludes the guided exercise.
+
+

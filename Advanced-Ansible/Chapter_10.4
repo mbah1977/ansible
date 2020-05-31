@@ -1,0 +1,277 @@
+Scheduling Jobs and Configuring Notifications
+Objectives
+After completing this section, students should be able to schedule automatic job execution and configure notification of job completion.
+
+Scheduling Job Execution
+Sometimes you might need to launch a job template automatically at a particular time, or on a particular schedule. Red Hat Ansible Tower lets you configure scheduled jobs, which launch Job Templates on a customizable schedule.
+
+If you have the Execute role on a Job Template, you can launch jobs from that template by setting up a schedule. To configure scheduled jobs, first select Templates from the left navigation bar. Click the Job Template that you want to schedule, and in the pane on the right, click SCHEDULES. Click the + button to create a new schedule for that Job Template.
+
+
+Figure 10.13: Scheduling Job execution
+Enter the required details:
+
+NAME: The name of the schedule.
+
+START DATE: The date the job schedule should start.
+
+START TIME: The time the associated Job will be launched.
+
+LOCAL TIME ZONE: The tzselect command-line utility can be used to determine your local time zone in this format.
+
+REPEAT FREQUENCY: How often to repeat the associated job. You can choose None (run once), Minute, Hour, Day, Week, Month, or Year.
+
+Depending on the chosen frequency, you might need to provide additional information (for example, to launch a job every two days, or on the first Sunday of every month).
+
+When finished, click SAVE to save the schedule. You can deactivate or activate a schedule using the ON/OFF button next to the schedule name.
+
+Temporarily Disabling a Schedule
+
+Click Schedules in the left navigation bar to display the Scheduled Jobs page. This page lists all the defined schedules. To the left of each schedule's name is an ON/OFF button. Set this to ON or OFF to activate or deactivate the schedule, respectively.
+
+You can also edit or delete any schedule, assuming you have sufficient privileges to do so, from this page.
+
+Scheduled Management Jobs
+
+Red Hat Ansible Tower ships with two special scheduled jobs by default. These two schedules are for built-in Management Jobs that perform periodic maintenance on the Ansible Tower server itself, by cleaning up old log information for the Activity Stream and historic job execution.
+
+Cleanup Job Schedule deletes the details of historic jobs to save space. It runs once a week on Sundays to remove information about jobs more than 120 days old by default, but you can change when this runs and how much data it keeps by editing the schedule.
+
+Cleanup Activity Schedule runs once a week on Tuesdays to remove information from the activity stream that is more than 355 days old. Again, you can change when it runs and how much data it keeps by editing the schedule.
+
+Reporting Job Execution Results
+One of the benefits of using Ansible Tower to manage an enterprise's Ansible infrastructure is centralized logging and auditing. When a job is executed, details regarding the job execution are logged in the Ansible Tower database. This database can be referenced by users at a later time to determine the historical results of past job executions.
+
+Historical job execution details are helpful to administrators for confirming the success and failure of scheduled and delegated job executions. The ability to retrieve historical job execution details is helpful, but for jobs related to critical functions, administrators likely desire immediate notification of a job's success or failure.
+
+Red Hat Ansible Tower can send immediate alerts of job execution results. To use this feature, administrators create Notification Templates which define how notifications are to be sent. Ansible Tower supports many mechanisms to send notifications. Some are based on open protocols such as email and IRC, and others are based on proprietary solutions, such as HipChat and Slack.
+
+Notification Templates
+
+A Notification Template is defined in the context of an Organization. After it has been created, the Notification Template can be used to send notifications of the results of jobs run by Ansible Tower for that Organization.
+
+A Notification Template defines the mechanism for how a notification is to be sent. Supported mechanisms include:
+
+Email
+
+Slack
+
+Twilio
+
+PagerDuty
+
+HipChat
+
+Webhook
+
+IRC
+
+Creating Notification Templates
+
+Notification Templates are created through the Notifications interface, accessible from the left navigation bar. Depending on the selected notification mechanism, the TYPE DETAILS section of the Notification Template interface prompts for different user input.
+
+
+Figure 10.14: Creating notifications
+The following steps are used to create an Email type Notification Template.
+
+In the NOTIFICATIONS interface, click the + button to create a new Notification Template.
+
+Enter a unique name for the Notification Template in the NAME field.
+
+In the ORGANIZATION field, specify the Organization within which to create the Notification Template.
+
+In the TYPE list, select Email as the mechanism to be used by the Notification Template for generating notifications. After you have selected the notification type, type-specific user input fields display under the TYPE DETAILS section.
+
+In the SENDER EMAIL field, specify the sender's email address to be used when composing the notification email.
+
+In the RECIPIENT LIST field, specify the email addresses of the recipients for the notification email, one on each line.
+
+In the PORT field, specify the port to connect to on the SMTP relay host.
+
+You can complete the fields for configuring SMTP authentication and for enabling secure transport, but these are optional.
+
+Click SAVE to save the Notification Template.
+
+Enabling Job Result Notification
+
+After a Notification Template has been created, it becomes available for use by certain Ansible Tower resources that are part of the Notification Template's Organization, such as Job Templates, Projects, or Workflows.
+
+
+Figure 10.15: Enabling notifications on a Job Template
+The following steps enable notifications for a Job Template.
+
+Click Templates on the left navigation bar to display the list of templates.
+
+Click the name of the required Job Template and then click NOTIFICATIONS.
+
+A list of Notification Templates for the Organization is displayed in the NOTIFICATIONS interface.
+
+Each listed Notification Template has controls for toggling success and failure notifications. Set the SUCCESS and FAILURE controls to achieve the desired notification configuration for the Job Template.
+
+NOTE
+You can also use Notification Templates to enable notifications for system jobs triggered by Project and Inventory resources to synchronize their data.
+
+REFERENCES
+Ansible Tower User Guide https://docs.ansible.com/ansible-tower/latest/html/userguide
+
+
+
+Guided Exercise: Scheduling Jobs and Configuring Notifications
+In this exercise, you will create an email Notification Template, configure a Job Template to use the Notification Template, and launch a job to confirm that the notification works.
+
+Outcomes
+
+You should be able to create a Notification Template and use it with a Job Template to generate email notifications of job results.
+
+You should have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in to workstation as student using student as the password and run lab project-notification start. This script will set up the SMTP server.
+
+[student@workstation ~]$ lab project-notification start
+Log in to the Ansible Tower web UI running on the tower system as admin using redhat as the password.
+
+Add a Notification Template to the DEV webservers setup Job Template.
+
+Click Notifications in the navigation bar.
+
+Click + to add a Notification Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Notify on Job Success and Failure
+DESCRIPTION	Sends an email to notify the status of the Job
+ORGANIZATION	Default
+TYPE	Email
+HOST	localhost
+RECIPIENT LIST	student@localhost
+SENDER EMAIL	system@tower.lab.example.com
+PORT	25
+Leave all the other fields untouched and click SAVE to save the Notification Template. You will be redirected to the list of Notification Templates.
+
+Validate the Notification Template.
+
+On the same line as the Notification Template named Notify on Job Success and Failure, click the bell icon on the right to test the Notification process.
+
+Wait several seconds. You should see a green notification that reads "Notify on Job Success and Failure: Notification sent."
+
+Configure the DEV webservers setup Job Template to notify you when its jobs succeeds or fails. Use the Notify on Job Success and Failure Notification Template.
+
+Click Templates in the navigation bar.
+
+From the list of available Job Templates, click DEV webservers setup to edit it.
+
+Click NOTIFICATIONS to manage Notifications for that Job Template.
+
+On the same line as the Notify on Job Success and Failure Notification Template, set the ON/OFF switches for both SUCCESS and FAILURE to ON.
+
+Verify that the DEV webservers setup Job Template triggers a notification email after job completion.
+
+Open a terminal and connect to the tower VM.
+
+[student@workstation ~]$ ssh tower
+Use the tail command to read incoming messages to the local mailbox file of the student user. You should see the email that was sent by the Test Notification launched from a previous step.
+
+[student@tower ~]$ tail -f /var/mail/student
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Subject: Tower Notification Test 1 https://tower.lab.example.com
+From: system@tower.lab.example.com
+To: student@localhost
+Date: Thu, 08 Nov 2018 13:35:55 -0000
+Message-ID: <20181108133555.1787.75547@tower.lab.example.com>
+
+Ansible Tower Test Notification 1 https://tower.lab.example.com
+Go back to the web UI and click Templates in the navigation bar.
+
+On the same line as the DEV webservers setup Job Template, click the rocket icon on the right to launch the Job.
+
+In the Survey window, enter v1.2 for the deployment version, click NEXT and then click LAUNCH.
+
+Go to your terminal running the tail command and wait. After about one minute, you should see a notification email arrive that looks similar to the following example:
+
+From system@tower.lab.example.com  Thu May 23 09:43:37 2019
+Return-Path: <system@tower.lab.example.com>
+X-Original-To: student@localhost
+Delivered-To: student@localhost
+Received: from tower.lab.example.com (localhost [IPv6:::1])
+	by tower.lab.example.com (Postfix) with ESMTP id 65CAB44ADB2
+	for <student@localhost>; Thu, 23 May 2019 09:43:37 +0000 (UTC)
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Subject: Job #43 'DEV webservers setup' succeeded:
+ https://tower.lab.example.com/#/jobs/playbook/43
+From: system@tower.lab.example.com
+To: student@localhost
+Date: Thu, 23 May 2019 09:43:37 -0000
+Message-ID: <20190523094337.1609.73858@tower.lab.example.com>
+
+Job #43 had status successful, view details at https://tower.lab.example.com/#/jobs/playbook/43
+
+{
+    "id": 43,
+    "name": "DEV webservers setup",
+    "url": "https://tower.lab.example.com/#/jobs/playbook/43",
+    "created_by": "admin",
+    "started": "2019-05-23T09:42:58.781684+00:00",
+    "finished": "2019-05-23T09:43:36.077699+00:00",
+    "status": "successful",
+    "traceback": "",
+    "inventory": "Dev",
+    "project": "My Webservers DEV",
+    "playbook": "apache-setup.yml",
+    "credential": "Developers",
+    "limit": "",
+    "extra_vars": "{\"deployment_version\": \"v1.2\"}",
+    "hosts": {
+        "servera.lab.example.com": {
+            "failed": false,
+            "changed": 1,
+            "dark": 0,
+            "failures": 0,
+            "ok": 6,
+            "processed": 1,
+            "skipped": 0
+        },
+        "serverb.lab.example.com": {
+            "failed": false,
+            "changed": 1,
+            "dark": 0,
+            "failures": 0,
+            "ok": 6,
+            "processed": 1,
+            "skipped": 0
+        }
+    },
+    "friendly_name": "Job"
+}
+CTRL+C
+Exit the terminal session on the tower system.
+
+[student@tower ~]$ exit
+Verify that the web servers have been updated successfully on servera.lab.example.com and serverb.lab.example.com.
+
+Open a web browser and navigate to http://servera.lab.example.com and http://serverb.lab.example.com in separate tabs. You should see this line at the bottom of each page:
+
+Deployment Version: v1.2
+Based on the DEV webservers setup Job Template, schedule a new job at three minutes from the current time.
+
+Click Templates in the navigation bar.
+
+From the list of available Job Templates, click DEV webservers setup to edit that template.
+
+Click SCHEDULES to manage automatic execution of a job based on this Job Template.
+
+Click the + button to add a new schedule.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Automatic job run
+START TIME	Look at the current time on workstation (possibly by using the date command), and set the execution of the job to +3 minutes from the current time.
+Click SAVE to create the new schedule. Click Jobs in the navigation bar and wait for the scheduled jobs to be executed.
+
+This concludes the guided exercise.
+
+

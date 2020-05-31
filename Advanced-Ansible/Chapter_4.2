@@ -1,0 +1,347 @@
+Templating External Data using Lookups
+Objectives
+After completing this section, students should be able to populate variables with data from external sources using lookup plug-ins.
+
+Lookup Plug-ins
+A lookup plug-in is an Ansible extension to the Jinja2 templating language. These plug-ins enable Ansible to use data from external sources, such as files and the shell environment.
+
+Calling Lookup Plug-ins
+You can call lookup plug-ins with one of two Jinja2 template functions, lookup or query. Both methods have a syntax that is very similar to filters. Specify the name of the function, and in parentheses the name of the lookup plug-in you want to call and any arguments that plug-in needs.
+
+For example, the following variable definition uses the file lookup plug-in to put the contents of the file /etc/hosts into the Ansible variable myhosts:
+
+  vars:
+    hosts: "{{ lookup('file', '/etc/hosts') }}"
+You can include more than one file name to the file plug-in. When called with the lookup function, each file's contents will be separated by a comma in the templated value.
+
+  vars:
+    hosts: "{{ lookup('file', '/etc/hosts', '/etc/issue') }}"
+The Jinja2 template expression above results in the following structure (line-wrapped):
+
+hosts: "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1         localhost localhost.localdomain localhost6 localhost6.localdomain6\n\n,\\S\nKernel \\r on an \\m (\\l)"
+In Ansible 2.5 and later, the query function can be used instead of lookup to call lookup plug-ins. The difference between the two is that instead of comma-separated the values returned, query always returns a list, which can be easier to parse and work with.
+
+The preceding example could be called like this:
+
+  vars:
+    hosts: "{{ query('file', '/etc/hosts', '/etc/issue') }}"
+The query call will return this data structure (line-wrapped):
+
+hosts:
+  - "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1         localhost localhost.localdomain localhost6 localhost6.localdomain6\n\n"
+  - "\\S\nKernel \\r on an \\m (\\l)"
+Selecting Lookup Plug-ins
+There are dozens of plug-ins available in the default Ansible installation. Use the command ansible-doc -t lookup -l to obtain the complete list of available lookup plug-ins. For details about the purpose of specific plug-ins and how to use them, run the ansible-doc -t lookup PLUGIN_NAME command.
+
+The following lines introduce some of the most useful plug-ins:
+
+Reading the Contents of Files
+
+The file plug-in allows Ansible to load the contents of a local file into a variable. If you provide a relative path, the plug-in looks for files in your playbook's files directory.
+
+The following example reads the contents of the user's public key file and uses the authorized_key module to add the authorized key to the managed host. The example uses a loop and the + operator to append strings in the template in order to lookup the files/fred.key.pub and files/naoko.key.pub files.
+
+- name: Add authorized keys
+  hosts: all
+  vars:
+    users:
+      - fred
+      - naoko
+  tasks:
+    - name: Add authorized keys
+      authorized_key:
+        user: "{{ item }}"
+        key: "{{ lookup('file', item + '.key.pub') }}"
+      loop: "{{ users }}"
+A useful trick with the file plug-in is that if the file is in YAML or JSON format, you can parse it into properly structured data with the from_yaml or from_json filters.
+
+my_yaml: "{{ lookup('file', '/path/to/my.yaml') | from_yaml }}"
+NOTE
+The file plug-in reads files that are on the control node, not the managed host.
+
+Applying Data with a Template
+
+Like the file plug-in, the template plug-in returns the contents of files. The difference is that the template plug-in expects the file contents to be a Jinja2 template, and evaluates that template before applying the contents. If you pass a relative path to the template file, the plug-in will look for it in your playbook's templates directory.
+
+{{ lookup('template', 'my.template.j2') }}
+The previous example will process the templates/my.template.js template in your playbook's directory. As an example, assume the content of the template is the following:
+
+Hello {{ name }}.
+The following task will display "Hello class.".
+
+- name: Print "Hello class."
+  vars:
+    name: class
+  debug:
+    msg: "{{ lookup('template', 'my.template.j2') }}"
+The template plug-in allows some extra parameters, like defining the start and end marking sequences. In case the output string is a YAML value, the convert_data option parses the string to provide structured data.
+
+IMPORTANT
+Do not confuse the template lookup plug-in with the template module.
+
+Reading an Environment Variable on the Control Node
+
+The env plug-in queries environment variables from the control node. It is useful when the controller host is a containerized application, and configuration maps and secrets are injected into the host by a container management application, such as Kubernetes or Red Hat OpenShift.
+
+{{ lookup('env','MY_PASSWORD') }}
+Reading Command Output on the Control Node
+
+The pipe and lines plug-ins both run a command on the Ansible control node and return the output. While the pipe plug-in returns the raw output generated by the command, the lines plug-in splits the output of that command into lines.
+
+For example, assume that you have the following Jinja2 expression:
+
+{{ query('pipe', 'ls files') }}
+This expression will return the raw output of the ls command as a string. If you use the lines plug-in, then the expression is as follows:
+
+{{ query('lines', 'ls files') }}
+This command results in a list with each line of output returned by ls as a list item.
+
+One interesting application of this functionality is to get the first line (or any specific line) of output from a set of commands:
+
+- name: Prints the first line of some files
+  debug:
+    msg: "{{ item[0] }}"
+  loop:
+    - "{{ query('lines', 'cat files/my.file') }}"
+    - "{{ query('lines', 'cat files/my.file.2') }}"
+Note that this example may not the most efficient way to do this particular task, given the existence of the head command.
+
+Getting Content from a URL
+
+Similar to the way the file plug-in gets the contents of a file, the url plug-in gets content from a URL.
+
+{{ lookup('url', 'https://my.site.com/my.file') }}
+Many options are available for controlling authentication, selecting web proxies, or splitting the content returned into lines.
+
+However, one advantage of using the URL plug-in is that you can use the data returned as values in your variables, possibly processing it first with a filter.
+
+Getting Information from the Kubernetes API
+
+The k8s plug-in provides full access to the Kubernetes API through the openshift Python module. To fetch a Kubernetes object, you must provide the object type using the kind option. Providing additional object details, such as the namespace option or label_selector option, helps to filter the results:
+
+{{ lookup('k8s', kind='Deployment', namespace='ns', resource_name='my_res') }}
+NOTE
+Use openshift as an alias for the k8s plug-in when the Ansible Playbook manages Red Hat OpenShift Container Platform instances.
+
+Be aware that the k8s plug-in is a lookup plug-in. Its primary purpose is to extract information from the Kubernetes cluster, not to update it. Use the k8s module to manage a Kubernetes cluster.
+
+NOTE
+Custom plug-ins can be made available to playbooks by dropping the appropriate Python script in a lookup_plugins directory next to the Ansible Playbook file. Plug-in development is beyond the scope of this course.
+
+Handling Lookup Error
+Most Ansible plug-ins are designed to abort the Ansible Playbook on a failure. However, the lookup function delegates execution to other plug-ins that may not need to abort the Ansible Playbook on failure. For example, the file plug-in may not need to abort the Ansible Playbook if the file is not found, but might need to recover by creating the missing file.
+
+To adapt to different plug-in needs, the lookup plug-in accepts the error parameter.
+
+{{ lookup('file', 'my.file', errors='warn') | default("Default file content") }}
+The default value for the error option is strict. This means that the lookup plug-in raises a fatal error if the underlying script fails. If the error option has the value warn, the lookup plug-in logs a warning when the underlying script fails and returns an empty string (or an empty list). If the error option has the value ignore, the lookup plug-in silently ignores the error and returns an empty string or list.
+
+REFERENCES
+Ansible Documentation for Lookup Plugins.
+
+Guided Exercise: Templating External Data using Lookups
+In this exercise, you will leverage using different lookup plug-ins to obtain and manipulate data from different sources.
+
+Outcomes
+
+You should be able to identify different sources of information in Ansible Playbooks and come up with existing lookup plug-ins that may retrieve and use that information.
+
+Log in as the student user on workstation and run lab data-lookups start. This setup script installs the needed Python requirements and gathers the lab exercise files.
+
+[student@workstation ~]$ lab data-lookups start
+This guided exercise is composed of two parts, using different directories. In the first section, you will create an Ansible Playbook populating all users defined in a plain text file to a managed host.
+
+Navigate to the ~/DO447/labs/data-lookups/users directory, and use your preferred editor to open the site.yml file.
+
+[student@workstation ~]$ cd ~/DO447/labs/data-lookups/users
+[student@workstation users]$ vim site.yml
+Reading the contents of a file can be performed many ways, but here you will use the lines lookup plug-in.
+
+"{{ query('lines','cat users.txt') }}"
+This plug-in reads the output of cat users.txt as individual lines. The query function breaks each line into a list item.
+
+The Ansible task needs to loop through the users in this simple list. You can use loop to do this:
+
+loop: "{{ query('lines','cat users.txt') }}"
+The file should display as follows:
+
+- name: Populate users from a file
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Create remote user
+      debug:
+        msg: "To be done"
+      loop: "{{ query('lines','cat users.txt') }}"
+When creating users, you will also create a random password. The password lookup plug-in generates random passwords and optionally stores the passwords in a local file.
+
+The previous step added a loop on users, so we can use the same item to generate the associated file for each user.
+
+"{{ lookup('password', 'credentials/' + item + ' length=9') }}"
+Store the password into a task variable for ease of usage. The site.yml file should display as follows. Be careful to include the space after the first single quote in ' length=9'.
+
+- name: Populate users from file
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Create remote user
+      vars:
+        password: "{{ lookup('password', 'credentials/' + item + ' length=9') }}"
+      debug:
+        msg: "To be done"
+      loop: "{{ query('lines','cat users.txt') }}"
+In the site.yml playbook, replace the debug module with the user module, configured to populate the users.
+
+Note that the password just created should be hashed before being used. The update_password: on_create option will only set the password if the user does not yet exist. If the user already exists but the password is different, the password will not be changed.
+
+- name: Populate users from file
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Create remote user
+      vars:
+        password: "{{ lookup('password', 'credentials/' + item + ' length=9') }}"
+      user:
+        name: "{{ item }}"
+        password: "{{ password | password_hash('sha512') }}"
+        update_password: on_create
+      loop: "{{ query('lines','cat users.txt') }}"
+Execute the playbook, and verify that it creates the users:
+
+[student@workstation users]$ ansible-playbook site.yml
+
+PLAY [Populate users from file] *********************************************
+
+TASK [Create remote user] ***************************************************
+changed: [serverf.lab.example.com] => (item=jonfoo)
+changed: [serverf.lab.example.com] => (item=janebar)
+changed: [serverf.lab.example.com] => (item=philbaz)
+
+PLAY RECAP ******************************************************************
+serverf : ok=1 changed=1 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+
+[student@workstation users]$ ssh jonfoo@serverf "cat /etc/passwd"
+...output omitted...
+jonfoo:x:1002:1002::/home/jonfoo:/bin/bash
+janebar:x:1003:1003::/home/janebar:/bin/bash
+philbaz:x:1004:1004::/home/philbaz:/bin/bash
+...output omitted...
+Note we are using the jonfoo user to log into the serverf server, demonstrating the user exists and is available.
+
+Execute the clean.yml to remove the users from the remote host and clean up the server:
+
+[student@workstation users]$ ansible-playbook clean.yml
+
+PLAY [Remove users listed in file] ********************************************
+
+TASK [Remove remote users] ****************************************************
+ok: [serverf.lab.example.com] => (item=jonfoo)
+ok: [serverf.lab.example.com] => (item=janebar)
+ok: [serverf.lab.example.com] => (item=philbaz)
+
+PLAY RECAP ********************************************************************
+serverf : ok=1 changed=0 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+
+[student@workstation users]$ ssh serverf "grep jonfoo /etc/passwd"; echo $?
+1
+[student@workstation users]$ 
+The output indicates the pattern was not found in the /etc/passwd file, confirming that the user jonfoo is no longer available. Since the jonfoo user is not available, use the student user to log into serverf to test this.
+
+In the second part of this guided exercise, you will use lookup plug-ins to internationalize the static web application deployed in previous chapters. Each server provides a localized version of the application, based on its own configured locale. In case no locale is configured, the server uses the locale provided by the controller.
+
+The static application contains the version of the project used for deployment, also known as the Infrastructure-as-Code version (IaC version). For the sake of simplicity, use the Git commit id for the project as the IaC version of the Ansible project.
+
+Navigate into the ~/DO447/labs/data-lookups/i18n directory.
+
+[student@workstation ~]$ cd ~/DO447/labs/data-lookups/i18n/
+[student@workstation i18n]$
+There are two files in the ~/DO447/labs/data-lookups/i18n/roles/webapp/templates directory. Those templates confirm the contents of the application in two different languages: en_US.UTF-8 English (the default language) and es_ES.UTF-8 Spanish. Review those files and note the template variables used.
+
+[student@workstation i18n]$ cat roles/webapp/templates/webapp.en_US.UTF-8.j2
+Greetings from {{ inventory_hostname }}.
+
+App Version: {{ webapp_version}}
+IaC Version: {{ iac_version }}
+[student@workstation i18n]$ cat roles/webapp/templates/webapp.es_ES.UTF-8.j2
+Saludos desde {{ inventory_hostname }}.
+
+App Version: {{ webapp_version}}
+IaC Version: {{ iac_version }}
+Use your preferred editor to edit the roles/webapp/defaults/main.yml file. This file defines three variables:
+
+controller_lang
+Holds the locale configured in the controller.
+
+iac_version
+Contains the version of the Ansible project (the commit id, as previously stated).
+
+webapp_version
+Defines the version of the web application being deployed.
+
+To obtain the locale for the controller host, use the env lookup plug-in to retrieve the value of the LANG environment variable. Is also a good practice to provide a default value, in case the environment variable is not available:
+
+controller_lang: "{{ lookup('env','LANG') | default('en_US.UTF-8') }}"
+Obtain the current Ansible project commit id by using the git rev-parse --short HEAD command. Use the pipe lookup to instruct Ansible to execute that command:
+
+iac_version: "{{ lookup('pipe', 'git rev-parse --short HEAD') | quote }}"
+NOTE
+The quote filter is used to sanitize the string from inappropriate characters. In this case, the git command does not return any harmful character, but it is a good security practice to use the quote filter when using input from external sources.
+
+The roles/webapp/defaults/main.yml file should display as follows:
+
+controller_lang: "{{ lookup('env','LANG') | default('en_US.UTF-8') }}"
+iac_version: "{{ lookup('pipe', 'git rev-parse --short HEAD')|quote }}"
+webapp_version: v1.0
+Use your preferred editor to edit the roles/webapp/tasks/main.yml file. Note the missing content attribute for the copy module. It should contain the appropriate contents of the web application for the calculated locale.
+
+Use the template lookup to load and resolve the template related to the calculated locale:
+
+content: "{{ lookup('template','webapp.' + locale + '.j2') }}"
+The previous code looks in the role's templates directory for a template file whose name begins with webapp., followed by the value of the locale, and with the extension .j2. The files that will be used are webapp.en_US.UTF-8.j2 and webapp.es_ES.UTF-8.j2.
+
+The ~/DO447/labs/data-lookups/i18n/roles/webapp/tasks/main.yml file should display as follows:
+
+---
+- name: Ensure stub web content is deployed
+  vars:
+    locale: "{{ ansible_facts.env.LANG | default(controller_lang) }}"
+  copy:
+    content: "{{ lookup('template','webapp.' + locale + '.j2') }}"
+    dest: /var/www/html/index.html
+Set the LANG variable to en_US.UTF-8 (it should already have that value). Verify the Ansible Playbook is correct and executes successfully:
+
+[student@workstation i18n]$ LANG=en_US.UTF-8
+[student@workstation i18n]$ ansible-playbook site.yml
+
+PLAY [Ensure HAProxy is deployed] ********************************************
+...output omitted...
+TASK [webapp : Ensure stub web content is deployed] **************************
+changed: [serverb.lab.example.com]
+changed: [serverc.lab.example.com]
+
+PLAY RECAP *******************************************************************
+servera : ok=10 changed=9 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+serverb : ok=8  changed=6 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+serverc : ok=8  changed=6 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+Validate that each server provides the right contents based on its configured locale. By twice reaching the servera (the load balancer), the round-robin algorithm redirects first query to serverb, and second query to serverc.
+
+[student@workstation i18n]$ curl servera; curl servera;
+Saludos desde serverb.lab.example.com.
+
+App Version: v1.1a
+IaC Version: 57eee8e
+Greetings from serverc.lab.example.com.
+
+App Version: v1.1b
+IaC Version: 57eee8e
+[student@workstation i18n]$ ssh serverb "printenv LANG"
+es_ES.UTF-8
+[student@workstation i18n]$ ssh serverc "printenv LANG"
+[student@workstation i18n]$ printenv LANG
+en_US.UTF-8
+Note how the serverb locale is es_ES.UTF-8 and the server responds with Spanish localized content. The locale is unset on the serverc server, so Ansible uses the locale defined in the controller: en_US.UTF-8.
+
+Execute the clean.yml command to clean up the environment for future sections:
+
+[student@workstation users]$ ansible-playbook clean.yml
+Finish

@@ -1,0 +1,56 @@
+
+Lab: Restoring Ansible Tower from Backup
+In this review, you will restore the Ansible Tower configuration from an existing backup.
+
+Outcomes
+
+You should be able to restore the Ansible Tower configuration from a backup.
+
+In this exercise, you will restore the configuration of your Ansible Tower server using a backup archive.
+
+IMPORTANT
+Your work from earlier exercises in this course will be erased from Tower by this exercise. You will start this exercise with an empty Ansible Tower environment.
+
+Set up your computers for this exercise by logging in to the workstation machine as the student user, and run the following command:
+
+[student@workstation ~]$ lab review-cr3 start
+Instructions
+
+On tower.lab.example.com, use the backup archive available at http://materials.example.com/classroom/ansible/tower-backup-latest.tar.gz to restore the Ansible Tower database from backup.
+
+Restoring the Ansible Tower infrastructure from backup.
+
+Use ssh to log in as root on the tower server.
+
+[student@workstation ~]$ ssh root@tower
+[root@tower ~]# 
+Change directory to /root/ansible-tower-setup-bundle-3.5.0-1.el8.
+
+[root@tower ~]# cd /root/ansible-tower-setup-bundle-3.5.0-1.el8
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# 
+Use the wget command to download the backup archive from http://materials.example.com/classroom/ansible/tower-backup-latest.tar.gz.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# wget \
+> http://materials.example.com/classroom/ansible/tower-backup-latest.tar.gz
+...output omitted...
+Saving to: 'tower-backup-latest.tar.gz'
+
+100%[======================================>] 44,787      --.-K/s   in 0s
+
+2019-06-03 09:21:58 (50.6 MB/s) - ‘tower-backup-latest.tar.gz’ saved [54068/54068]
+Using the setup.sh command with the -r option, restore Ansible Tower from backup.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# ./setup.sh -r
+...output omitted...
+PLAY RECAP ******************************************************************************
+localhost                  : ok=43   changed=24   unreachable=0    failed=0    skipped=14
+
+The setup process completed successfully.
+Setup log saved to /var/log/tower/setup-2019-06-03-04:26:17.log
+Evaluation
+
+Log into Tower as the admin user with a password of redhat, and verify that the configuration is restored. One indicator of success is that there should only be one Job Template, Demo Job Template, present after the restoration.
+
+This concludes the lab.
+
+

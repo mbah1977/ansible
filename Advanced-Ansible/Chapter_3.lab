@@ -1,0 +1,384 @@
+Lab: Managing Task Execution
+Performance Checklist
+
+In this lab, you will reorganize privilege escalation, add tags and handlers to tasks, and profile playbooks to optimize them.
+
+Outcomes
+
+You should be able to:
+
+Change privilege escalation to a more secure configuration.
+
+Add task hooks and handlers to alter the task behavior.
+
+Tag tasks to control their execution.
+
+Log in as the student user on workstation and run lab task-review start. This script initializes the remote Git repository that you need for this lab.
+
+[student@workstation ~]$ lab task-review start
+Clone the Git repository http://git.lab.example.com:8081/git/task-review.git in the /home/student/git-repos directory. Change to the cloned project directory.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+Change to this directory:
+
+[student@workstation ~]$ cd git-repos/
+Clone the repository, and change to the cloned project directory:
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/task-review.git
+Cloning into 'task-review'...
+remote: Enumerating objects: 62, done.
+remote: Counting objects: 100% (62/62), done.
+remote: Compressing objects: 100% (47/47), done.
+remote: Total 62 (delta 7), reused 0 (delta 0)
+Unpacking objects: 100% (62/62), done.
+[student@workstation git-repos]$ cd task-review
+Modify the ansible.cfg file so that privileges do not escalate by default for each task. For the firewall, haproxy, apache, and webapp roles, add privilege escalation to any tasks or handlers that require it. If all tasks in a role require privilege escalation, put the tasks inside a block and define privilege escalation for just the block. Do not put handler tasks inside of a block.
+
+Edit the ansible.cfg file.
+
+[student@workstation task-review]$ vi ansible.cfg
+Remove the become=true entry from the privilege_escalation block. The file should display as follows:
+
+[defaults]
+inventory=inventory.yml
+remote_user=devops
+
+[privilege_escalation]
+become_method=sudo
+become_user=root
+become_ask_pass=false
+Edit the roles/firewall/tasks/main.yml file:
+
+[student@workstation task-review]$ vi roles/firewall/tasks/main.yml
+Add the become: true directive to the firewalld task:
+
+---
+# tasks file for firewall
+
+- name: Ensure Firewall Sources Configuration
+  firewalld:
+    source: "{{ item.source if item.source is defined else omit }}"
+    zone: "{{ item.zone if item.zone is defined else omit }}"
+    permanent: true
+    state: "{{ item.state | default('enabled') }}"
+    service: "{{ item.service if item.service is defined else omit }}"
+    immediate: true
+    port: "{{ item.port if item.port is defined else omit }}"
+  loop: "{{ firewall_rules }}"
+  notify: reload firewalld
+  become: true
+Edit the roles/firewall/handlers/main.yml file:
+
+[student@workstation task-review]$ vi roles/firewall/handlers/main.yml
+Add the become directive to the task. The file should display as follows:
+
+---
+# handlers file for firewall
+
+- name: reload firewalld
+  service:
+    name: firewalld
+    state: reloaded
+  become: true
+Edit the roles/haproxy/tasks/main.yml file:
+
+[student@workstation task-review]$ vi roles/haproxy/tasks/main.yml
+Nest the tasks within the block directive and add the become: true directive to the tasks block. Remember to indent the tasks now inside the block. The file should display as follows:
+
+---
+# tasks file for haproxy
+
+- block:
+  - name: Ensure haproxy packages are present
+    yum:
+      name:
+        - haproxy
+        - socat
+      state: present
+
+  - name: Ensure haproxy is started and enabled
+    service:
+      name: haproxy
+      state: started
+      enabled: true
+
+  - name: Ensure haproxy configuration is set
+    template:
+      src: haproxy.cfg.j2
+      dest: /etc/haproxy/haproxy.cfg
+    notify: reload haproxy
+  become: true
+Edit the roles/haproxy/handlers/main.yml file:
+
+[student@workstation task-review]$ vi roles/haproxy/handlers/main.yml
+Add the become: true directive to each task. The file should display as follows:
+
+---
+# handlers file for haproxy
+
+- name: restart haproxy
+  service:
+    name: haproxy
+    state: restarted
+  become: true
+
+- name: reload haproxy
+  service:
+    name: haproxy
+    state: reloaded
+  become: true
+Edit the roles/apache/tasks/main.yml file:
+
+[student@workstation task-review]$ vi roles/apache/tasks/main.yml
+Surround the tasks in a block and add the become: true directive to the block. Remember to indent the tasks now inside the block. The file should display as follows:
+
+---
+# tasks file for apache
+
+- block:
+  - name: Ensure httpd packages are installed
+    yum:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - httpd
+      - php
+      - git
+      - php-mysqlnd
+
+  - name: Ensure SELinux allows httpd connections to a remote database
+    seboolean:
+      name: httpd_can_network_connect_db
+      state: true
+      persistent: true
+
+  - name: Ensure httpd service is started and enabled
+    service:
+      name: httpd
+      state: started
+      enabled: true
+
+  become: true
+Edit the roles/webapp/tasks/main.yml file:
+
+[student@workstation task-review]$ vi roles/webapp/tasks/main.yml
+Add the become: true directive to the copy task. The file should display as follows:
+
+---
+# tasks file for webapp
+
+- name: Ensure stub web content is deployed
+  copy:
+    content: "{{ webapp_message }}. (version {{ webapp_version}})\n"
+    dest: /var/www/html/index.html
+  become: true
+Add a copy task to the deploy_haproxy.yml playbook that executes before any other task and writes the text Playbook site.yml ready to start to the /tmp/site.ready file on the servers in the lb_servers group.
+
+Edit the file deploy_haproxy.yml and add a pre_tasks block that writes the file with the message at the beginning of the playbook.
+
+[student@workstation task-review]$ vi deploy_haproxy.yml
+The file should display as follows:
+
+- name: Ensure HAProxy is deployed
+  hosts: lb_servers
+  force_handlers: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Setting the maintenance message
+      copy:
+        dest: /tmp/site.ready
+        content: "Playbook site.yml ready to start"
+
+  roles:
+    # The "haproxy" role has a dependency on the "firewall" role.
+    # The "firewall" role requires a "firewall_rules" variable be defined.
+    - role: haproxy
+Add a handler to the haproxy role that writes the message Reloaded to the /tmp/haproxy.status file. Notify the handler from the task that uses the template module in the haproxy role. Use haproxy filehandler as the name of the handler.
+
+Edit the roles/haproxy/handlers/main.yml file and add the handler that copies the text to the file.
+
+[student@workstation task-review]$ vi roles/haproxy/handlers/main.yml
+The file should display as follows:
+
+---
+# handlers file for haproxy
+
+- name: restart haproxy
+  service:
+    name: haproxy
+    state: restarted
+  become: true
+
+- name: reload haproxy
+  service:
+    name: haproxy
+    state: reloaded
+  become: true
+
+- name: haproxy filehandler
+  copy:
+    dest: /tmp/haproxy.status
+    content: "Reloaded"
+Edit the file roles/haproxy/tasks/main.yml:
+
+[student@workstation task-review]$ vi roles/haproxy/tasks/main.yml
+Call the haproxy filehandler handler in the Ensure haproxy configuration is set task. The file should look like:
+
+---
+# tasks file for haproxy
+
+- block:
+  - name: Ensure haproxy packages are present
+    yum:
+      name:
+        - haproxy
+        - socat
+      state: present
+
+  - name: Ensure haproxy is started and enabled
+    service:
+      name: haproxy
+      state: started
+      enabled: true
+
+  - name: Ensure haproxy configuration is set
+    template:
+      src: haproxy.cfg.j2
+      dest: /etc/haproxy/haproxy.cfg
+    notify:
+      - reload haproxy
+      - haproxy filehandler
+  become: true
+Add the apache_installer tag to the yum task in the apache role.
+
+Edit the roles/apache/tasks/main.yml file and add the tag apache_installer to the yum task.
+
+[student@workstation task-review]$ vi roles/apache/tasks/main.yml
+The output should display as follows:
+
+---
+# tasks file for apache
+
+- block:
+  - name: Ensure httpd packages are installed
+    yum:
+      name: "{{ item }}"
+      state: present
+    loops:
+      - httpd
+      - php
+      - git
+      - php-mysqlnd
+    tags:
+      - apache_installer
+
+  - name: Ensure SELinux allows httpd connections to a remote database
+    seboolean:
+      name: httpd_can_network_connect_db
+      state: true
+      persistent: true
+
+  - name: Ensure httpd service is started and enabled
+    service:
+      name: httpd
+      state: started
+      enabled: true
+  become: true
+Enable the timer and profile_tasks callback plug-ins for the playbook.
+
+Edit the configuration file ansible.cfg and add the plug ins to the callback_whitelist directive.
+
+[student@workstation task-review]$ vi ansible.cfg
+The file should display as follows:
+
+[defaults]
+inventory=inventory
+remote_user=devops
+callback_whitelist=timer,profile_tasks
+
+[privilege_escalation]
+become_method=sudo
+become_user=root
+become_ask_pass=false
+Run the site.yml playbook and analyze the output to find the most time expensive task.
+
+Run the main playbook site.yml.
+
+[student@workstation task-review]$ ansible-playbook site.yml
+...output omitted...
+PLAY RECAP ********************************************************************
+servera.lab.example.com    : ok=7    changed=6    unreachable=0    failed=0 ...
+serverb.lab.example.com    : ok=6    changed=5    unreachable=0    failed=0 ...
+serverc.lab.example.com    : ok=6    changed=4    unreachable=0    failed=0 ...
+
+Wednesday 22 May 2019  18:47:32 +0000 (0:00:01.664)       0:00:52.487 *********
+===============================================================================
+apache : Ensure httpd packages are installed --------------------------- 14.24s
+firewall : reload firewalld -------------------------------------------- 11.54s
+haproxy : Ensure haproxy packages are present --------------------------- 4.87s
+firewall : reload firewalld --------------------------------------------- 4.75s
+haproxy : reload haproxy ------------------------------------------------ 4.61s
+haproxy : haproxy filehandler ------------------------------------------- 4.09s
+firewall : Ensure Firewall Sources Configuration ------------------------ 3.09s
+haproxy : Ensure haproxy configuration is set --------------------------- 2.80s
+haproxy : Ensure haproxy is started and enabled ------------------------- 2.45s
+apache : Ensure SELinux allows httpd connections to a remote database --- 2.32s
+Setting the maintenance message ----------------------------------------- 2.22s
+apache : Ensure httpd service is started and enabled -------------------- 2.11s
+firewall : Ensure Firewall Sources Configuration ------------------------ 1.27s
+webapp : Ensure stub web content is deployed ---------------------------- 1.23s
+Playbook run took 0 days, 0 hours, 1 minutes, 1 seconds
+The apache task, Ensure httpd packages are installed, takes most of the playbook execution time.
+
+Refactor the most expensive task in the apache role to make it more efficient. To verify the changes, run the site.yml playbook with an appropriate tag so that you only execute the modified task.
+
+Edit the file roles/apache/tasks/main.yml:
+
+[student@workstation task-review]$ vi roles/apache/tasks/main.yml
+Remove the loop from the yum task. The file should display as follows:
+
+---
+# tasks file for apache
+
+- block:
+  - name: Ensure httpd packages are installed
+    yum:
+      name:
+        - httpd
+        - php
+        - git
+        - php-mysqlnd
+      state: present
+    tags:
+      - apache_installer
+
+  - name: Ensure SELinux allows httpd connections to a remote database
+    seboolean:
+      name: httpd_can_network_connect_db
+      state: true
+      persistent: true
+
+  - name: Ensure httpd service is started and enabled
+    service:
+      name: httpd
+      state: started
+      enabled: true
+  become: true
+Execute the site.yml playbook using the tag apache_installer.
+
+[student@workstation task-review]$ ansible-playbook site.yml \
+> --tags apache_installer
+...output omitted...
+PLAY RECAP ********************************************************************
+serverb.lab.example.com    : ok=1    changed=1    unreachable=0    failed=0 ...
+serverc.lab.example.com    : ok=1    changed=1    unreachable=0    failed=0 ...
+
+Wednesday 22 May 2019  19:40:12 +0000 (0:00:07.640)        0:00:07.741 ********
+===============================================================================
+apache : Ensure httpd packages are installed ---------------------------- 7.64s
+Playbook run took 0 days, 0 hours, 0 minutes, 7 seconds
+

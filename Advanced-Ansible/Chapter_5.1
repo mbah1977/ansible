@@ -1,0 +1,219 @@
+hapter 5. Coordinating Rolling Updates
+Delegating Tasks and Facts
+Guided Exercise: Delegating Tasks and Facts
+Managing Rolling Updates
+Guided Exercise: Managing Rolling Updates
+Lab: Coordinating Rolling Updates
+Summary
+Abstract
+
+Goal	Use advanced features of Ansible to manage rolling updates in order to minimize downtime, and to ensure maintainability and simplicity of Ansible Playbooks.
+Objectives	
+Run a task for a managed host on a different host, and control whether facts gathered by that task are delegated to the managed host or to the other host.
+
+Tune behavior of the serial directive when batching hosts for execution, abort the play if too many hosts fail, and create tasks that run only once for each batch or for all hosts in the inventory.
+
+Sections	
+Delegating Tasks and Facts (and Guided Exercise)
+
+Managing Rolling Updates (and Guided Exercise)
+
+Lab	
+Coordinating Rolling Updates
+
+Delegating Tasks and Facts
+Objectives
+After completing this section, you should be able to run a task for a managed host on a different host, and control whether facts gathered by that task are delegated to that host or the other host.
+
+Delegating Tasks
+Sometimes, when Ansible is running a play to ensure the correct configuration of a system, it might need to perform one or more tasks on a different system on the managed host's behalf. For example, you might need to log into a network device to change a DHCP configuration, or make sure certain groups exist in an Active Directory domain, or communicate with the API of a service using tools that are not available on the managed host.
+
+In a play, you can delegate a task to run on a different host instead of the current managed host.
+
+A task delegates the action to a host using the delegate_to directive. This directive points Ansible to the host that will execute the task in place of the corresponding target.
+
+One of the most common places you might delegate a task is on localhost, the Ansible control node. For example, you might do this if you need to talk to an API for a service that can not be reached from the managed host for some reason, but can from the control node.
+
+The following simple example runs the uname -a command on each host in the play, and then runs the uname -a command on localhost on behalf of each host in the play.
+
+---
+- hosts: servera.lab.example.com
+
+  tasks:
+  - name: Get system information
+    command: uname -a
+    register: server
+
+  - name: Display servera system information
+    debug:
+      msg: {{ server }}
+
+  - name: Get system information
+    command: uname -a
+    delegate_to: localhost
+    register: local
+
+  - name: Display localhost system information
+    debug:
+      msg: {{ local }}
+In the following practical example, the first task is delegated to each of the HAProxy load balancers in the Ansible group lbservers in turn, removing the managed host from all the load balancers. Then, the second task, which is not delegated, stops the web server on the managed host. This task runs for each host in the play.
+
+  - name: Remove the server from HAProxy
+    haproxy:
+      state: disabled
+      host: "{{ ansible_facts['fqdn'] }}"
+      socket: /var/lib/haproxy/stats
+    delegate_to: "{{ item }}"
+    loop: "{{ groups['lbservers'] }}"
+
+  - name: Make sure Apache HTTPD is stopped
+    service:
+      name: httpd
+      state: stopped
+Delegating Facts
+In the preceding example, the fact ansible_facts['fqdn'] was used. The FQDN for the managed host is used, not localhost.
+
+When you delegate a task, use the host variables and facts for the managed host (the current inventory_hostname) for which the task is running. So, if the task is running for servera, but has been delegated to localhost, then use the variables and facts for servera. This is usually exactly what you want.
+
+However, sometimes you might want to assign the facts collected by a delegated task to the host to which the task was delegated. To change this setting, set the delegate_facts directive to true.
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Set a fact in delegated task on servera
+      set_fact:
+        myfact: Where am I set?
+      delegate_to: servera.lab.example.com
+      delegate_facts: True
+
+    - name: Display the facts from servera.lab.example.com
+      debug:
+        msg: "{{ hostvars['servera.lab.example.com']['myfact'] }}"
+The preceding play runs for localhost, but the first task is delegated to servera.lab.example.com. Using the delegate_facts directive on that task instructs Ansible to gather facts into the hostvars['servera.lab.example.com'] namespace for the delegated host, instead of the default hostvars['localhost'] namespace for the current managed host.
+
+REFERENCES
+Delegation, Rolling Updates, and Local Actions — Ansible Documentation
+
+
+
+Guided Exercise: Delegating Tasks and Facts
+In this exercise you will run a playbook that includes a task that is delegated to another host.
+
+Outcomes
+
+You should be able to delegate a task to run on another host.
+
+Open a terminal on the workstation machine as the student user, and then run the following command:
+
+[student@workstation ~]$ lab update-delegation start
+Clone the Git repository http://git.lab.example.com:8081/git/update-delegation.git in the /home/student/git-repos directory, and change to the cloned project directory.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+Change to this directory:
+
+[student@workstation ~]$ cd git-repos/
+Clone the repository:
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/update-delegation.git
+Cloning into 'update-delegation'...
+remote: Enumerating objects: 11, done.
+remote: Counting objects: 100% (11/11), done.
+remote: Compressing objects: 100% (11/11), done.
+remote: Total 11 (delta 2), reused 0 (delta 0)
+Unpacking objects: 100% (11/11), done.
+[student@workstation update-delegation]$ cd update-delegation
+Review the contents of the inventory.yml inventory file. Verify that web_servers host group contains servers A to F.
+
+[student@workstation update-delegation]$ cat inventory.yml
+web_servers:
+  hosts:
+    server[a:f].lab.example.com:
+Add tasks to the query_times.yml playbook to:
+
+Query the time on each server in the web_servers host group.
+
+Store the result in the /tmp/times.txt file on the workstation machine.
+
+Open the query_times.yml file in an editor of your choice:
+
+[student@workstation update-delegation]$ vi query_times.yml
+Add a task to execute the date command on each server, which retrieves the current time. Register the result in a variable named date. Because the task does not change the state of the server, you must include changed_when: false in the task.
+
+The task should display as follows:
+
+- name: Take time on server
+  shell: 'date'
+  register: date
+  changed_when: false
+Add a task that adds a line of text for each server to the /tmp/times.txt file on workstation. Each line contains the name of a web server and the registered time for that server. Delegate this task to localhost. Ensure that each line of text appends to the /tmp/times.txt file.
+
+The task displays as follows:
+
+- name: Save times to localhost
+  vars:
+    record: "{{ inventory_hostname }} time: {{ date.stdout_lines[0] }}"
+  shell: "echo '{{ record }}' >> /tmp/times.txt"
+  delegate_to: localhost
+NOTE
+A vars section is not necessary for this task. A variable keeps each line of the task under 80 characters in length, making it easier to read.
+
+The content of the query_times.yml file follows:
+
+---
+- name: Query server times and store them locally
+  hosts: web_servers
+  gather_facts: false
+
+  tasks:
+    - name: Take time on server
+      shell: 'date'
+      register: date
+      changed_when: false
+
+    - name: Save times to localhost
+      vars:
+        record: "{{ inventory_hostname }} time: {{ date.stdout_lines[0] }}"
+      shell: "echo '{{ record }}' >> /tmp/times.txt"
+      delegate_to: localhost
+Run the playbook using the ansible-playbook command to test the delegation of tasks:
+
+[student@workstation update-delegation]$ ansible-playbook query_times.yml
+
+PLAY [Query server times and store them locally] **************************...
+
+TASK [Take time on server] ************************************************...
+ok: [servera.lab.example.com]
+...output omitted...
+ok: [serverf.lab.example.com]
+
+TASK [Save times to localhost] ********************************************...
+changed: [servera.lab.example.com]
+...output omitted...
+changed: [serverf.lab.example.com]
+
+PLAY RECAP ****************************************************************...
+servera.lab.example.com   : ok=2    changed=1    unreachable=0    failed=0 ...
+serverb.lab.example.com   : ok=2    changed=1    unreachable=0    failed=0 ...
+serverc.lab.example.com   : ok=2    changed=1    unreachable=0    failed=0 ...
+serverd.lab.example.com   : ok=2    changed=1    unreachable=0    failed=0 ...
+servere.lab.example.com   : ok=2    changed=1    unreachable=0    failed=0 ...
+serverf.lab.example.com   : ok=2    changed=1    unreachable=0    failed=0 ...
+Verify that the playbook has gathered the times correctly, and that Ansible stored the information in the workstation machine:
+
+[student@workstation update-delegation]$ cat /tmp/times.txt
+servera.lab.example.com time: jue jun  6 16:52:55 EDT 2019
+serverb.lab.example.com time: jue jun  6 16:52:55 EDT 2019
+servere.lab.example.com time: jue jun  6 16:52:55 EDT 2019
+serverc.lab.example.com time: jue jun  6 16:52:55 EDT 2019
+serverd.lab.example.com time: jue jun  6 16:52:55 EDT 2019
+serverf.lab.example.com time: jue jun  6 16:52:57 EDT 2019
+The order of hosts in your file may differ.
+
+Finish
+
+On workstation, run the lab update-delegation finish script to complete this lab.
+
+[student@workstation update-delegation]$ lab update-delegation finish 

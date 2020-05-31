@@ -1,0 +1,265 @@
+
+Lab: Privilege Escalation, Lookups, and Rolling Updates
+In this review, you will modify roles to use privilege escalation on only those tasks that need it, configure a play to log execution using a lookup, and configure the play to update one host and abort the rest of the play if that host fails.
+
+Outcomes
+
+You should be able to:
+
+Identify and apply existing lookup plug-ins and filters to solve problems.
+
+Limit privilege escalation to only the tasks that need it.
+
+Process a play in batches and abort the play if there are too many failures.
+
+Set up your computers for this exercise by logging in to the workstation machine as the student user, and run the following command:
+
+[student@workstation ~]$ lab review-cr2 start
+Instructions
+
+The review-cr2 Git repository that you use in this activity contains a site.yml playbook that configures a front-end load balancer and a pool of back-end web servers.
+
+Clone the git repository at http://git.lab.example.com:8081/git/review-cr2.git in the /home/student/git-repos folder. Before you grade your work, be sure to commit and push all changes back to the remote repository.
+
+Refactor the second task of the webapp role to generate an HTML file for each location in the ~/git-repos/review-cr2/locations.yml file. Use the webapp role's location.html.j2 template to generate each HTML location file. Write all HTML files to the /var/www/html directory. The name of the location file must match the name of the location, with a .html extension.
+
+Apply fine-grained privilege escalation for tasks as a good practice to avoid potential authorization issues. Remove privilege escalation from the Ansible configuration to prevent all tasks from executing as a privileged user by default. Then, enable privilege escalation for tasks and handlers that need it:
+
+The block of tasks for the apache role.
+
+The only handler and the only task in the firewall role.
+
+Both handlers and task blocks in the haproxy role.
+
+The block of tasks in the webapp role. Make sure this block contains all tasks in the file.
+
+Introduce logging tasks to register the beginning and the end of the web application deployment.
+
+Before deploying or updating the web application, add a line to the end of the /tmp/times.txt file on the Ansible controller (workstation). The line must contain the date and time for the deployment, obtained from the date command. Use the lineinfile module to create and update the log file, and the pipe lookup plug-in to retrieve the current date and time. The line must contain the literal string Deploying version, and the version of the web app. The line must contain the host name of the server where the deployment occurs, as defined in the inventory file.
+
+After deploying or updating the web application, add a line to the end of the /tmp/times.txt file on the workstation machine. The line must include the same contents as described in the previous instruction, but the literal string must be Deployment complete.
+
+The following lines are an example of the content to be logged:
+
+Thu Jun 13 22:10:24 UTC 2019 Deploying version v1.0 to serverc.lab.example.com
+Thu Jun 13 22:10:44 UTC 2019 Deployment complete v1.0 to serverc.lab.example.com
+Change the deploy_webapp.yml playbook to enable batch updates to managed hosts. The first batch must only update a single host. If the update succeeds, the second batch must update the rest of the hosts.
+
+If a single host fails to update, the playbook must stop executing immediately.
+
+Clone the Git repository in http://git.lab.example.com:8081/git/review-cr2.git to the /home/student/git-repos directory.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+Change to this directory:
+
+[student@workstation ~]$ cd git-repos/
+Clone the review-cr2 repository and change to this directory.
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/review-cr2.git
+Cloning into 'review-cr2'...
+remote: Enumerating objects: 62, done.
+remote: Counting objects: 100% (62/62), done.
+remote: Compressing objects: 100% (47/47), done.
+remote: Total 62 (delta 7), reused 0 (delta 0)
+Unpacking objects: 100% (62/62), done.
+[student@workstation git-repos]$ cd review-cr2
+Update the ~/git-repos/review-cr2/roles/webapp/tasks/main.yml to generate web pages based on the locations file. Modify the second task to parse the contents of the ~/git-repos/review-cr2/locations.yml file. This file contains a list of locations in YAML format. In the second task, iterate that list and apply each element contents to the ~/git-repos/review-cr2/roles/webapp/templates/location.html.j2 template.
+
+Use your preferred editor to open the ~/git-repos/review-cr2/roles/webapp/tasks/main.yml file.
+
+Add a loop keyword that iterates through all locations. You can use file lookup to retrieve the contents of the locations.yml file. Use the from_yaml filter to parse the retrieved contents into an iterable form.
+
+Observe that the second task create a single /var/www/html/location.html based on the location.html.j2 template, instead of multiple files. Use the {{ item.name }} variable to create multiple files, based on the name of the location.
+
+The resulting task should display as follows:
+
+  - name: Ensure location files are created
+    template:
+      src: location.html.j2
+      dest: "/var/www/html/{{ item.name }}.html"
+    loop: "{{ lookup('file','locations.yml') | from_yaml }}"
+Apply fine-grained control privilege escalation in tasks as a good practice to avoid potential authorization issues.
+
+To remove privilege escalation from the Ansible configuration, edit the ~/git-repos/review-cr2/ansible.cfg file, and remove become=true from the [privilege_escalation] section.
+
+Add the become: true keyword to the appropriate task and handler files. Be careful to indent the keyword correctly, so it applies to an entire block and not to an individual task.
+
+Update the apache role to use fine-grained privilege escalation control.
+
+Add escalation to the block keyword of the ~/git-repos/review-cr2/roles/apache/tasks/main.yml file:
+
+---
+# tasks file for apache
+- block:
+  - name: Ensure httpd packages are installed
+...output omitted...
+  - name: Ensure SELinux allows httpd connections to a remote database
+...output omitted...
+  - name: Ensure httpd service is started and enabled
+...output omitted...
+  become: true
+Update the firewall role to use fine-grained privilege escalation control.
+
+Add the escalation to the only task in the tasks file ~/git-repos/review-cr2/roles/firewall/tasks/main.yml.
+
+---
+# tasks file for firewall
+
+- name: Ensure Firewall Sources Configuration
+...output omitted...
+  become: true
+Add the escalation to the only handler the handlers file ~/git-repos/review-cr2/roles/firewall/handlers/main.yml.
+
+---
+# handlers file for firewall
+
+- name: reload firewalld
+...output omitted...
+  become: true
+Update the haproxy role to use fine-grained privilege escalation control.
+
+Add the escalation to each of the handlers in the ~/git-repos/review-cr2/roles/haproxy/handlers/main.yml file:
+
+---
+# handlers file for haproxy
+- name: restart haproxy
+  ...output omitted...
+  become: true
+
+- name: reload haproxy
+  ...output omitted...
+  become: true
+Add the escalation to the block keyword if the tasks file ~/git-repos/review-cr2/roles/haproxy/tasks/main.yml:
+
+---
+# tasks file for haproxy
+- block:
+  - name: Ensure haproxy packages are present
+    ...output omitted...
+  - name: Ensure haproxy is started and enabled
+    ...output omitted...
+  - name: Ensure haproxy configuration is set
+    ...output omitted...
+  become: true
+Update the webapp role to use fine-grained privilege escalation control.
+
+Add the escalation to the block keyword of the tasks file ~/git-repos/review-cr2/roles/webapp/tasks/main.yml:
+
+---
+# tasks file for webapp
+- block:
+  - name: Ensure stub web content is deployed
+    ...output omitted...
+  - name: Ensure location files are created
+    ...output omitted...
+  become: true
+Introduce logging tasks to register the start and end of the deployment on your control node.
+
+Use a text editor to edit the file ~/git-repos/review-cr2/deploy_webapp.yml. Add a pre_tasks keyword with a single task. That task executes the lineinfile module to append the expected record to the /tmp/times.txt file.
+
+Note that the file, and hence the task, must apply to the controller. Add the delegate_to: localhost keyword to ensure local application.
+
+ pre_tasks:
+    - name: Ensure logging the deployment start
+      lineinfile:
+        path: /tmp/times.txt
+        create: yes
+        line: "{{ lookup('pipe', 'date') }}: Deploying version {{ webapp_version }} to {{ inventory_hostname }}"
+      delegate_to: localhost
+The exact format of the record may vary. However, each line must contain the text Deploying version and the inventory host name.
+
+In the same file, add a post_tasks keyword with a single task that writes the deployment completion record. Like the previous pre_tasks task, the post_tasks task must also run on the controller.
+
+  post_tasks:
+    - name: Ensure logging the deployment completion
+      lineinfile:
+        path: /tmp/times.txt
+        create: yes
+        line: "{{ lookup('pipe', 'date') }}: Deployment complete {{ webapp_version }} to {{ inventory_hostname }}"
+      delegate_to: localhost
+Make sure the record contains the Deployment complete string and the inventory host name.
+
+Change the deploy_webapp.yml playbook to enable batch updates to managed hosts. The first batch must only update a single host. If the update succeeds, the second batch must update the rest of the hosts.
+
+Edit the ~/git-repos/review-cr2/deploy_webapp.yml file to introduce a serial keyword. The first batch must only apply to one host, while the second batch applies changes to all the remaining hosts:
+
+- name: Ensure Web App is deployed
+  hosts: web_servers
+  gather_facts: false
+  serial:
+    - 1
+    - 100%
+...output omitted...
+If a single host in any batch fails to update, the playbook must halt immediately. Use the max_fail_percentage keyword to indicate Ansible that behavior.
+
+- name: Ensure Web App is deployed
+  hosts: web_servers
+  gather_facts: false
+  serial:
+    - 1
+    - 100%
+  max_fail_percentage: 0
+Verify the playbook runs correctly:
+
+Execute the playbook and validate it succeeds:
+
+[student@workstation review-cr2]$ ansible-playbook site.yml
+...output omitted...
+
+PLAY RECAP *********************************************************************
+servera...: ok=6 changed=6 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+serverb...: ok=9 changed=6 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+serverc...: ok=9 changed=6 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+serverd...: ok=9 changed=6 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+Verify the location contents are available in the web application:
+
+[student@workstation review-cr2]$ curl \
+> -s http://servera.lab.example.com/Sydney.html
+Hello from Sydney.
+
+The office address is:
+  Level 35
+100 Miller Street
+North Sydney NSW 2060
+Australia
+Check the log file for the expected records:
+
+[student@workstation review-cr2]$ tail -6 /tmp/times.txt
+Fri Jun 14 13:12:13 UTC 2019: Deploying version v1.0 to serverb.lab.example.com
+Fri Jun 14 13:12:31 UTC 2019: Deployment complete v1.0 to serverb.lab.example.com
+Fri Jun 14 13:12:31 UTC 2019: Deploying version v1.0 to serverc.lab.example.com
+Fri Jun 14 13:12:31 UTC 2019: Deploying version v1.0 to serverd.lab.example.com
+Fri Jun 14 13:12:49 UTC 2019: Deployment complete v1.0 to serverc.lab.example.com
+Fri Jun 14 13:12:49 UTC 2019: Deployment complete v1.0 to serverd.lab.example.com
+Note serverb deployment starts and completes in the first batch. The rest of the servers may start and complete in any order.
+
+Commit and push your changes to the Git repository:
+
+[student@workstation review-cr2]$ git add .
+[student@workstation review-cr2]$ git commit -m "Lab contents"
+[master 7a3d4db] Lab contents
+ 8 files changed, 23 insertions(+), 11 deletions(-)
+[student@workstation review-cr2]$ git push
+...output omitted...
+To http://git.lab.example.com:8081/git/review-cr2.git
+   4633518..7a3d4db  master -> master
+Evaluation
+
+Prior to grading your work, be sure to commit and push all changes to the remote repository. The grading script executes checks against the content of the remote repository, not the files on the workstation machine.
+
+Grade your work by running the lab review-cr2 grade command from your workstation machine.
+
+[student@workstation ~]$ lab review-cr2 grade
+Correct any reported failures in your local Git repository, and then commit and push the changes. Rerun the script after pushing the changes to the remote repository. Repeat this process until you receive a passing score for all criteria.
+
+Finish
+
+From the workstation machine, run the lab review-cr2 finish command to complete this lab.
+
+[student@workstation ~]$ lab review-cr2 finish
+This concludes the lab.
+
+

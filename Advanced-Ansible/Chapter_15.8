@@ -1,0 +1,81 @@
+
+Lab: Testing the Prepared Environment
+In this review, you will test your work in this Comprehensive Review chapter.
+
+Outcomes
+
+You should be able to:
+
+Launch the Full Stack Deployment workflow Job Template.
+
+Verify that the workflow sent an email notification.
+
+Verify that the end results of your work are correct.
+
+All previous exercise in this comprehensive review should be completed before evaluating your work with this section.
+
+Instructions
+
+Manually test your work on this comprehensive review as follows:
+
+As user robert in the Ansible Tower interface, launch the Full Stack Deployment Workflow Job Template
+
+As the Linux user student on tower.lab.example.com, verify that the Full Stack Deployment Workflow Job Template sent you an email when it completed.
+
+Verify that the web servers have been installed and configured on servera.lab.example.com, serverd.lab.example.com, servere.lab.example.com, and serverf.lab.example.com
+
+Verify that the load balancer has been installed and configured on serverb.lab.example.com.
+
+If it is working correctly, it should direct sequential HTTP requests sent to http://serverb.lab.example.com to different web servers. Every refresh of this page redirects the connection to a different web server.
+
+If the configuration is correct, it should redirect connections to the following web servers: servera, serverd, servere and serverf.
+
+To Launch the Full Stack Deployment Workflow as user robert:
+
+Log in to the Ansible Tower web interface as user robert with redhat123 as the password.
+
+Click Templates in the left navigation bar.
+
+On the same line as the Workflow Job Template, Full Stack Deployment, click the rocket icon on the right to launch the Workflow. This action opens the Survey that you just created and asks for your input.
+
+Click NEXT, and then LAUNCH to launch the Workflow. This action redirects you to a detailed status page of the running Workflow.
+
+Observe the running Jobs of the Workflow. Click on the DETAILS link of a running or completed Job to see a more detailed live output of the Job.
+
+To verify that the Workflow Full Stack Deployment triggered an email notification after completion:
+
+Open a terminal and connect to the Tower VM.
+
+[student@workstation ~]$ ssh tower
+Last login: Thu Apr 20 11:33:22 2018 from workstation.lab.example.com
+[student@tower ~]$ 
+View incoming messages to the local mailbox file of the student user by using the tail command. You should see this type of successful Workflow Job completion notification email arrive:
+
+[student@tower ~]$ tail -f /var/mail/student
+...output omitted...
+Message-ID: <20181203131145.5064.41602@tower.lab.example.com>
+
+Workflow job summary:
+
+- node #6 spawns job #15, "Dynamic Inventory - Custom Script", which finished with status successful.
+- node #7 spawns job #16, "My Full-Stack Project", which finished with status successful.
+- node #8 spawns job #17, "Set up Databases", which finished with status successful.
+- node #9 spawns job #19, "Set up Web servers", which finished with status successful.
+- node #10 spawns job #21, "Set up Load Balancer", which finished with status successful.
+...output omitted...
+At this point, the web servers and the balancer are installed, configured, and functioning. Verify that the results are correct:
+
+Open a web browser and go to http://servera.lab.example.com, http://serverd.lab.example.com, http://servere.lab.example.com, and http://serverf.lab.example.com in separate tabs. You should see this line at the bottom of each page:
+
+...output omitted...
+Deployment Version: Development
+Open a web browser and go to http://serverb.lab.example.com. Every time you refresh the page, the load balancer redirects your request to one of the web servers verified in the previous step.
+
+Evaluation
+
+As the student user on workstation, run the lab review-cr3 script with the grade argument, to confirm success on these exercises. Correct any reported failures and rerun the script until successful.
+
+[student@workstation ~]$ lab review-cr3 grade
+This concludes the comprehensive review.
+
+

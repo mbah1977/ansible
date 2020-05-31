@@ -1,0 +1,280 @@
+
+Running Selected Tasks
+Objectives
+After completing this section, you should be able to label tasks with tags, run only tasks labeled with specific tags, or start playbook execution at a specific task.
+
+Tagging Ansible Resources
+When working with a large or complex playbook, you may want to run only a subset of its plays or tasks. Apply tags to specific resources that you may want to skip or run. A tag is a text label on an Ansible resource like a play or task. To tag a resource, use the tags keyword on the resource, followed by a list of the tags to apply.
+
+When running a playbook with ansible-playbook, use the --tags option to filter the playbook and execute only specific tagged plays or tasks. Tags are available for the following resources:
+
+Tag each task. This is one of the most common ways tags are used.
+
+- name: Install application
+  hosts: dbservers
+  vars:
+    packages:
+      - postfix
+      - mariadb-server
+
+  tasks:
+    - name: Ensure that packages are installed
+      yum:
+        name: "{{ packages }}"
+        state: installed
+      tags:
+        - install
+Tag an entire play. Use the tags directive at the play level.
+
+- name: Setup web services
+  hosts: webservers
+  tags:
+    - setup
+
+  tasks:
+  - name: Install http daemon
+    yum:
+      name: httpd
+      state: present
+When including a task file in a playbook, the task can be tagged, thus allowing administrators to set a global tag for the tasks loaded by include_tasks:
+
+  tasks:
+    - name: Include common web services tasks
+      include_tasks: common.yml
+      tags:
+        - webproxy
+        - webserver
+Tag a role in the roles section. All the tasks in the role are associated with this tag. In this example the role databases has a list of two tags, production and staging.
+
+  roles:
+    - { role: databases, tags: ['production', 'staging'] }
+Tag a block of tasks. All the tasks in the block are associated with this tag. In this example we group all httpd related tasks under the webserver tag.
+
+---
+- name: Setup httpd service
+
+  tasks:
+    - name: Notify start of process
+      debug:
+        msg: Beginning httpd setup
+
+    - block:
+      - name: Ensure httpd packages are installed
+        yum:
+          name:
+            - httpd
+            - php
+            - git
+            - php-mysqlnd
+          state: present
+
+      - name: Ensure SELinux allows httpd connections to a remote database
+        seboolean:
+          name: httpd_can_network_connect_db
+          state: true
+          persistent: true
+
+      - name: Ensure httpd service is started and enabled
+        service:
+          name: httpd
+          state: started
+          enabled: true
+      tags:
+        - webserver
+IMPORTANT
+When roles or include_tasks statements are tagged, the tag is not a way to exclude some of the tagged tasks the included files contain. Rather, tags in this context are a way to apply a global tag to all tasks.
+
+Managing Tagged Resources
+Use the ansible-playbook command to run tasks with a specific tag, using the --tags option, or skip tasks with a specific tag using the --skip-tags option.
+
+The following playbook contains two tasks. The first task is tagged with the webserver tag. The second task does not have any associated tags.
+
+---
+- name: Example play using tagging
+  hosts:
+    - servera.lab.example.com
+    - serverb.lab.example.com
+
+  tasks:
+    - name: httpd is installed
+      yum:
+        name: httpd
+        state: latest
+      tags: webserver
+
+    - name: postfix is installed
+      yum:
+        name: postfix
+        state: latest
+To only run the first task, the --tags argument can be used:
+
+[user@demo ~]$ ansible-playbook main.yml --tags webserver
+
+PLAY [Example play using tagging] ******************************************...
+
+TASK [Gathering Facts] *****************************************************...
+ok: [serverb.lab.example.com]
+ok: [servera.lab.example.com]
+
+TASK [httpd is installed] **************************************************...
+ok: [servera.lab.example.com]
+ok: [serverb.lab.example.com]
+
+PLAY RECAP *****************************************************************...
+servera.lab.example.com    : ok=2    changed=0    unreachable=0    failed=0 ...
+serverb.lab.example.com    : ok=2    changed=0    unreachable=0    failed=0 ...
+Because the --tags option was specified, the playbook ran only the task tagged with the webserver tag.
+
+Specify multiple tags to --tags as a comma-separated list:
+
+[user@demo ~]$ ansible-playbook main.yml --tags install,setup
+Use the --skip-tags option to skip tasks with a specific tag and only run the tasks without that tag:
+
+[user@demo ~]$ ansible-playbook main.yml --skip-tags webserver
+
+PLAY [Example play using tagging] ******************************************...
+
+TASK [Gathering Facts] *****************************************************...
+ok: [serverb.lab.example.com]
+ok: [servera.lab.example.com]
+
+TASK [postfix is installed] ************************************************...
+ok: [serverb.lab.example.com]
+ok: [servera.lab.example.com]
+
+PLAY RECAP *****************************************************************...
+servera.lab.example.com    : ok=2    changed=0    unreachable=0    failed=0 ...
+serverb.lab.example.com    : ok=2    changed=0    unreachable=0    failed=0 ...
+To list all tags that exist in a playbook, pass the --list-tags option to the ansible-playbook command. For example:
+
+[student@demo examples]$ ansible-playbook playbook.yml --list-tags
+
+playbook: playbook.yml
+
+  play #1 (webservers): Setup web services	TAGS: [setup]
+      TASK TAGS: [setup]
+
+  play #2 (webservers): Teardown web services	TAGS: [teardown]
+      TASK TAGS: [teardown]
+Special Tags
+Ansible has a special tag that can be assigned in a playbook: always. A resource tagged always will always run, even if it does not match the list of tags passed to --tags. The only exception is when it is explicitly skipped, using the --skip-tags always option.
+
+A task you tag with the never special tag does not run, except when you run the playbook with the --tags option set to never or to one of the other tag associated with the task.
+
+There are three additional special tags:
+
+The tagged tag will run any resource with an explicit tag.
+
+The untagged tag will run any resource that does not have an explicit tag, and exclude all tagged resources.
+
+The all tag will include all tasks in the play, whether or not they have a tag. This is the default behavior of Ansible.
+
+
+
+Guided Exercise: Running Selected Tasks
+In this exercise, you will use tags to run only specific tasks in a playbook.
+
+Outcomes
+
+You should be able to tag specific tasks in a playbook to run or skip them.
+
+Open a terminal on workstation as the student user and run the following command:
+
+[student@workstation ~]$ lab task-tagging start
+Clone the Git repository http://git.lab.example.com:8081/git/task-tagging.git in the /home/student/git-repos directory.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+Change to this directory:
+
+[student@workstation ~]$ cd git-repos/
+Clone the repository:
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/task-tagging.git
+Cloning into 'task-tagging'...
+remote: Enumerating objects: 56, done.
+remote: Counting objects: 100% (56/56), done.
+remote: Compressing objects: 100% (42/42), done.
+remote: Total 56 (delta 5), reused 0 (delta 0)
+Unpacking objects: 100% (56/56), done.
+[student@workstation git-repos]$ cd task-tagging
+Create a new playbook to test the successful deployment of the web application.
+
+Create the test_webapp.yml file.
+
+[student@workstation task-tagging]$ vi test_webapp.yml
+Add a task that verifies that the content of the web application is accessible. Use the the uri module to retrieve the contents. The contents of the file should display as follows:
+
+---
+- name: Web application smoke test
+  hosts: web_servers
+  gather_facts: no
+  tasks:
+    - name: Verify content of http://localhost
+      uri:
+        url: http://localhost
+        return_content: yes
+      register: test_url
+      failed_when: "'Hello from' not in test_url.content"
+      tags:
+        - tests
+Add the new playbook to the site.yml file.
+
+[student@workstation task-tagging]$ vi site.yml
+Import the new playbook. The content of the file should display as follows:
+
+- name: Deploy HAProxy
+  import_playbook: deploy_haproxy.yml
+
+- name: Deploy Web Server
+  import_playbook: deploy_apache.yml
+
+- name: Deploy Web App
+  import_playbook: deploy_webapp.yml
+
+- name: Test deployed Web App
+  import_playbook: test_webapp.yml
+Use the site.yml playbook to test the web application deployment only. After the test fails, execute the playbook to configure the environment, skipping all tests.
+
+Use the tests tag to test the web application before it is setup.
+
+[student@workstation task-tagging]$ ansible-playbook site.yml --tags tests
+...output omitted...
+TASK [Verify content of http://localhost] **********************************...
+fatal: [serverc.lab.example.com]: FAILED! => {"ansible_facts": {"discovered_interpreter_python": "/usr/libexec/platform-python"}, "changed": false, "content": "", "elapsed": 0, "failed_when_result": true, "msg": "Status code was -1 and not [200]: Request failed: <urlopen error [Errno 111] Connection refused>", "redirected": false, "status": -1, "url": "http://localhost"}
+fatal: [serverb.lab.example.com]: FAILED! => {"ansible_facts": {"discovered_interpreter_python": "/usr/libexec/platform-python"}, "changed": false, "content": "", "elapsed": 0, "failed_when_result": true, "msg": "Status code was -1 and not [200]: Request failed: <urlopen error [Errno 111] Connection refused>", "redirected": false, "status": -1, "url": "http://localhost"}
+
+
+PLAY RECAP *****************************************************************...
+serverb.lab.example.com    : ok=0    changed=0    unreachable=0    failed=1 ...
+serverc.lab.example.com    : ok=0    changed=0    unreachable=0    failed=1 ...
+This command executed only the task tagged with the tests tag; because the server was not setup, the test failed.
+
+Run the playbook, skipping the tests to setup the web application.
+
+[student@workstation task-tagging]$ ansible-playbook site.yml --skip-tags tests
+...output omitted...
+PLAY RECAP *****************************************************************...
+servera.lab.example.com    : ok=6    changed=6    unreachable=0    failed=0 ...
+serverb.lab.example.com    : ok=6    changed=6    unreachable=0    failed=0 ...
+serverc.lab.example.com    : ok=6    changed=6    unreachable=0    failed=0 ...
+Use the tests tag again to test the web application.
+
+[student@workstation task-tagging]$ ansible-playbook site.yml --tags tests
+...output omitted...
+TASK [Verify content of http://localhost] **********************************...
+ok: [serverc.lab.example.com]
+ok: [serverb.lab.example.com]
+
+PLAY RECAP *****************************************************************...
+serverb.lab.example.com    : ok=1    changed=0    unreachable=0    failed=0 ...
+serverc.lab.example.com    : ok=1    changed=0    unreachable=0    failed=0 ...
+Now that the web application is setup, the test was successful.
+
+Finish
+
+On workstation, run the lab task-tagging finish script to complete this lab.
+
+[student@workstation task-tagging]$ lab task-tagging finish 

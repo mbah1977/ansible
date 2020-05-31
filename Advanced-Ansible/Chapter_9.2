@@ -1,0 +1,399 @@
+Creating Job Templates and Launching Jobs
+Objectives
+After completing this section, students should be able to create and manage a job template that specifies a project and playbook, an inventory, and credentials that you can use to launch Ansible jobs on managed hosts.
+
+Job Templates, Projects, and Inventories
+In Red Hat Ansible Tower, a Job Template is a template that you can use to launch jobs which run playbooks. A Job Template associates a playbook from a Project with an Inventory of hosts, Credentials for authentication, and other parameters used when you launch an Ansible job to run that playbook. Whether a user can launch jobs or create job templates with particular Projects and Inventories depends on the roles that you have assigned them. When granted the Use role, users can use a Job Template to associate Projects with Inventories.
+
+A Job Template defines the parameters for the execution of an Ansible job. An Ansible job executes a playbook against a set of managed hosts. Therefore, a Job Template must define what Project provides the playbook and what Inventory contains the list of managed hosts.
+
+Additionally, the Job Template must also define the Machine Credential which will be used to authenticate to the managed hosts. Like Projects and Inventories, a user must have the Use role assigned to a Machine Credential to be able to associate it to a Job Template.
+
+Once defined, a Job Template allows for the repeated execution of a job and is therefore ideal for routine execution of tasks. Since the Project, Inventory, and Machine Credential parameters are part of the Job Template definition, the job will run the same way each time.
+
+Creating Job Templates
+Unlike other Ansible Tower resources, Job Templates do not directly belong to an Organization but are used by a Project that belongs to an Organization. A Job Template's relationship to an Organization is determined by the Project that it uses. Therefore, you do not need to have the Admin role in an Organization to create a Job Template. Instead, you only need to have the Use role for the Project that you assign to the Job Template.
+
+Since a Job Template has to be defined with an Inventory, Project, and Machine Credential, a User can only create a Job Template if they have Use roles assigned to one or more of each of these three Ansible Tower resources. The following procedure details how to create a Job Template for running a playbook on a set of managed hosts with a focus on just the mandatory parameters (optional parameters are discussed later):
+
+Log in to the Ansible Tower web interface as a user who has been assigned the Use role for the Inventory, Project, and Machine Credential resources.
+
+Click the Templates in the left quick navigation bar to go to the Templates management interface.
+
+Click the + button and then select Job Template.
+
+Enter a name for the Job Template in the NAME field.
+
+Select Run as the JOB TYPE.
+
+Specify the managed hosts that the job will be executed against.
+
+Click the magnifying glass icon for the INVENTORY field.
+
+Select the desired Inventory and then click SELECT.
+
+Specify the Project containing the playbook that the job will execute.
+
+Click the magnifying glass icon for the PROJECT field.
+
+Select the desired Project and then click SELECT.
+
+Specify the playbook that the job will execute.
+
+Click the drop-down menu for the PLAYBOOK field. All playbooks contained in the Project selected in the previous field are listed.
+
+Select the desired playbook.
+
+Specify the Credential required for authenticate against the managed hosts.
+
+Click the magnifying glass icon for the CREDENTIAL field.
+
+Select the desired Credential and then click SELECT.
+
+Select the desired setting from the drop-down menu for the VERBOSITY field. This determines the level of detail that is generated in the output of the job run.
+
+Click SAVE to finalize creation of the new Job Template.
+
+
+Figure 9.6: A new Job Template
+Modifying Job Execution
+A Job Template has other settings you can use to adjust how Ansible Tower runs the playbook when the template is launched:
+
+DESCRIPTION
+This field is used to store an optional description of the Job Template.
+
+FORKS
+Use this field to specify the forks setting that controls the number of parallel processes to allow during playbook execution. This is the equivalent of the -f or --forks option for the ansible-playbook command. A value of 0 causes the default setting from the Ansible configuration file to be used.
+
+LIMIT
+Use this field to restrict the list of managed hosts provided by the Job Template's Inventory. Filtering is accomplished by supplying a host pattern as a value for this field. This is the equivalent of the -l or --limit option for the ansible-playbook command.
+
+JOB TAGS
+This field accepts a comma separated list of tags which exist in a playbook. Tags are used to identify distinct portions of a playbook. By specifying a list of tags in this field, you can selectively execute only certain portions of a playbook. This is the equivalent of the -t or --tags option for the ansible-playbook command.
+
+SKIP TAGS
+This field accepts a comma-separated list of tags that exist in a playbook. By specifying a list of tags in this field, you can selectively skip certain portions of a playbook during its execution. This is the equivalent of the --skip-tags option for the ansible-playbook command.
+
+LABELS
+Labels are names that you can attach to Job Templates to help you group or filter Job Templates.
+
+Enable Privilege Escalation
+When enabled, this check box causes the playbook to be executed with escalated privileges. This is the equivalent of the --become option for the ansible-playbook command.
+
+Allow Provisioning Callbacks
+When enabled, this check box results in the creation of a provisioning callback URL on Ansible Tower which can be used by hosts to request a configuration update using the Job Template.
+
+Enable Concurrent Jobs
+When enabled, this check box allows for multiple, simultaneous executions of this Job Template.
+
+Use Fact Cache
+When enabled, this check box causes the usage of cached facts and stores newly discovered facts in the fact cache on Ansible Tower. Fact caching is discussed in more detail later in this course.
+
+EXTRA VARIABLES
+Equivalent to the -e or --extra-vars options for the ansible-playbook command, this field can be used to pass extra command-line variables to the playbook executed by a job. These extra variables are defined as key/value pairs using either YAML or JSON.
+
+Prompting for Job Parameters
+When executing playbooks from the command-line using the ansible-playbook command, administrators have the ability to modify playbook execution through the use of command-line options. Ansible Tower allows for some of this flexibility by allowing certain parameters in Job Templates to prompt for user input at the time of job execution. This Prompt on launch option is available for:
+
+JOB TYPE
+
+INVENTORY
+
+CREDENTIAL
+
+LIMIT
+
+VERBOSITY
+
+JOB TAGS
+
+SKIP TAGS
+
+EXTRA VARIABLES
+
+The flexibility to change job parameters at the time of job execution encourages playbook reuse. For example, rather than creating multiple job templates to run the same playbook on different sets of managed hosts, a single job template that has the Prompt on launch option enabled for the Inventory field will suffice. When the job is launched, the user executing the job is given the option to specify an Inventory to execute the playbook on. When prompted, users can only select from Inventories that they have been assigned the Use role on.
+
+
+Figure 9.7: Prompting for Inventory on launch
+Job Templates Roles
+There are three roles used to control user access to Job Templates.
+
+Admin
+
+The Admin role provides a user the ability to delete a Job Template or edit its properties, including its associated permissions. This role also grants permissions associated with the Job Template Execute and Read roles.
+
+Execute
+
+The Execute role grants users permission to execute a job using the Job Template. It also grants the Users permission to schedule a job using the Job Template. This role also grants permissions associated with the Job Template Read role.
+
+IMPORTANT
+A Job Template makes use of other Ansible Tower resources such as Projects, Inventories, and Credentials. For a user to execute a job using a Job Template, they only need to be assigned the Execute role on the Job Template and do not need to be assigned Use roles to any of these associated Ansible Tower resources.
+
+Read
+
+The Read role grants users read-only access to view the properties of a Job Template. It also grants access to view other information related to the Job Template, such as the list of jobs executed using the Job Template, as well as its associated permissions and notifications.
+
+Managing Job Template Access
+When a Job Template is first created, it is only accessible by the user that created it or users with either an Admin or Auditor role in the Organization that the Project was created in. Additional access must be specifically configured if desired.
+
+The assignment of the previously discussed Job Template roles to users or teams dictates who has permissions to a Job Template. These permissions cannot be assigned at the time of a Job Template's creation. They are administered after a Job Template has been created by editing the Job Template.
+
+Roles are assigned through the PERMISSIONS section of the Job Template editor screen. The following procedure details the steps for granting permissions to a Job Template after it is created.
+
+Log in as a user with Admin role on the Organization that the Job Template is associated with or as the user who created the Job Template.
+
+Click TEMPLATES in the left quick navigation bar to display the list of templates.
+
+Click the pencil icon for the Job Template to edit to enter the Job Template editor screen.
+
+On the Job Template editor screen, click the PERMISSIONS button to enter the permissions editor.
+
+Click the + button to add permissions.
+
+In the user and team selection screen, click either USERS or TEAMS and then select the users or teams to be granted permissions.
+
+Click KEY to display the list of Job Template roles and their definitions.
+
+Click the SELECT ROLES drop-down menu and select the desired Job Template role for each user or team.
+
+Click SAVE to finalize the changes to permissions.
+
+
+Figure 9.8: Assigning a Job Template role to a user
+Launching Jobs
+Once a Job Template is created, it can be used to launch a job with the following procedure.
+
+Log in as a user that possesses the Execute role on the desired Job Template.
+
+Click Templates in the left quick navigation bar to see the list of templates.
+
+Locate the desired Job Template in the list of templates and click the rocket icon under the ACTIONS column to launch the job.
+
+If any of the Job Template parameters have the Prompt on launch option enabled, then you are prompted for input prior to the job execution. Enter the desired input for each parameter prompted for and the click LAUNCH to launch the job.
+
+
+Figure 9.9: Launching a Job
+Evaluating the Results of a Job
+Once a job run has been launched from a Job Template in the Ansible Tower web interface, the user is automatically redirected to the job's detail page. Users can also navigate to this same page by clicking Jobs in the left quick navigation bar to see the list of executed jobs and then clicking the link for the job of interest.
+
+The job detail page is divided into two panes. The DETAILS pane displays the details of the job's parameters while the job output pane displays the output of the playbook executed by the job.
+
+While the output in the job output pane resembles that which would have been generated by the execution of the playbook on the command-line using the ansible-playbook command, it also offers several additional features. Across the top of the job output pane is a summary detailing the number of plays and tasks which were executed, the count of hosts which the job was executed against, and also the time it took for the job to execute. Additionally, controls are provided for maximizing this pane to full screen size, as well as for downloading the output of the job execution.
+
+Along the left side of the output section, the + and - controls can be used to expand or collapse the output for each task in the playbook. Along the right side of the output section are controls for scrolling through the output as well as for jumping to the beginning and end of the output.
+
+
+Figure 9.10: Job run results
+REFERENCES
+Ansible Tower User Guide
+
+
+
+
+Guided Exercise: Creating Job Templates and Launching Jobs
+In this exercise, you will create a Job Template, assign a role to a team so that team members can use that Job Template, and use that Job Template to launch a job.
+
+Outcomes
+
+You will be able to create a Job Template and launch a Job from the Ansible Tower web interface.
+
+You have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab provision-job start. This setup script ensures that the workstation and tower virtual machines are started.
+
+[student@workstation ~]$ lab provision-job start
+Log in to the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Create a new Job Template called DEV webservers setup.
+
+In the left navigation bar, click the Templates quick navigation link.
+
+Click the + button to add a new Job Template.
+
+From the drop-down menu, select Job Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	DEV webservers setup
+DESCRIPTION	Setup apache on DEV webservers
+JOB TYPE	Run
+INVENTORY	Dev
+PROJECT	My Webservers DEV
+PLAYBOOK	apache-setup.yml
+CREDENTIAL	Developers
+Leave the other fields untouched and click SAVE to create the new Job Template.
+
+Give the Developers team Admin role on the Job Template, DEV webservers setup.
+
+Click the PERMISSIONS button to manage the Job Template’s permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, check the box next to Developers team. This causes the team to display in the second section underneath the first one.
+
+In the second section below, select the Admin role from the drop-down menu.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Job Template, DEV webservers setup, which now shows that all members of the Developers team are assigned the Admin role on the Job Template.
+
+Launch a Job using the Job Template, DEV webservers setup, as a member of the Developers team.
+
+Click the Log Out icon in the top right corner to log out and log back in as daniel with a password of redhat123.
+
+In the left navigation bar, click the Templates quick navigation link.
+
+On the same line as the Job Template, DEV webservers setup, click the rocket icon on the right to launch the Job. This redirects you to a detailed status page of the running job.
+
+Observe the live output of the running job for a minute.
+
+Verify that the STATUS of the Job in the DETAILS section displays Successful.
+
+Verify that the web servers are up and running on servera.lab.example.com and serverb.lab.example.com.
+
+Open a new tab and go to http://servera.lab.example.com. You should see the following output:
+
+This is a test message RedHat 8.0
+Current Host: servera
+Server list:
+serverb.lab.example.com
+servera.lab.example.com
+Open a new tab and go to http://serverb.lab.example.com. You should see the following output:
+
+This is a test message RedHat 8.0
+Current Host: serverb
+Server list:
+serverb.lab.example.com
+servera.lab.example.com
+The setup script for this exercise created a directory that contains files which need to be pushed to the my_webservers_DEV Git repository. On workstation, the git-repos directory should exist. Pull the latest changes from the my_webservers_DEV Git repository.
+
+Change directory to the /home/student/git-repos/my_webservers_DEV.
+
+[student@workstation ~]$ cd ~/git-repos/my_webservers_DEV
+NOTE
+If the directory does not exist, clone the project instead:
+
+[student@workstation ~]$ cd ~/git-repos
+[student@workstation git-repo]$ git clone \
+> http://git@git.lab.example.com:8081/git/my_webservers_DEV.git
+[student@workstation git-repo]$ cd my_webservers_DEV
+Pull the latest changes using git pull.
+
+[student@workstation my_webservers_DEV]$ git pull
+Already up-to-date.
+Copy the content of the /home/student/DO447/labs/provision-job/ to the /home/student/git-repos/my_webservers_DEV directory. Push the new files to the master branch of your Git repository.
+
+Use cp -R to copy the content of the /home/student/DO447/labs/provision-job/ directory to the current working directory.
+
+[student@workstation my_webservers_DEV]$ cp -R -v ~/DO447/labs/provision-job/* .
+'/home/student/DO447/labs/provision-job/ansible-vsftpd.yml' -> './ansible-vsftpd.yml'
+'/home/student/DO447/labs/provision-job/ftpclient.yml' -> './ftpclient.yml'
+'/home/student/DO447/labs/provision-job/site.yml' -> './site.yml'
+'/home/student/DO447/labs/provision-job/templates/vsftpd.conf.j2' -> './templates/vsftpd.conf.j2'
+'/home/student/DO447/labs/provision-job/vars' -> './vars'
+'/home/student/DO447/labs/provision-job/vars/defaults-template.yml' -> './vars/defaults-template.yml'
+'/home/student/DO447/labs/provision-job/vars/vars.yml' -> './vars/vars.yml'
+Add all the new files to the staging area using git add --all.
+
+[student@workstation my_webservers_DEV]$ git add --all
+Commit the changes using git commit with the comment Adding playbooks.
+
+[student@workstation my_webservers_DEV]$ git commit -m "Adding playbooks"
+[master 3a0643f] Adding files
+ 6 files changed, 118 insertions(+)
+ create mode 100644 ansible-vsftpd.yml
+ create mode 100644 ftpclient.yml
+ create mode 100644 site.yml
+ create mode 100644 templates/vsftpd.conf.j2
+ create mode 100644 vars/defaults-template.yml
+ create mode 100644 vars/vars.yml
+Push the changes to the remote repository.
+
+[student@workstation my_webservers_DEV]$ git push
+Enumerating objects: 12, done.
+Counting objects: 100% (12/12), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (10/10), done.
+Writing objects: 100% (10/10), 1.69 KiB | 866.00 KiB/s, done.
+Total 10 (delta 0), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/my_webservers_DEV.git
+   ac5d142..3a0643f  master -> master
+Trigger an SCM update of the project My Webservers DEV.
+
+Go back to the Ansible Tower web interface. You should still be logged in as user daniel.
+
+In the left navigation bar, click the Projects quick navigation link.
+
+In the line with the My Webservers DEV project, click the double arrow icon.
+
+Observe the update and wait a couple of seconds. In the list of Projects, there is a status icon left of the My Webservers DEV Project. This icon is white at the start, red with an exclamation mark (!) when it fails, and green when it succeeds.
+
+Click the Log Out icon to log out of the Ansible Tower web interface.
+
+Log in to the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Create a new Job Template called DEV ftpservers setup.
+
+In the left navigation bar, click the Templates quick navigation link.
+
+Click the + button to add a new Job Template.
+
+From the drop-down menu, select Job Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	DEV ftpservers setup
+DESCRIPTION	Setup FTP on DEV servers
+JOB TYPE	Run
+INVENTORY	Dev
+PROJECT	My Webservers DEV
+PLAYBOOK	site.yml
+CREDENTIAL	Developers
+NOTE
+Notice that the My Webservers DEV project offers you additional playbooks to choose from, because you have pushed additional Ansible Playbooks and templates to the same Git repository that serves as the remote source for the project.
+
+Leave the other fields untouched and click SAVE to create the new Job Template.
+
+Give the Developers team Admin role on the Job Template DEV ftpservers setup.
+
+Click the PERMISSIONS button to manage the Job Template’s permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, check the box next to Developers team. This causes the team to display in the second section underneath the first one.
+
+In the second section below, select the Admin role from the drop-down menu.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Job Template DEV ftpservers setup, which now shows that all members of the Developers team are assigned the Admin role on the Job Template.
+
+Launch a Job using the Job Template DEV ftpservers setup, as a member of the Developers team.
+
+Click the Log Out icon in the top right corner to logout and log back in as daniel with a password of redhat123.
+
+In the left navigation bar, click the Templates quick navigation link.
+
+On the same line as the Job Template DEV ftpservers setup, click the rocket icon on the right to launch the Job. This redirects you to a detailed status page of the running job.
+
+Observe the live output of the running job for a minute.
+
+Verify that the STATUS of the Job in the DETAILS section displays Successful.
+
+Verify that the FTP servers are up and running on servera.lab.example.com and serverb.lab.example.com.
+
+On workstation use the nc servera 21 command to verify that FTP server is running on servera.
+
+[student@workstation ~]$ nc servera 21
+220 (vsFTPd 3.0.3)
+CTRL+C
+On workstation use the nc serverb 21 command to verify that FTP server is running on serverb.
+
+[student@workstation ~]$ nc serverb 21
+220 (vsFTPd 3.0.3)
+CTRL+C
+Click the Log Out icon to log out of the Ansible Tower web interface.
+
+This concludes the guided exercise.

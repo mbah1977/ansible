@@ -1,0 +1,759 @@
+Chapter 11. Communicating with APIs using Ansible
+Launching Jobs with the Ansible Tower API
+Guided Exercise: Launching Jobs with the Ansible Tower API
+Interacting with APIs using Ansible Playbooks
+Guided Exercise: Interacting with APIs using Ansible Playbooks
+Lab: Communicating with APIs using Ansible
+Summary
+Abstract
+
+Goal	Interact with REST APIs in Ansible Playbooks, and control Red Hat Ansible Tower using its REST API.
+Objectives	
+Control Ansible Tower by accessing its API with curl, and in Ansible Playbooks.
+
+Write playbooks that interact with a REST API to get information from a web service, and to trigger events.
+
+Sections	
+Launching Jobs with the Ansible Tower API (and Guided Exercise)
+
+Interacting with APIs using Ansible Playbooks (and Guided Exercise)
+
+Lab	
+Communicating with APIs using Ansible
+
+Launching Jobs with the Ansible Tower API
+Objective
+After completing this section, students should be able to control Ansible Tower by accessing its API from Ansible Playbooks.
+
+The Red Hat Ansible Tower REST API
+Red Hat Ansible Tower provides a Representational State Transfer (REST) API. An API provides a mechanism that allows administrators and developers to control their Ansible Tower environment outside of the web UI. Custom scripts or external applications access the API using standard HTTP messages. The REST API is useful when integrating Ansible Tower with other programs.
+
+One of the benefits of the REST API is that any programming language, framework, or system with support for the HTTP protocol can use the API. This provides an easy way to automate repetitive tasks and integrate other enterprise IT systems with Ansible Tower.
+
+NOTE
+The API is in active development, and all features of the web UI may not be accessible through the API. There are two versions of the API currently available. We expect that version 1 will be deprecated in the near future.
+
+Using the REST API
+
+In case you are not familiar with REST APIs, the way they work is relatively straightforward. A client sends a request to a server element located at a Uniform Resource Identifier (URI) and performs operations with standard HTTP methods, such as GET, POST, PUT, and DELETE. The REST architecture provides a stateless communication channel between the client and server. Each client request acts independently of any other request, and contains all the necessary information to complete the request.
+
+The following example request uses an HTTP GET method to retrieve a representation of the main entry point of the API. A graphical web browser or Linux command-line tools could be used to issue the request manually. This example uses the curl command to make the request from the command line:
+
+[user@demo ~]$ curl -X GET https://tower.lab.example.com/api/ -k
+{"description":"AWX REST API","current_version":"/api/v2/","available_versions":
+{"v1":"/api/v1/","v2":"/api/v2/"},"oauth2":"/api/o/","custom_logo":"","custom_login_info":""}
+The output of the API request is in JSON format, which is readily parsable by computer programs, but may be a little challenging for a human to read.
+
+The Red Hat Ansible Tower API is browsable. For example, if your Ansible Tower server is the host tower.lab.example.com, you can access the browsable API at https://tower.lab.example.com/api/. You can click the /api/v2/ link on that page to browse information specific to version 2 of the API.
+
+The following example shows how to do this using the curl command. The json_pp command is provided by the perl-JSON-PP RPM package and "pretty-prints" the JSON output of the API for easier reading by a human.
+
+[user@demo ~]$ curl -X GET https://tower.lab.example.com/api/v2/ -k -s | json_pp
+{
+   "dashboard" : "/api/v2/dashboard/",
+   "unified_jobs" : "/api/v2/unified_jobs/",
+   "ping" : "/api/v2/ping/",
+   "users" : "/api/v2/users/",
+   "me" : "/api/v2/me/",
+   "system_jobs" : "/api/v2/system_jobs/",
+   "ad_hoc_commands" : "/api/v2/ad_hoc_commands/",
+   "instance_groups" : "/api/v2/instance_groups/",
+   "workflow_job_template_nodes" : "/api/v2/workflow_job_template_nodes/",
+   "inventory_sources" : "/api/v2/inventory_sources/",
+   "applications" : "/api/v2/applications/",
+   "inventory" : "/api/v2/inventories/",
+   "project_updates" : "/api/v2/project_updates/",
+   "tokens" : "/api/v2/tokens/",
+   "notifications" : "/api/v2/notifications/",
+   "notification_templates" : "/api/v2/notification_templates/",
+   "inventory_updates" : "/api/v2/inventory_updates/",
+   "teams" : "/api/v2/teams/",
+   "hosts" : "/api/v2/hosts/",
+   "credentials" : "/api/v2/credentials/",
+   "schedules" : "/api/v2/schedules/",
+   "unified_job_templates" : "/api/v2/unified_job_templates/",
+   "jobs" : "/api/v2/jobs/",
+   "instances" : "/api/v2/instances/",
+   "config" : "/api/v2/config/",
+   "roles" : "/api/v2/roles/",
+   "organizations" : "/api/v2/organizations/",
+   "system_job_templates" : "/api/v2/system_job_templates/",
+   "credential_types" : "/api/v2/credential_types/",
+   "inventory_scripts" : "/api/v2/inventory_scripts/",
+   "workflow_job_nodes" : "/api/v2/workflow_job_nodes/",
+   "job_events" : "/api/v2/job_events/",
+   "groups" : "/api/v2/groups/",
+   "workflow_job_templates" : "/api/v2/workflow_job_templates/",
+   "job_templates" : "/api/v2/job_templates/",
+   "activity_stream" : "/api/v2/activity_stream/",
+   "settings" : "/api/v2/settings/",
+   "labels" : "/api/v2/labels/",
+   "workflow_jobs" : "/api/v2/workflow_jobs/",
+   "projects" : "/api/v2/projects/"
+}
+This entry point provides a collection of links in the API environment. As you can see in the example, there are many links to choose from.
+
+The following example illustrates information accessible through the API. To examine what actions have been performed on the Ansible Tower server, you use the /api/v2/activity_stream/ URI. Make a GET request to that resource to retrieve the list of activity streams:
+
+[user@demo ~]$ curl -X GET \
+> https://tower.lab.example.com/api/v2/activity_stream/ -k
+{"detail":"Authentication credentials were not provided. To establish a login session, visit /api/login/."}
+As you can see in the output above, not all information generated by the API is publicly available. You need to log in to access this resource.
+
+The next example shows the output of the activity_stream resource when correct authentication information is provided:
+
+[user@demo ~]$ curl -X GET --user admin:redhat \
+> https://tower.lab.example.com/api/v2/activity_stream/ -k -s | json_pp
+{
+   "next" : "/api/v2/activity_stream/?page=2",
+   "previous" : null,
+   "count" : 212,
+   "results" : [
+      {
+...output omitted...
+         "summary_fields" : {
+            "user" : [
+               {
+                  "id" : 4,
+                  "last_name" : "Stephens",
+                  "first_name" : "Simon",
+                  "username" : "simon"
+               }
+            ],
+            "actor" : {
+               "id" : 1,
+               "last_name" : "",
+               "first_name" : "",
+               "username" : "admin"
+            }
+         },
+         "timestamp" : "2018-11-07T15:43:28.936831Z",
+         "changes" : {
+            "password" : [
+               "hidden",
+               "hidden"
+            ]
+         },
+         "url" : "/api/v2/activity_stream/25/",
+         "id" : 25,
+         "type" : "activity_stream",
+         "operation" : "update",
+         "object2" : ""
+...output omitted...
+IMPORTANT
+The output of the API may be paginated, as in the preceding example. Ansible Tower only returns a limited number of records for a particular request for performance reasons. The next value gives the URI for the next page of results. If the value is null, you are on the last page. Likewise, the value of previous is the URI for the previous page of results, and if the value is null, then you are on the first page.
+
+The output of the API is in JSON format, which can be difficult to read without running it through a parser such as json_pp. You can also access the browsable REST API with a graphical web browser to get the same information in a more readable format. This example accesses the same API using the Firefox web browser:
+
+
+Figure 11.1: Activity stream API output
+You can click various links in the API to explore related resources.
+
+
+Figure 11.2: Browsable API
+Click the ? icon next to an API endpoint name to get documentation on the access methods for that endpoint. The documentation also provides information on what data is returned when using those methods.
+
+IMPORTANT
+The documentation available to graphical browsers through the ? icon is very useful when trying to understand how to use the Ansible Tower API. Make use of this resource.
+
+
+Figure 11.3: Documentation for API endpoints
+You can also use PUT or POST methods on the specific API pages by providing JSON formatted text or files in the graphical interface.
+
+
+Figure 11.4: Example of POST method text field
+Launching a Job Template Using the API
+One common use of the API is to launch an existing Job Template. This example uses the curl command to quickly outline how to use the API to find and launch a Job Template that has already been configured in Ansible Tower.
+
+Starting with Red Hat Ansible Tower 3.2, you can refer to a Job Template by name in the API.
+
+For example, you can use the GET method to get information about a Job Template. The following example illustrates how to use this method on the Demo Job Template Job Template. Because the name of the Job Template contains spaces, you must escape them using double quotes or URL percent encoding (%20 for each space character).
+
+[user@demo ~]$ curl -X GET --user admin:redhat \
+> https://tower.lab.example.com/api/v2/job_templates/"Demo Job Template"/ -k -s \
+> | json_pp
+Launching a Job Template from the API is done in two steps. First, access it with the GET method to get information about any parameters or data that you need to launch the job. Then, access it with the POST method to launch the job.
+
+The following example uses the GET method to get the parameters that you need to launch the Demo Job Template Job Template through the API. The output is piped into json_pp for better readability.
+
+[user@demo ~]$ curl -X GET --user admin:redhat \
+> https://tower.lab.example.com/api/v2/job_templates/"Demo Job Template"/launch/ -k -s | json_pp
+{
+   "job_template_data" : {
+      "name" : "Demo Job Template",
+      "id" : 5,
+      "description" : ""
+   },
+   "ask_inventory_on_launch" : false,
+   "defaults" : {
+      "inventory" : {
+         "name" : "Demo Inventory",
+         "id" : 1
+      },
+      "verbosity" : 0,
+      "extra_vars" : "",
+      "credentials" : [
+         {
+            "passwords_needed" : [],
+            "credential_type" : 1,
+            "name" : "Demo Credential",
+            "id" : 1
+         }
+      ],
+      "diff_mode" : false,
+      "skip_tags" : "",
+      "job_type" : "run",
+      "job_tags" : "",
+      "limit" : ""
+   },
+   "ask_skip_tags_on_launch" : false,
+   "passwords_needed_to_start" : [],
+   "ask_variables_on_launch" : false,
+   "ask_credential_on_launch" : false,
+   "inventory_needed_to_start" : false,
+   "ask_limit_on_launch" : false,
+   "survey_enabled" : false,
+   "ask_diff_mode_on_launch" : false,
+   "ask_verbosity_on_launch" : false,
+   "credential_needed_to_start" : false,
+   "ask_job_type_on_launch" : false,
+   "can_start_without_user_input" : true,
+   "variables_needed_to_start" : [],
+   "ask_tags_on_launch" : false
+}
+Most of this information is discussed in more detail in the Ansible Tower API Guide in the chapter on launching job templates. Notice that the id and name of the Inventory and machine Credential for the job is listed, and no extra information is needed to launch the job.
+
+Because no extra information is needed, the job can be launched by accessing the URI with a POST method. Information about the job is returned. In particular, note that the job id (72) returns a pending status, because it has been launched but has not yet completed.
+
+[user@demo ~]$ curl -X POST --user admin:redhat \
+> https://tower.lab.example.com/api/v2/job_templates/"Demo Job Template"/launch/ -k -s | json_pp
+{
+   "result_traceback" : "",
+   "passwords_needed_to_start" : [],
+   "elapsed" : 0,
+   "ignored_fields" : {},
+   "skip_tags" : "",
+   "summary_fields" : {
+      "unified_job_template" : {
+         "unified_job_type" : "job",
+         "name" : "Demo Job Template",
+         "id" : 5,
+         "description" : ""
+      },
+      "inventory" : {
+         "organization_id" : 1,
+         "total_hosts" : 1,
+         "total_inventory_sources" : 0,
+         "name" : "Demo Inventory",
+         "inventory_sources_with_failures" : 0,
+         "has_inventory_sources" : false,
+         "description" : "",
+         "kind" : "",
+         "total_groups" : 0,
+         "id" : 1,
+         "hosts_with_active_failures" : 0,
+         "groups_with_active_failures" : 0,
+         "has_active_failures" : false
+      },
+      "extra_credentials" : [],
+      "project" : {
+         "scm_type" : "",
+         "status" : "ok",
+         "name" : "Demo Project",
+         "id" : 4,
+         "description" : ""
+      },
+      "credentials" : [
+         {
+            "cloud" : false,
+            "kind" : "ssh",
+            "credential_type_id" : 1,
+            "name" : "Demo Credential",
+            "id" : 1,
+            "description" : ""
+         }
+      ],
+      "user_capabilities" : {
+         "delete" : true,
+         "start" : true
+      },
+      "job_template" : {
+         "name" : "Demo Job Template",
+         "id" : 5,
+         "description" : ""
+      },
+      "modified_by" : {
+         "id" : 1,
+         "last_name" : "",
+         "first_name" : "",
+         "username" : "admin"
+      },
+      "labels" : {
+         "count" : 0,
+         "results" : []
+      },
+      "credential" : {
+         "cloud" : false,
+         "kind" : "ssh",
+         "credential_type_id" : 1,
+         "name" : "Demo Credential",
+         "id" : 1,
+         "description" : ""
+      },
+      "created_by" : {
+         "id" : 1,
+         "last_name" : "",
+         "first_name" : "",
+         "username" : "admin"
+      }
+   },
+   "timeout" : 0,
+   "url" : "/api/v2/jobs/72/",
+   "instance_group" : null,
+   "id" : 72,
+   "scm_revision" : "",
+   "ask_credential_on_launch" : false,
+   "job_cwd" : "",
+   "unified_job_template" : 5,
+   "vault_credential" : null,
+   "playbook" : "hello_world.yml",
+   "name" : "Demo Job Template",
+   "ask_limit_on_launch" : false,
+   "description" : "",
+   "ask_diff_mode_on_launch" : false,
+   "modified" : "2018-11-20T11:09:50.004538Z",
+   "related" : {
+      "relaunch" : "/api/v2/jobs/72/relaunch/",
+      "project" : "/api/v2/projects/4/",
+      "create_schedule" : "/api/v2/jobs/72/create_schedule/",
+      "job_host_summaries" : "/api/v2/jobs/72/job_host_summaries/",
+      "credentials" : "/api/v2/jobs/72/credentials/",
+      "notifications" : "/api/v2/jobs/72/notifications/",
+      "modified_by" : "/api/v2/users/1/",
+      "stdout" : "/api/v2/jobs/72/stdout/",
+      "labels" : "/api/v2/jobs/72/labels/",
+      "inventory" : "/api/v2/inventories/1/",
+      "unified_job_template" : "/api/v2/job_templates/5/",
+      "extra_credentials" : "/api/v2/jobs/72/extra_credentials/",
+      "job_events" : "/api/v2/jobs/72/job_events/",
+      "activity_stream" : "/api/v2/jobs/72/activity_stream/",
+      "job_template" : "/api/v2/job_templates/5/",
+      "cancel" : "/api/v2/jobs/72/cancel/",
+      "credential" : "/api/v2/credentials/1/",
+      "created_by" : "/api/v2/users/1/"
+   },
+   "forks" : 0,
+   "job_type" : "run",
+   "ask_job_type_on_launch" : false,
+   "job_tags" : "",
+   "type" : "job",
+   "credential" : 1,
+   "finished" : null,
+   "ask_inventory_on_launch" : false,
+   "job_env" : {},
+   "use_fact_cache" : false,
+   "artifacts" : {},
+   "project" : 4,
+   "status" : "pending",
+   "event_processing_finished" : false,
+   "diff_mode" : false,
+   "ask_skip_tags_on_launch" : false,
+   "failed" : false,
+   "execution_node" : "",
+   "job_explanation" : "",
+   "ask_variables_on_launch" : false,
+   "launch_type" : "manual",
+   "limit" : "",
+   "allow_simultaneous" : false,
+   "job_args" : "",
+   "start_at_task" : "",
+   "inventory" : 1,
+   "verbosity" : 0,
+   "extra_vars" : "{}",
+   "job" : 72,
+   "created" : "2018-11-20T11:09:49.813893Z",
+   "force_handlers" : false,
+   "ask_verbosity_on_launch" : false,
+   "job_template" : 5,
+   "controller_node" : "",
+   "started" : null,
+   "ask_tags_on_launch" : false
+   }
+The JSON formatted output of this example shows the id of this job is 72. You can use the job id to retrieve updated status information, such as whether or not the job has completed. For job 72, use the URI /api/v2/jobs/72/, as indicated by the url field in the preceding output.
+
+[user@demo ~]$ curl -X GET --user admin:redhat \
+> https://tower.lab.example.com/api/v2/jobs/72/ -k -s | json_pp
+This reports job status (success or failure), at what time the job finished, the result_stdout of the Ansible Playbook, which playbook was used, as well as other information about the inventory, credentials, and project from the job template, and more.
+
+NOTE
+You can also launch Job Templates using the internal ID number instead of their name. In earlier versions of Red Hat Ansible Tower, using the version 1 API, you had to launch Job Templates using only the ID number.
+
+First, find the id number of your Job Template. If you know the name of the Job Template, you can use the API to search for it. For example, if the desired Job Template is named Demo Job Template, you can search for it with the following curl command:
+
+[user@demo ~]$ curl -X GET --user admin:redhat \
+> https://tower.lab.example.com/api/v2/job_templates/?name="A Job Template" \
+> -k -s | json_pp
+...output omitted...
+         "timeout" : 0,
+         "url" : "/api/v2/job_templates/6/",
+         "id" : 6,
+         "ask_credential_on_launch" : false,
+         "last_job_failed" : false,
+         "vault_credential" : null,
+         "playbook" : "hello_world.yml",
+         "name" : "A Job Template",
+...output omitted...
+Then you can refer to the Job Template using its ID number and not its name in the URL, as follows:
+
+[user@demo ~]$ curl -X POST --user admin:redhat \
+> https://tower.lab.example.com/api/v2/job_templates/6/launch/ -k -s
+Launching a Job Using the API from an Ansible Playbook
+You can use an Ansible Playbook to launch a Job Template by using the uri module to access the Ansible Tower API. It is also possible to run that playbook from a Job Template in Ansible Tower and use it to launch another Job Template as one of its tasks.
+
+In the playbook, specify the correct URL to your Job Template, using the ID or the Named URL. You must also provide sufficient credentials to Ansible Tower to authenticate as a user who has permission to launch the job.
+
+The following Ansible Playbook can start a new job from one of the Ansible Tower server's existing Job Templates, using the Ansible Tower API:
+
+---
+- name: Tower API
+  hosts: localhost
+  become: false
+
+  vars:
+    tower_user: admin1
+    tower_pass: redhat
+    tower_host: demo.example.com
+    tower_job: Demo%20Job%20Template2
+
+  tasks:
+    - name: Launch a new Job
+      uri:3
+        url: https://{{ tower_host }}/api/v2/job_templates/{{ tower_job }}/launch/
+        method: POST
+        validate_certs: no
+        return_content: yes
+        user: "{{ tower_user }}"
+        password: "{{ tower_pass }}"
+        force_basic_auth: yes
+        status_code: 201
+1
+
+To access the API, Ansible requires the login credentials for a user that is allowed to launch a Job from a Job Template. In the example, two variables are used to store the relevant information: tower_user and tower_pass.
+
+2
+
+The playbook also requires the URL of the actual API to which Ansible must connect. This example uses the named URL to the Demo Job Template. Notice how the spaces in the Job Template name have been specified using the %20 code. You can also use the urlencode filter: tower_job: "{{ 'Demo Job Template' | urlencode }}"
+
+3
+
+Ansible can access the Ansible Tower API from the Ansible Tower server by using the uri module.
+
+The problem with this example is that it embeds the username and password for authentication to the Ansible Tower server in the playbook. To protect that data, you should either encrypt the playbook with Ansible Vault, or move the secrets into a variable file and encrypt that file with Ansible Vault. You should do this before you commit files containing those secrets to your source control repository.
+
+[user@demo ~]$ ansible-vault encrypt api_demo.yml
+New Vault password: your_password
+Confirm New Vault password: your_password
+Vault Credentials
+
+For Ansible Tower to use encrypted files (such as a playbook or included variable file containing secrets), you must set up a Vault Credential in Ansible Tower that can decrypt those files. You must also configure any Job Templates that use the Project with a Vault Credential, in addition to any machine credentials or other credentials that Project needs.
+
+First, create a Vault Credential that stores the Vault password for those files. This Credential is encrypted and stored in the Ansible Tower server's database, just like Machine Credentials. The following procedure describes how to create this type of Credential:
+
+Log in as a User with the appropriate role assignment. If creating a private Credential, there are no specific role requirements. If creating an Organization Credential, log in as a User with the Admin role for the Organization.
+
+Click Credentials in the left navigation bar to open the Credentials management interface.
+
+On the CREDENTIAL screen, click + to create a new Credential.
+
+On the NEW CREDENTIAL screen, enter the required information for the new Credential.
+
+Enter a name for the new Credential, and then select Vault from the TYPE list.
+
+If the user has Organization Admin privileges, the ORGANIZATION can be set to assign this Credential to an Organization. If the User does not have admin privileges, the ORGANIZATION field is not present and only private Credentials can be created.
+
+For Vault Credentials, additional fields appear in the TYPE DETAILS section, as shown in the following illustration:
+
+
+Figure 11.5: New Vault credential (after Save)
+Two fields contain the information needed to decrypt the Vault protected Playbooks.
+
+VAULT PASSWORD is the password with which the playbook has been encrypted.
+
+VAULT IDENTIFIER is the optional Vault ID, only needed if the playbook has been encrypted using multiple passwords.
+
+Click SAVE to save the new Vault Credential.
+
+After you have the Vault Credential in place, you can create a new Job Template that will use it to decrypt your encrypted project file or files. This Job Template must include the Vault Credential required to decrypt the project files as one of its Credentials.
+
+
+Figure 11.6: Job Template with Vault Credential
+When you have finished, a job can be launched using the new Job Template. When you launch the Job Template, Ansible Tower decrypts the encrypted playbook using the Vault Credential. When it runs the playbook, the task that accesses the API to launch another Job Template is executed. This launches a new job on the Ansible Tower server, using the Job Template referenced by the playbook's task.
+
+NOTE
+In recent versions of Ansible, you can encrypt different files with different Ansible Vault passwords. Ansible Tower can use multiple Vault Credentials in the same Job Template to ensure that it can decrypt all files in the project that were encrypted with Ansible Vault.
+
+Token-based Authentication
+Since Red Hat Ansible Tower 3.3, the API uses OAuth 2 to provide token-based authentication. Any call to the API with a valid token in the headers of the request will be authenticated. There are two kinds of tokens: Application Tokens and Personal Access Tokens.
+
+Application Tokens are requested for an application that was previously created in Tower, and represents a client application that will access the API frequently with multiple users. Personal Access Tokens (PAT) are a much simpler mechanism, providing access to the API for a single user.
+
+This example shows a request for a Personal Access Token, as well as how to use the issued token to launch a Job Template.
+
+---
+- name: Tower API
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    tower_user: admin
+    tower_pass: redhat
+    tower_host: tower.lab.example.com
+    template_name: DEV ftpservers setup
+
+  tasks:
+    - name: Get the token
+      uri:
+        url: "https://{{ tower_host }}/api/v2/users/1/personal_tokens/"
+        method: POST
+        validate_certs: false
+        return_content: true
+        user: "{{ tower_user }}"
+        password: "{{ tower_pass }}"
+        force_basic_auth: true 1
+        status_code: 201
+      register: response 2
+
+    - name: Use the token
+      uri:
+        url: "https://{{ tower_host }}/api/v2/job_templates/{{ template_name | urlencode }}/launch/"
+        method: POST
+        validate_certs: false
+        return_content: true
+        status_code: 201
+        headers:
+          Authorization: "Bearer {{ response['json']['token'] }}" 3
+          Content-Type: "application/json"
+      register: launch
+1
+
+We use the regular authentication mechanism.
+
+2
+
+Save the result for later use.
+
+3
+
+Use the token in the response variable to provide the authentication.
+
+REFERENCES
+Ansible Tower API Guide
+
+Token-Based Authentication
+
+
+
+
+Guided Exercise: Launching Jobs with the Ansible Tower API
+In this exercise, you will launch a job from an existing Job Template by running an Ansible Playbook.
+
+Outcomes
+
+You should be able to:
+
+Launch a job from an existing job template by running an Ansible Playbook.
+
+Ensure that the workstation and tower virtual machines are started.
+
+Log in to the workstation machine as the student user, using student as the password.
+
+On the workstation machine, run the lab api-tower start command, which verifies that Ansible Tower services are running and all the required resources are available. The command also creates additional Vault credentials and uploads a new playbook into the Git repository.
+
+[student@workstation ~]$ lab api-tower start
+In the first part of this exercise, you will directly use the REST API provided by Ansible Tower.
+
+On the workstation machine, use Firefox to view the resources available from your Ansible Tower server's API.
+
+In Firefox, navigate to https://tower.lab.example.com/api/. You should see your Ansible Tower server's browsable API. If you are not logged in, log in as the user admin, using redhat as the password.
+
+Click the /api/v2/ link to access the browsable list of all the available resources accessible through the API.
+
+...output omitted...
+{
+    "ping": "/api/v2/ping/",
+    "instances": "/api/v2/instances/",
+    "instance_groups": "/api/v2/instance_groups/",
+...output omitted...
+From the list, click the /api/v2/ping/ link to access that URI. You should see a recent heartbeat time stamp. This URI can be used by an external program to verify that the Ansible Tower server is operating.
+
+HTTP 200 OK
+Allow: GET, HEAD, OPTIONS
+Content-Type: application/json
+Vary: Accept
+X-API-Node: localhost
+X-API-Time: 0.008s
+
+
+{
+     "instance_groups": [
+         {
+...output omitted...
+             "node": "localhost",
+             "heartbeat": "2018-11-16T09:24:17802Z",
+...output omitted...
+In Firefox, use the API to launch a job from the existing Demo Job Template Job Template.
+
+Click the Version 2 link at the top of the page to return to the /api/v2/ URI.
+
+Click the /api/v2/job_templates/ link to access the list of available job templates.
+
+From the list of results, find the Job Template containing "name": "Demo Job Template". Find its url resource and click the link to access the template. The link should be /api/v2/job_templates/5/ or similar.
+
+Notice that the Job Template has a related named_url resource that provides a link with the Job Template name, which you can use when calling the API instead of using the Job Template's ID.
+
+On the resulting page, look for the Job Template's related resource named launch. Click the link associated with that resource. The link should be /api/v2/job_templates/5/launch/ or similar.
+
+This link sends a GET request to the launch resource for that Job Template, providing details about what information is needed to launch a job from the template.
+
+To monitor the execution of the job you are about to launch, open another Firefox tab and log in to the Ansible Tower web UI as the user admin, using redhat as the password. Click Jobs in the navigation bar.
+
+Go back to the https://tower.lab.example.com/api/v2/job_templates/5/launch/ tab. Scroll down to the bottom of this page and click the green POST button to launch the job.
+
+The page immediately refreshes with JSON information about the launched job, including the job's id number.
+
+Quickly switch to the tab displaying the JOBS page in the Ansible Tower web UI.
+
+The launched job should be at the top of the list of jobs that have been run. You can confirm it is the job you launched by matching its ID with the id in the JSON output for the job on the other tab.
+
+The curl command can also use the API to launch jobs from existing Job Templates. Use curl to launch a job from the existing Demo Job Template Job Template.
+
+To make it easier to read the JSON output provided by the curl command, ensure the perl-JSON-PP package is installed on workstation.
+
+[student@workstation ~]$ sudo yum install perl-JSON-PP
+Enter the password for the student user, student, when you are prompted. Review the packages that will install, if any, and enter a y character when prompted to begin package installation.
+
+Use the API with a name filter to search for the Demo Job Template Job Template. Determine the Job Template's ID. This ID should be the same as the one that you saw using Firefox earlier in this exercise. For your convenience, you can copy and paste the following command from the ~/DO447/labs/api-tower/curl_commands file.
+
+[student@workstation ~]$ curl -X GET --user admin:redhat \
+> https://tower.lab.example.com/api/v2/job_templates/?name="Demo Job Template" \
+> -k -s | json_pp
+In the previous command, the -k (--insecure) option instructs curl to operate even if it cannot verify the SSL certificate. With the -s (--silent) option, curl only displays the returned data and not the progress status or the error messages.
+
+Now that you have confirmed the ID for Demo Job Template, use that number and the Job Template's launch resource to get information about how to launch the job.
+
+[student@workstation ~]$ curl -X GET --user admin:redhat \
+> https://tower.lab.example.com/api/v2/job_templates/5/launch/ -k -s \
+> | json_pp
+{
+   "passwords_needed_to_start" : [],
+   "ask_limit_on_launch" : false,
+   "ask_inventory_on_launch" : false,
+   "can_start_without_user_input" : true,
+   "defaults" : {
+...output omitted...
+Alternatively, you can refer to the job template by its name in the API: https://tower.lab.example.com/api/v2/job_templates/"Demo Job Template"/launch/.
+
+Again, because you can launch this job without user input, you can issue a POST request to the same URL without any other data to launch the job.
+
+[student@workstation ~]$ curl -X POST --user admin:redhat \
+> https://tower.lab.example.com/api/v2/job_templates/5/launch/ -k -s \
+> | json_pp
+{
+...output omitted...
+   "unified_job_template" : 5,
+   "network_credential" : null,
+   "extra_vars" : "{}",
+   "scm_revision" : "",
+   "job" : 28,
+   "modified" : "2017-05-24T16:34:49.086Z",
+   "description" : "",
+   "job_args" : "",
+   "name" : "Demo Job Template",
+...output omitted...
+   "id" : 28,
+   "verbosity" : 0,
+   "timeout" : 0,
+   "force_handlers" : false,
+   "type" : "job",
+   "playbook" : "hello_world.yml"
+...output omitted...
+}
+Note the ID number for the launched job in the JSON output.
+
+Return to the Ansible Tower web UI tab that displays the JOBS page.
+
+The job launched by the curl command should now be at the top of the list of jobs that have run. Again, you can confirm that it is the job you just launched by comparing the ID in the web UI with the ID in the JSON output from curl.
+
+In the second part of this exercise, you will configure and use the provided tower_api.yml playbook. This playbook uses the Ansible Tower API to remotely launch a new job based on an existing Job Template. Because the login and the password to access the API are stored in this playbook, it is encrypted using the ansible-vault command with a password of redhat.
+
+Optional. Clone the repository at http://git.lab.example.com:8081/git/my_webservers_DEV.git in the /home/student/git-repos directory. If you have already cloned the repository in a previous exercice, pull the new contents instead.
+
+[student@workstation ~]$ cd ~/git-repos
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/my_webservers_DEV.git
+[student@workstation git-repos]$ cd my_webservers_DEV
+[student@workstation my_webservers_DEV]$ git pull
+Inspect the contents of the tower_api.yml playbook and notice that the file is encrypted:
+
+[student@workstation my_webservers_DEV]$ cat tower_api.yml
+$ANSIBLE_VAULT;1.1;AES256
+38373162626337666162356239343939353334326532316165663439646263366433623737393830
+6135303131313931363866353839336664623134666563640a303465346463643632386231636634
+33393435333633363265363835353032663566313831626365386666333963373434663830356337
+3765313537643265610a616331383464386432643266326431363665386430656537366664613339
+...output omitted...
+Use the ansible-vault view command to display the contents of the playbook:
+
+[student@workstation my_webservers_DEV]$ ansible-vault view tower_api.yml
+Vault password: redhat
+...output omitted...
+  vars:
+    tower_user: admin
+    tower_pass: redhat
+    tower_host: tower.lab.example.com
+  tasks:
+
+    - name: Launch Job
+      uri:
+        url: https://{{ tower_host }}/api/v2/job_templates/DEV%20ftpservers%20setup/launch/
+        method: POST
+        validate_certs: no
+        return_content: yes
+        user: "{{ tower_user }}"
+        password: "{{ tower_pass }}"
+        force_basic_auth: yes
+        status_code: 201
+...output omitted...
+In the Ansible Tower instance, new credentials called vault have been created to provide the correct Vault password for decrypting the new playbook. Associate the new credentials with the new API usage Job Template.
+
+Click Templates in the left navigation bar.
+
+Click the API usage Job Template to edit the settings.
+
+Click the magnifying glass button under CREDENTIAL.
+
+In the CREDENTIALS window, click the CREDENTIAL TYPE list to access the list of available credential types.
+
+Choose the Vault credential type from the list. In the lower pane, select the vault credential name, and click SELECT to add this new credential to the API usage Job Template.
+
+Using this new credential in the Job Template, Ansible Tower will decrypt the provided and encrypted tower_api.yml playbook to access its own API to start a new job.
+
+Click SAVE at the bottom of the API usage window.
+
+Launch a new job based on the modified API usage Job Template.
+
+Scroll down the page and click the rocket icon in the API usage Job Template line.
+
+Observe the output of the playbook. Notice the Print Output task, which shows how the Ansible Tower API was used from the playbook to launch a new job.
+
+Click the Jobs link in the navigation bar.
+
+Notice how a new job called DEV ftpservers setup has been launched. This new job was launched by the tower_api.yml encrypted playbook used by the API usage Job Template.
+
+In addition to the API usage and the DEV ftpservers setup jobs, you may notice that Ansible Tower launches other jobs to update the associated Git projects.
+
+Finish
+
+On workstation, run the lab api-tower finish script to clean up this exercise.
+
+[student@workstation ~]$ lab api-tower finish

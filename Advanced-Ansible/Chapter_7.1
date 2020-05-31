@@ -1,0 +1,312 @@
+
+Chapter 7. Managing Access with Users and Teams
+Creating and Managing Ansible Tower Users
+Guided Exercise: Creating and Managing Ansible Tower Users
+Managing Users Efficiently with Teams
+Guided Exercise: Managing Users Efficiently with Teams
+Lab: Managing Access with Users and Teams
+Summary
+Abstract
+
+Goal	Create user accounts and organize them into teams in Red Hat Ansible Tower. Then, assign the users and teams permissions to administer and access resources in the Ansible Tower service.
+Objectives	
+Create new users in the web UI, and explain the different types of user in Ansible Tower.
+
+Create new teams in the web UI, assign users to them, and explain the different roles that can be assigned to users.
+
+Sections	
+Creating and Managing Ansible Tower Users (and Guided Exercise)
+
+Managing Users Efficiently with Teams (and Guided Exercise)
+
+Lab	
+Managing Access with Users and Teams
+
+Creating and Managing Ansible Tower Users
+Objectives
+After completing this section, students should be able to create new users in the web UI and explain the different types of users in Ansible Tower.
+
+Role-Based Access Controls
+Different people using an Ansible Tower installation need to have different levels of access. Some may simply need to run existing job templates against a preconfigured inventory of machines. Others need to be able to modify particular inventories, job templates, and playbooks. Still others may need access to change anything in the Ansible Tower installation.
+
+The Ansible Tower interface has a built-in administrative user, admin, that has superuser access to the entire Ansible Tower configuration. Setting up user accounts for each person makes it easier to manage individual access to Inventories, Credentials, Projects, and Job Templates.
+
+Users are assigned roles granting permissions that define who can see, change, or delete an object in Ansible Tower. Roles are managed with Role-Based Access Controls (RBAC). Roles can be managed collectively by granting them to a Team, which is a collection of users. All users in a team inherit the team's roles.
+
+Roles determine whether users and teams can see, use, change, or delete objects such as Inventories and Projects.
+
+Ansible Tower Organizations
+An Ansible Tower Organization is a logical collection of Teams, Projects, and Inventories. All Users must belong to an Organization.
+
+One of the benefits of implementing Ansible Tower is the ability to share Ansible roles and playbooks across departmental or functional boundaries within an enterprise. For example, an operations group of an organization may already have Ansible roles for provisioning production web, database, and application servers, which the developers group should use to provision servers to prepare their development environment. Ansible Tower makes it easier for different users and groups to use existing roles and playbooks.
+
+However, for very large deployments it can be useful to categorize large numbers of Users, Teams, Projects, and Inventories under one umbrella Organization. Certain departments may not deploy to certain inventories of hosts, or run certain playbooks. By using Organizations, a collection of Users and Teams can be configured to work with only those Ansible Tower resources that they are expected to use.
+
+As part of the Ansible Tower installation, a Default Organization is created. The following is the procedure for creating additional Organizations using the Ansible Tower web interface.
+
+Log in to the Ansible Tower web interface as the admin user.
+
+Click on the Organizations link located on the left navigation bar.
+
+Click on the + button to create a new Organization.
+
+In the provided fields, enter a name for the new Organization and, if desired, an optional description.
+
+
+Figure 7.1: Complete information about the new Organization
+Click SAVE to finalize the creation of the new Organization.
+
+User Types
+By default, the Ansible Tower installer creates an admin user account with full control of the Ansible Tower installation. Using the special admin account, an Ansible Tower administrator can log in to the web interface and create additional users.
+
+The three user types in Ansible Tower are:
+
+System Administrator
+
+The System Administrator user type (also known as Superuser) provides unrestricted access to perform any action within the entire Ansible Tower installation. System Administrator is a special singleton role, which has read-write permission on all objects in all Organizations on the Ansible Tower.
+
+The admin user created by the installer also has the System Administrator singleton role and should therefore only be used by the Ansible Tower administrator.
+
+System Auditor
+
+The System Auditor user type also has a special singleton role, which has read-only access to the entire Ansible Tower installation.
+
+Normal User
+
+Normal User is the standard user type. It initially has no special roles assigned, and starts with minimal access. It is not assigned any singleton roles, and is only assigned roles associated with the Organization of which the user is a member.
+
+Creating Users
+A user logged in as the Ansible Tower admin can create new users by executing the following procedure:
+
+Click on the Users link located on the left navigation bar.
+
+Click on the + button to create a new user.
+
+Enter the first name, last name, and email address for the new user into the FIRST NAME, LAST NAME, and EMAIL fields, respectively.
+
+In the USERNAME field, specify a unique username for the new user.
+
+Click the magnifying glass icon next to the ORGANIZATION field to display a list of Organizations within Ansible Tower. Select an Organization from the list and click SAVE.
+
+Enter the desired password for the new user into the PASSWORD and CONFIRM PASSWORD fields.
+
+Select a user type.
+
+Click SAVE to finish.
+
+
+Figure 7.2: Fill in information for the new user
+Editing Users
+Use the Edit User screen to edit the properties of the newly created user by executing the following procedure:
+
+Click the Users link on the left navigation bar.
+
+Click on the link for the user to edit.
+
+Make the changes to the desired fields.
+
+Click SAVE to finish.
+
+Organization Roles
+Newly created users inherit specific roles from their Organization, based on their user type. You can assign additional roles to a user after creation to grant permissions to view, use, or change other Ansible Tower objects. An Organization is itself one of these objects. There are four roles that users can be assigned on an Organization:
+
+Organizational Admin
+
+When assigned the Admin role on an Organization, a user gains the ability to manage all aspects of that Organization, including reading and changing the Organization, and adding and removing Users and Teams from the Organization.
+
+A number of related administrative roles exist that grant more limited access than Admin:
+
+Project Admin
+Can create, read, update and delete any project in the Organization. In conjunction with the Inventory Admin permission, this allows users to create Job Templates.
+
+Inventory Admin
+Can create, read, update and delete any inventory in the Organization. In conjunction with the Job Template Admin and Project Admin roles, this allows the user full control over job templates within the organization.
+
+Credential Admin
+Can create, read, update and delete shared credentials.
+
+Notification Admin
+Can be assigned notifications.
+
+Workflow Admin
+Can create workflows within the Organization.
+
+Job Template Admin
+Can make changes to nonsensitive fields on Job Templates. To make changes to fields that impact job runs, the user also needs the Admin role on the Job Template, the Use role on the related project, and the Use role in the related inventory.
+
+Auditor
+
+When assigned the Auditor role on an Organization, a user gains read-only access to the Organization.
+
+Member
+
+When assigned the Member role on an Organization, a user gains read permission to the Organization. The Organization Member role only provides a user the ability to view the list of users who are members of the Organization and their assigned Organization roles.
+
+Unlike the Organization Admin and Auditor roles, the Member role does not provide users permissions to any of the resources the Organization contains, such as Teams, Credentials, Projects, Inventories, Job Templates, Work Templates, and Notifications.
+
+Read
+
+When assigned the Read role on an Organization, a user gains read permission to the Organization only. The Organization Read role only provides a user with the ability to view the list of users who are members of the Organization and their assigned Organization roles.
+
+Unlike the Organization Admin and Auditor roles, the Read role does not inherit roles on any of the resources the Organization contains, such as Teams, Credentials, Projects, Inventories, Job Templates, Work Templates, and Notifications.
+
+The Organization object cannot be assigned roles on Ansible Tower resources. Therefore, a user that has the Member role on an Organization only has access to the Organization object and inherits no other permissions as a result of this role. Consequently, a user that has the Member role on an Organization is the equivalent of a user that has the Read role on an Organization.
+
+Execute
+
+When assigned the Execute role on an Organization, a user gains permission to execute Job Templates and Workflow Job Templates in the Organization.
+
+IMPORTANT
+Users with the System Administrator singleton role inherit the Admin role on every Organization within Ansible Tower.
+
+Users with the System Auditor singleton role inherit the Auditor role on every Organization within Ansible Tower.
+
+A user created with the Normal User user type is assigned a Member role on the Organization they were assigned to at the time of the user's creation in Ansible Tower. Other roles can be added later, including additional Member roles on other Organizations.
+
+Managing User Organization Roles
+
+The Edit User screen only allows changes to user type and the Organization a user belongs to. Since the user types designated to users determine their inherited Organization roles, modifying a user's Organization and user type can impact their Organization role.
+
+However, full administration of a user's role in an Organization requires the following procedure:
+
+Log in to the Ansible Tower web interface as admin or any user with the Admin role on the Organization being modified.
+
+Click on the Organizations link on the left navigation bar.
+
+Click on the Permissions link under the organization being managed.
+
+A list of users who have been granted roles to the Organization appears.
+
+If a user does not appear on the list and needs a role in the Organization, or if a user exists and needs additional Organization roles, use the following procedure:
+
+In the ADD USERS/TEAMS screen, under USERS, check the box next to the desired user.
+
+Click the SELECT ROLES drop-down and select the desired Organization role for the user. This step can be repeated multiple times to add multiple roles for a user.
+
+NOTE
+For a list of each role's definition, click the KEY button.
+
+
+Figure 7.3: Set the roles to assign on Organization
+Click SAVE to assign roles to the user for the Organization.
+
+Click the X preceding to the role to remove existing roles from a user.
+
+REFERENCES
+Ansible Tower User Guide http://docs.ansible.com/ansible-tower/latest/html/userguide
+
+
+
+Guided Exercise: Creating and Managing Ansible Tower Users
+In this exercise, you will create user accounts of different types and explore the different levels of access of those account types.
+
+Outcomes
+
+You should be able to create user accounts and describe the access provided by different account types.
+
+You should have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in to the Ansible Tower web interface running at https://tower.lab.example.com on the tower system using the admin account and the redhat password.
+
+Create a user, sam, as a Normal User.
+
+Go to Users in the left navigation bar.
+
+Click the + button to add a new user.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Sam
+LAST NAME	Simons
+ORGANIZATION	Default
+EMAIL	sam@lab.example.com
+USERNAME	sam
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	Normal User
+Click SAVE to create the new user.
+
+Verify the permissions for the newly created sam user.
+
+Click PERMISSIONS to see the user’s permissions.
+
+As you can see, sam is simply a Member of the Default Organization.
+
+Click the Log Out icon in the top right corner to log out and then log back in as sam with password of redhat123.
+
+In the left navigation bar, you can see the user's access is limited.
+
+Click Users in the left navigation bar to manage user permission. As you can see, it is not possible for sam to add new users.
+
+Click the Log Out icon in the top right corner to log out.
+
+Create a user, sylvia, as a System Auditor.
+
+Log back in as admin user with password of redhat.
+
+Click Users in the left navigation bar to manage users.
+
+Click the + button to add a new user.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Sylvia
+LAST NAME	Simons
+ORGANIZATION	Default
+EMAIL	sylvia@lab.example.com
+USERNAME	sylvia
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	System Auditor
+Click SAVE to create the new user.
+
+Verify the permissions for sylvia.
+
+Click PERMISSIONS to see the user’s permissions.
+
+As you can see, sylvia has the role of a System Auditor.
+
+Log out and log back in as sylvia with password of redhat123.
+
+You can see the user has access to all the elements in the left navigation bar.
+
+Click Users in the left navigation bar to manage Users. As you can see, it is not possible for sylvia to add new users.
+
+Click the Log Out icon to log out of the Tower web interface.
+
+Create a user, simon, as a System Administrator.
+
+Log in to the Tower web interface as the admin user with the redhat password.
+
+Click Users in the left navigation bar to manage users.
+
+Click the + button to add a new user.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Simon
+LAST NAME	Stephens
+ORGANIZATION	Default
+EMAIL	simon@lab.example.com
+USERNAME	simon
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	System Administrator
+Click SAVE to create the new user.
+
+Verify the permissions for simon.
+
+Click PERMISSIONS to see the user’s permissions. This time the permissions explicitly say "SYSTEM ADMINISTRATORS HAVE ACCESS TO ALL PERMISSIONS".
+
+Log out and log back in as simon with password of redhat123.
+
+You can see, the user has access to all the elements in the left navigation bar.
+
+Click Users in the left navigation bar to manage users. As you can see, simon has the rights to create new users.
+
+Click the Log Out icon to log out of the Tower web interface.
+
+This concludes the guided exercise.

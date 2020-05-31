@@ -1,0 +1,192 @@
+Creating Workflow Job Templates and Launching Workflow Jobs
+Objectives
+After completing this section, students will be able to create a Workflow Job Template and launch multiple Ansible jobs as a single workflow.
+
+Workflow Job Templates
+In a previous section, you learned how to use Job Templates to run single Ansible Playbooks as jobs. As an organization's use of Ansible grows, so does the number of Ansible Playbooks it has. Each playbook typically performs a set of tasks associated with a certain function.
+
+Instead of writing one large playbook to automate a complex operation, you might want to run several playbooks in sequence. For example, to provision a server you might need to use the Networking team's playbook to allocate an IP address to the server and set up a DNS record, then use a separate playbook from the Operations team to install and configure the server's operating system. Finally, you would use a playbook from the Development team to deploy an application. In other words, there is a particular workflow that you need to follow for the process to succeed.
+
+This could be managed in Ansible Tower by having users manually launch multiple jobs in sequence. But the jobs have to be executed in the correct order, as defined by your workflow, for everything to work correctly.
+
+The Networking jobs have to be executed first.
+
+The Operations jobs would follow only if the Networking jobs were successfully completed.
+
+Likewise, the Application Development jobs would then follow only if the Networking and Operations jobs successfully completed.
+
+Finally, if one of these playbooks fails, you might want to run other playbooks to recover.
+
+To make this easier to manage, Red Hat Ansible Tower supports Workflow Job Templates. A Workflow Job Template connects multiple Job Templates into a workflow. When launched, the Workflow Job Template launches a job using the first Job Template, and depending on whether it succeeds or fails, determines which Job Template to launch next. This allows a sequence of jobs to be launched, and for recovery steps to be taken automatically if a job fails.
+
+Workflow Job Templates can be started in many ways: manually, from the Ansible Tower web UI; as a scheduled job; by an external program using the Ansible Tower API.
+
+Workflow Job Templates do not just run Job Templates in a serial fashion. Using the graphical workflow editor, Workflow Job Templates chain together multiple Job Templates and run different Job Templates depending on whether the previous one succeeded or failed.
+
+Creating Workflow Job Templates
+You need to create a Workflow Job Template before a workflow can be defined and associated with it. They can be created with or without an Organization. Creating a Workflow Job Template within the context of an Organization requires that the user has the admin role for the Organization. The singleton System Administrator user type is required in order to create a Workflow Job Template that is not part of an Organization.
+
+
+Figure 10.7: Creating a Workflow Job Template
+Workflow Job Templates are created in a similar fashion to Job Templates.
+
+Click Templates in the left navigation bar to access the Template management interface.
+
+Click the + button and select Workflow Template.
+
+Enter a unique name for the Workflow Job Template in the NAME field. Optionally enter any desired key-value pairs in the EXTRA VARIABLES field.
+
+Click SAVE to create the Workflow Job Template. After a Workflow Job Template has been created, you can use the Workflow Visualizer to define an associated workflow.
+
+Using the Workflow Visualizer
+
+After you have created a Workflow Job Template, the WORKFLOW VISUALIZER becomes active in the Workflow Job Template editing screen. The Workflow Editor opens in a new window. The Workflow Visualizer is a graphical interface for defining the job templates to incorporate in a workflow as well as the decision tree structure, which should be used to chain the job templates together.
+
+
+Figure 10.8: Starting a workflow in the Workflow Visualizer
+When the Workflow Visualizer is launched, it contains a single START node representing the starting point for the execution of the workflow. Click START to initiate the workflow editing process; the Workflow Visualizer displays a list of Ansible Tower resources, which can be added as the first step of the workflow. You can select the desired resource type, the specific resource, and then click SELECT to add an Ansible Tower resource as the first node in the workflow.
+
+In addition to Job Templates, jobs that synchronize Projects or Inventories can also be incorporated into a workflow. This is useful to ensure that Project and Inventory resources are updated prior to the use of Job Templates that depend on them. To make them easier to identify, Project Sync and Inventory Sync nodes are indicated by a P or an I in the lower-left of the node, respectively. This notation is explained by the key at the top of the Workflow Editor screen. Job Template nodes are not marked with any special notation because they are the main node type in a workflow.
+
+
+Figure 10.9: Adding an 'On Success' node to the workflow
+After a resource has been added as the first workflow node, hovering over it causes two buttons to appear. The red - button deletes the node and the green + button adds a subsequent node. When adding subsequent nodes, the RUN prompt appears in the resource selection panel prompting for additional input when you select a resource. The following three choices are offered by this prompt to designate the relationship between the new node and the preceding node.
+
+RUN	Node Relationship
+On Success	The node resource is executed upon successful completion of the actions associated with the previous node.
+On Failure	The node resource is executed upon failure of the actions associated with the previous node.
+Always	The node resource is executed regardless of the outcome of the actions associated with the previous node.
+A node can have more than one child node. For example, a child node can be added with a parent node association type of On Success and another child node can be added with an association type of On Failure. For example, you can add a child node to a parent node using an On Success association type. You can add a second child node to the same parent using an On Failure association type. This creates a branch in the workflow structure such that one course of action is taken upon the success of an action, and a different course is taken upon failure.
+
+
+Figure 10.10: Adding multiple child nodes to the workflow
+As nodes are added to a workflow, differently colored lines connecting the nodes in the Workflow Editor indicate the relationships between parent and child nodes. A green line indicates an On Success type relationship between a parent and child node, and a red line indicates an On Failure type relationship. A blue line indicates an Always type relationship.
+
+
+Figure 10.11: Workflow node relationships
+After the entire decision tree structure of the workflow has been created in the Workflow Editor, click SAVE to save the workflow.
+
+Surveys
+
+Workflow Job Templates have access to many of the features that have been discussed for Job Templates. Like Job Templates, Workflow Job Templates can have Surveys added to them to allow users to interactively set extra variables.
+
+NOTE
+When Surveys are added to a Workflow Job Template, the resulting extra variables are accessible by every job executed by the workflow.
+
+Launching Workflow Jobs
+Like Job Templates, Users need the execute role on the Workflow Job Template to execute it. When assigned the execute role, a User can launch a job through a Workflow Job Template even if they do not have permissions to independently launch the Job Templates it uses.
+
+The procedure to launch a Workflow Job Template is similar to how to launch a Job Template
+
+Click Templates in the navigation bar to access the Template management interface.
+
+Click the Workflow Job Template's rocket icon to launch the job.
+
+Evaluating Workflow Job Execution
+
+After a workflow job is launched, the Ansible Tower web UI displays the Job Details page for the job being executed. This page consists of two panes. The DETAILS pane displays details of the workflow job execution. The workflow progress pane displays the progress of the job through the steps in the workflow.
+
+As each step is completed, its node is outlined in either green or red, indicating the success or failure of the actions associated with that step in the workflow. Progressions from one step to another are represented by colored lines indicating the decision responsible for the progression. Green indicates an On Success progression, and red indicates an On Failure progression. Blue indicates an Always progression.
+
+
+Figure 10.12: Workflow job progress
+Details of the workflow job's run can be displayed either during or after the execution. Each node in the workflow diagram representing a currently running job or completed job provides a DETAILS link. You can click this link to display the results and standard output for the job run.
+
+REFERENCES
+Ansible Tower User Guide https://docs.ansible.com/ansible-tower/latest/html/userguide/
+
+
+
+Guided Exercise: Creating Workflow Job Templates and Launching Workflow Jobs
+In this exercise, you will create a Workflow Job Template to launch multiple jobs and launch it using the web UI.
+
+Outcomes
+
+You should be able to create a Workflow Job Template and launch a Workflow from the Ansible Tower web UI.
+
+You have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab project-workflow start. This script ensures that the workstation and tower virtual machines are started.
+
+[student@workstation ~]$ lab project-workflow start
+Log in to the Ansible Tower web UI running on the tower as admin using redhat as the password.
+
+Create a Workflow Job Template called From Dev to Test.
+
+Click Templates in the left navigation bar.
+
+Click the + button to add a new Workflow Job Template.
+
+Select Workflow Template from the list.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	From Dev to Test
+DESCRIPTION	Deploy to Dev and on success deploy to Test
+ORGANIZATION	Default
+EXTRA VARIABLES	deployment_version: "v1.1"
+Click SAVE to create the new Workflow Job Template.
+
+Configure the Workflow of the From Dev to Test Workflow Job Template.
+
+The WORKFLOW VISUALIZER opens automatically.
+
+Click START to add the first action. This displays a list of actions to be performed in the right panel.
+
+In the right panel, click PROJECT SYNC to display the list of projects available.
+
+Select My Webservers DEV and click SELECT. This links the START node with a blue line (always perform) to the node for the Project, My Webservers DEV, in the Workflow Visualizer window.
+
+Move your mouse over the new node and click on the green + button to add an action after the Project Sync of My Webservers DEV. This displays a list of actions to be performed in the right panel.
+
+In the right panel, make sure you are in the JOBS section and select the DEV webservers setup Job Template.
+
+In the RUN section below, select On Success and click SELECT. This links the node for the My Webservers DEV Project to a new node for the DEV webservers setup Job Template in the Workflow Visualizer window. The green link indicates that the progression only takes place upon success of the first step.
+
+Move your mouse over the new node and click the green + button to add an action after the DEV webservers setup Job Template.
+
+In the right panel, click PROJECT SYNC to display the list of available Projects.
+
+Select My Webservers TEST. In the RUN section below, select On Success and click SELECT.
+
+Move your mouse over the new node and click the green + button to add an action after the Project Sync of My Webservers TEST.
+
+In the right panel, make sure you are in the JOBS section and select the TEST webservers setup Job Template. In the RUN section below, select On Success and click SELECT.
+
+Click SAVE to save the Workflow Job Template.
+
+Launch a job using the From Dev to Test Workflow Job Template.
+
+Click Templates in the navigation bar.
+
+On the same line as the From Dev to Test Workflow Job Template, click the rocket icon on the right to launch the Workflow. This redirects you to a detailed status page of the running Workflow.
+
+Observe the running Jobs of the Workflow. You can click the DETAILS link of each running Job to see a more detailed live output of each job.
+
+Verify that the STATUS of the Workflow in the DETAILS section of the page is Successful.
+
+Verify that the web servers have been updated on servera.lab.example.com, serverb.lab.example.com, serverc.lab.example.com, and serverd.lab.example.com.
+
+Open a web browser and navigate to http://servera.lab.example.com, http://serverb.lab.example.com, http://serverc.lab.example.com, and http://serverd.lab.example.com in separate tabs. You should see this line at the bottom of each page:
+
+Deployment Version: v1.1
+Shut down servera.lab.example.com and launch a job using the From Dev to Test Workflow Job Template. Observe how the DEV webservers setup job node fails, which makes the whole workflow fail.
+
+On workstation, open a terminal and open an SSH connection to servera.lab.example.com. Use shutdown -h now to shut down the server.
+
+[student@workstation ~]$ ssh root@servera
+[root@servera ~]# shutdown -h now
+Go back to the Ansible Tower web UI and click Templates in the navigation bar.
+
+On the same line as the From Dev to Test Workflow Job Template, click the rocket icon on the right to launch the Workflow. This redirects you to a detailed status page of the running Workflow.
+
+Observe the running Jobs of the Workflow. You can click the DETAILS link of each running Job to see a more detailed live output of each Job. When you click the DETAILS link for the failed DEV webservers setup node, you see that the job failed because servera.lab.example.com could not be reached. In this workflow example, when one of the nodes fails, the whole workflow reports its status as being Failed.
+
+Verify that the STATUS of the Workflow in the DETAILS section of the page is Failed.
+
+Start the servera.lab.example.com server.
+
+This concludes the guided exercise.
+
+

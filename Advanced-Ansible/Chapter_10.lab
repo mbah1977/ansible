@@ -1,0 +1,178 @@
+
+Lab: Constructing Advanced Job Workflows
+Performance Checklist
+
+In this exercise, you will create a new Workflow Job Template that uses a Survey to set variables, and Fact Caching to speed up the workflow.
+
+Outcomes
+
+You will be able to create a Workflow Job Template with an associated Survey and Notification Template and then launch a job from the Ansible Tower web UI using the Workflow Job Template.
+
+You have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user with student as password on workstation and run lab project-review start. This script creates all the necessary objects (Git repository, Project, and Job Template) for use with the Prod Inventory.
+
+[student@workstation ~]$ lab project-review start
+Log in to the Ansible Tower web UI running on tower as admin using redhat as the password.
+
+Enable the Fact Caching option for the TEST webservers setup Job Template and PROD webservers setup Job Template.
+
+In the navigation bar, click Templates.
+
+Click the TEST webservers setup Job Template to edit the Template.
+
+If not already selected, select USE FACT CACHE to enable the Fact Caching option.
+
+Click SAVE.
+
+Scroll down and click PROD webservers setup Job Template to edit the Template.
+
+If not already selected, select USE FACT CACHE to enable the Fact Caching option.
+
+Click SAVE.
+
+Create a Workflow Job Template called From Test to Prod with the following information.
+
+Field	Value
+NAME	From Test to Prod
+DESCRIPTION	Deploy to Test and on success deploy to Prod
+ORGANIZATION	Default
+EXTRA VARIABLES	deployment_version: "v1.3"
+Click Templates in the navigation bar.
+
+Click the + button to add a new Workflow Job Template.
+
+From the drop-down list, select Workflow Template.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	From Test to Prod
+DESCRIPTION	Deploy to Test and on success deploy to Prod
+ORGANIZATION	Default
+EXTRA VARIABLES	deployment_version: "v1.3"
+Click SAVE to create the new Workflow Job Template.
+
+Configure the From Test to Prod Workflow Job Template so that it contains the following steps.
+
+Synchronize the My Webservers TEST Project.
+
+Upon success of the previous step, launch the TEST webservers setup Job Template.
+
+Upon success of the previous step, synchronize the My Webservers PROD Project.
+
+Upon success of the previous step, launch the PROD webservers setup Job Template.
+
+Click WORKFLOW VISUALIZER to open the Workflow Visualizer.
+
+Click START to add the first action to be performed. This displays a list of actions to be performed in the right panel.
+
+In the right panel, click PROJECT SYNC to display the list of available Projects. Select My Webservers TEST and then click SELECT. In the Workflow Visualizer window, this links the START node to the node for the My Webservers TEST Project with a blue line, indicating that this step will always be performed.
+
+Move your mouse over the new node and click the green + button to add an action after the Project Sync of My Webservers TEST. This displays a list of actions to be performed in the right panel.
+
+In the right panel, make sure that you are in the JOBS section. Select the TEST webservers setup Job Template. Depending on the size of your web browser window, you may need to look at the next page to find the Job Template. In the RUN section, select On Success and click SELECT.
+
+The Workflow Visualizer window should show the node for the My Webservers TEST Project linked by a green line to the TEST webservers setup Job Template. This indicates that if the Project Sync for My Webservers TEST is successful, the TEST webservers setup Job Template will be launched.
+
+Move your mouse over the new node and click the green + button to add an action after the TEST webservers setup Job Template.
+
+In the right panel, click PROJECT SYNC to display the list of available Projects. Select My Webservers PROD and click SELECT.
+
+Move your mouse over the new node and click the green + button to add an action after the Project Sync of My Webservers PROD.
+
+In the right panel, make sure you are in the JOBS section and select the PROD webservers setup Job Template. In the RUN section below, select On Success and click SELECT.
+
+Click SAVE to save the Workflow Job Template.
+
+Add a Survey containing the following information to the From Test to Prod Workflow Job Template. Make sure this is a required survey.
+
+Field	Value
+PROMPT	What version are you deploying?
+DESCRIPTION	This version number will be displayed at the bottom of the index page.
+ANSWER VARIABLE NAME	deployment_version
+ANSWER TYPE	Text
+MINIMUM LENGTH	1
+MAXIMUM LENGTH	40
+DEFAULT ANSWER	v1.0
+Click ADD SURVEY to add a Survey.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+PROMPT	What version are you deploying?
+DESCRIPTION	This version number will be displayed at the bottom of the index page.
+ANSWER VARIABLE NAME	deployment_version
+ANSWER TYPE	Text
+MINIMUM LENGTH	1
+MAXIMUM LENGTH	40
+DEFAULT ANSWER	v1.0
+REQUIRED	Selected
+Click ADD to add the Survey Prompt to the Survey. This displays a preview of your Survey on the right.
+
+IMPORTANT
+Before saving, make sure that the ON/OFF switch is set to ON at the top of the Survey editor window.
+
+Click SAVE to add the Survey to the Workflow Job Template.
+
+Activate both the SUCCESS and FAILURE Notifications for the From Test to Prod Workflow Job Template, using the existing Notify on Job Success and Failure Notification Template.
+
+Click NOTIFICATIONS to manage notifications for the From Test to Prod Workflow Job Template.
+
+On the same line as the Notify on Job Success and Failure Notification Template, set both ON/OFF switches for SUCCESS and FAILURE to ON.
+
+Launch a Workflow using the From Test to Prod Workflow Job Template. When prompted by the Survey, enter v1.3 for the deployment version.
+
+Scroll down to the TEMPLATES section.
+
+On the same line as the From Test to Prod Workflow Job Template, click the rocket icon on the right to launch the Workflow. This opens the Survey you just created and prompts for input.
+
+Enter v1.3 in the text field, click NEXT and then click LAUNCH to launch the Workflow. This redirects you to a detailed status page of the running Workflow.
+
+Observe the running Jobs of the Workflow. You can click the DETAILS link of a running or completed Job to see a more detailed live output of the Job.
+
+Verify that the Workflow triggers an email notification after completion.
+
+Open a terminal and connect to the tower VM.
+
+[student@workstation ~]$ ssh tower
+Last login: Thu Apr 20 11:33:22 2017 from workstation.lab.example.com
+[student@tower ~]$ 
+Use the tail command to view incoming messages to the local mailbox file of the student user. You should see this type of successful Workflow Job completion notification email arrive:
+
+[student@tower ~]$ tail -f /var/mail/student
+...output omitted...
+From system@tower.lab.example.com  Thu Apr 20 18:06:10 2017
+Return-Path: <system@tower.lab.example.com>
+X-Original-To: student@tower.lab.example.com
+Delivered-To: student@tower.lab.example.com
+Received: from tower.lab.example.com (localhost [IPv6:::1])
+	by tower.lab.example.com (Postfix) with ESMTP id AAB30401FB3
+	for <student@tower.lab.example.com>; Thu, 20 Apr 2017 18:06:10 -0400 (EDT)
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: Workflow Job #50 'From Test to Prod' succeeded on Ansible Tower:
+ https://tower.lab.example.com/#/workflows/50
+From: system@tower.lab.example.com
+To: student@tower.lab.example.com
+Date: Thu, 20 Apr 2017 22:06:10 -0000
+Message-ID: <20170420220610.2290.67752@tower.lab.example.com>
+
+Workflow job summary:
+
+- node #9 spawns job #51, "My Webservers TEST", which finished with status successful.
+- node #10 spawns job #52, "TEST webservers setup", which finished with status successful.
+- node #11 spawns job #54, "My Webservers PROD", which finished with status successful.
+- node #12 spawns job #55, "PROD webservers setup", which finished with status successful.
+Exit the console session on the tower system.
+
+[student@tower ~]$ exit
+Verify that the web servers have been updated on serverc.lab.example.com, serverd.lab.example.com, servere.lab.example.com, and serverf.lab.example.com.
+
+Open a web browser and navigate to http://serverc.lab.example.com, http://serverd.lab.example.com, http://servere.lab.example.com, and http://serverf.lab.example.com in separate tabs. You should see this line at the bottom of each page:
+
+Deployment Version: v1.3
+When ready, log out from the Ansible Tower web UI.
+
+

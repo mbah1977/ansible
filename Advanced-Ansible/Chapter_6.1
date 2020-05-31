@@ -1,0 +1,114 @@
+Chapter 6. Installing and Accessing Ansible Tower
+Explaining the Red Hat Ansible Tower Architecture
+Quiz: Explaining the Red Hat Ansible Tower Architecture
+Installing Red Hat Ansible Tower
+Guided Exercise: Installing Red Hat Ansible Tower
+Navigating Red Hat Ansible Tower
+Guided Exercise: Accessing Red Hat Ansible Tower
+Quiz: Installing and Accessing Red Hat Ansible Tower
+Summary
+Abstract
+
+Goal	Explain what Red Hat Ansible Tower is and demonstrate a basic ability to navigate and use its web user interface.
+Objectives	
+Describe the architecture, use cases, and installation requirements of Red Hat Ansible Tower.
+
+Install Red Hat Ansible Tower in a single-server configuration.
+
+Navigate and describe the Ansible Tower web UI, and successfully launch a job using the demo job template, project, credential, and inventory.
+
+Sections	
+Explaining the Red Hat Ansible Tower Architecture (and Quiz)
+
+Installing Red Hat Ansible Tower (and Guided Exercise)
+
+Navigating Red Hat Ansible Tower (and Guided Exercise)
+
+Quiz	
+Installing and Accessing Red Hat Ansible Tower
+
+Explaining the Red Hat Ansible Tower Architecture
+Objectives
+After completing this section, you should be able to describe the architecture, use cases, and installation requirements of Red Hat Ansible Tower.
+
+Why Red Hat Ansible Tower?
+As an enterprise's experience with Ansible matures, there are often additional opportunities for leveraging Ansible to simplify and improve IT operations. The same Ansible Playbooks used by operations teams to deploy production systems can also be used to deploy identical systems in earlier stages of the software development life cycle. When automated with Ansible, complex production support tasks typically handled by skilled engineers can easily be delegated to, and resolved by, entry-level technicians.
+
+However, sharing an existing Ansible infrastructure to scale IT automation across an enterprise can present some challenges. While properly written Ansible Playbooks can be used across teams, Ansible does not provide any facilities for managing shared access. Additionally, although playbooks may allow for the delegation of complex tasks, executing those tasks may require highly privileged and guarded administrator credentials.
+
+IT teams often vary in their preferred tool sets. While some may prefer the direct execution of playbooks, other teams may wish to trigger playbook execution from existing continuous integration and delivery tool suites. In addition, those that traditionally work with GUI-based tools may find Ansible's pure command-line interface intimidating and awkward.
+
+Red Hat Ansible Tower overcomes many of these problems by providing a framework for running and managing Ansible efficiently on an enterprise scale. Ansible Tower eases the administration involved with sharing an Ansible infrastructure while maintaining organization security by introducing features such as a centralized web UI for playbook management, role-based access control (RBAC), and centralized logging and auditing. The REST API ensures that Ansible Tower integrates easily with an enterprise's existing workflows and tool sets. The Ansible Tower API and notification features make it particularly easy to associate Ansible Playbooks with other tools such as Jenkins, Red Hat CloudForms, or Red Hat Satellite, to enable continuous integration and deployment. It provides mechanisms to enable centralized use and control of machine credentials and other secrets without exposing them to end users of Ansible Tower.
+
+Support for Red Hat Ansible Tower is included along with Red Hat Ansible Engine support as part of the Red Hat Ansible Automation subscription. More information is available at https://www.redhat.com/en/technologies/management/ansible.
+
+Red Hat Ansible Tower Architecture
+Red Hat Ansible Tower is a Django web application designed to run on a Linux server as an on-premise, self-hosted solution that layers on top of an enterprise's existing Ansible infrastructure.
+
+
+Figure 6.1: Ansible Tower architecture
+Users interact with their enterprise's underlying Ansible infrastructure using either the Ansible Tower web UI or RESTful API. The Ansible Tower web UI is a graphical interface that performs actions by executing calls against the Ansible Tower API. Any action available through the Ansible Tower web UI can therefore also be performed using the Ansible Tower RESTful API. The RESTful API is essential for those users looking to integrate Ansible with existing software tools and processes.
+
+Ansible Tower stores its data in a PostgreSQL back-end database and makes use of the RabbitMQ messaging system. Versions of Ansible Tower prior to version 3.0 also relied on a MongoDB database. This dependency has since been removed, and data is now stored solely in a PostgreSQL database.
+
+Depending on the needs of the enterprise, Ansible Tower can be implemented using one of the following architectures:
+
+Single Machine with Integrated Database
+All Ansible Tower components, the web front-end, RESTful API back end, and PostgreSQL database, reside on a single machine. This is the standard architecture.
+
+Single Machine with Remote Database
+The Ansible Tower web UI and RESTful API back end are installed on a single machine, and the PostgreSQL database is installed on another server on the same network. The remote database can be hosted on a server with an existing PostgreSQL instance, outside the management of Ansible Tower. Another option is to have the Ansible Tower installer create a PostgreSQL instance on the remote server, managed by Ansible Tower, and then populate it with the Ansible Tower database.
+
+High Availability Multimachine Cluster
+Earlier Ansible Tower versions offered a redundant, active-passive architecture consisting of a single active node and one or more inactive nodes. Starting with Red Hat Ansible Tower 3.1, this architecture is now replaced by an active-active, high-availability cluster consisting of multiple active Ansible Tower nodes.
+
+Each node in the cluster hosts the Ansible Tower web UI and RESTful API back end, and can receive and process requests. In this cluster architecture, the PostgreSQL database is hosted on a remote server. The remote database can reside either on a server with an existing PostgreSQL instance, outside the management of Ansible Tower, or on a server with a PostgreSQL instance created by the installer and managed by Ansible Tower.
+
+OpenShift Pod with Remote Database
+In this architecture, Red Hat Ansible Tower operates as a container-based cluster running on Red Hat OpenShift. The cluster runs on an OpenShift pod, which contains four containers to run the Ansible Tower components. OpenShift adds or removes pods to scale Ansible Tower up and down. The installation procedure for this architecture differs from the installation procedure for other architectures.
+
+NOTE
+This course focuses on the most straightforward architecture to deploy; that is, a single Red Hat Ansible Tower server with an integrated database.
+
+Red Hat Ansible Tower Features
+The following are some of the many features offered by Red Hat Ansible Tower for controlling, securing, and managing Ansible in an enterprise environment:
+
+Visual Dashboard
+The Ansible Tower web UI displays a Dashboard that provides a summary view of an enterprise's entire Ansible environment. The Ansible Tower Dashboard allows administrators to easily see the current status of hosts and inventories, as well as the results of recent job executions.
+
+Role-based Access Control (RBAC)
+Ansible Tower uses a Role-based Access Control (RBAC) system, which maintains security while streamlining user access management. This system simplifies the delegation of user access to Ansible Tower objects, such as Organizations, Projects, and Inventories.
+
+Graphical Inventory Management
+Use the Ansible Tower web UI to create inventory groups and add inventory hosts. Update inventories from an external inventory source such as public cloud providers, local virtualization environments, and an organization's custom configuration management database (CMDB).
+
+Job Scheduling
+Use Ansible Tower to schedule playbook execution and updates from external data sources either on a one-time basis or recurring at regular intervals. This allows routine tasks to be performed unattended and is especially useful for tasks such as backup routines, which are ideally executed during operational off-hours.
+
+Real-time and Historical Job Status Reporting
+When you initiate a playbook execution in Ansible Tower, the web UI displays the playbook's output and execution results in real time. The results of previously executed jobs and scheduled job runs are also available in Ansible Tower.
+
+User-triggered Automation
+Ansible simplifies IT automation, and Ansible Tower takes it a step further by enabling user self-service. The Ansible Tower streamlined web UI, coupled with the flexibility of its RBAC system, allows administrators to reduce complex tasks to simple routines that are easy to use.
+
+Remote Command Execution
+Ansible Tower makes the on-demand flexibility of Ansible ad hoc commands available through its remote command execution feature. User permissions for remote command execution are enforced using the Ansible Tower RBAC system.
+
+Credential Management
+Ansible Tower centrally manages authentication credentials. This means that you can run Ansible plays on managed hosts, synchronize information from dynamic inventory sources, and import Ansible project content from version control systems. Ansible Tower encrypts the passwords or keys provided so that they cannot be retrieved by Ansible Tower users. Users can be granted the ability to use or replace these credentials without actually exposing them to the user.
+
+Centralized Logging and Auditing
+Ansible Tower logs all playbook and remote command execution. This provides the ability to audit when each job was executed and by whom. In addition, Ansible Tower offers the ability to integrate its log data into third-party logging aggregation solutions, such as Splunk and Sumologic.
+
+Integrated Notifications
+Ansible Tower notifies you when job executions succeed or fail. Ansible Tower can deliver notifications using many different applications, including email, Slack, and HipChat.
+
+Multi-playbook Workflows
+Complex operations often involve the serial execution of multiple playbooks. Ansible Tower multi-playbook workflows allow users to chain together multiple playbooks to facilitate the execution of complex routines involving provisioning, configuration, deployment, and orchestration. An intuitive workflow editor also helps to simplify the modeling of multi-playbook workflows.
+
+RESTful API
+The Ansible Tower RESTful API exposes every Ansible Tower feature available through the web UI. The API's browsable format makes it self-documenting and simplifies the lookup of API usage information.
+
+REFERENCES
+For more information, refer to the Ansible Tower Administration Guide at https://docs.ansible.com/ansible-tower/latest/html/administration/:wq
+

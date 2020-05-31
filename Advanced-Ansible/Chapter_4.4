@@ -1,0 +1,240 @@
+Working with Network Addresses Using Filters
+Objectives
+After completing this section, students should be able to inspect, validate, and manipulate variables containing network information with filters.
+
+Gathering and Processing Network Information
+A number of filters and lookup plugins are available to collect and process network information for Ansible automation. These filters and plugins can be useful in conjunction with fact gathering when you configure the network devices on your managed hosts.
+
+The standard setup module that automatically gathers facts at the start of many plays collects a lot of network-related information from each managed host.
+
+NOTE
+If you only need network-related facts, you can run setup as an explicit task and use the gather_subset option to limit collection to those facts.
+
+- name: Collect only network related facts
+  setup:
+    gather_subset:
+      - '!all'
+      - network
+There are a number of particularly useful facts. The fact ansible_facts['interfaces'] is a list of all the network interface names on the system. You can use this list to examine the facts for each of the network interfaces on the system. For example, if enp11s0 is an interface on the system, then it has a fact named ansible_facts['enp11s0'] that is a dictionary containing its MAC address, IPv4 and IPv6 addresses, kernel module, and so on as values.
+
+There are some other useful facts to remember:
+
+Table 4.2. Selected Networking Facts
+
+Fact name	Description
+ansible_facts['dns']['nameservers']	
+The DNS nameservers used for name resolution by the managed host.
+
+ansible_facts['domain']	
+Includes the subdomain for the managed host.
+
+ansible_facts['all_ipv4_addresses']	
+All the IPv4 addresses configured on the managed host.
+
+ansible_facts['all_ipv6_addresses']	
+All the IPv6 addresses configured on the managed host.
+
+ansible_facts['fqdn']	
+The fully-qualified domain name (DNS name) for the managed host.
+
+ansible_facts['hostname']	
+The unqualified hostname, the string in the FQDN before the first period.
+
+
+An example playbook using these facts would be:
+
+---
+- name: Set up web servers
+  hosts: web_servers
+  become: true
+
+  tasks:
+    - name: Ensure httpd is installed
+      yum:
+        name: httpd
+        state: installed
+
+    - name: Start and enable webserver
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Notify root of server provisioning
+      mail:
+        subject: System {{ ansible_facts['hostname'] }} has been successfully provisioned.
+Networking Information Filters
+The ipaddr filter provides capabilities to manipulate and validate facts related to networking. You can use it to check the syntax of IP addresses, convert from VLSN subnet masks to CIDR subnet prefix notation, perform subnet math, and find the next usable address in a network range, and so on.
+
+Comprehensive documentation for this filter is available at "ipaddr filter", but this section will explore some of its uses.
+
+IMPORTANT
+The ipaddr filter needs the netaddr Python module, provided by the python3-netaddr package in Red Hat Enterprise Linux 8. Make sure that the package is installed on your control node, using Ansible or the Yum package manager.
+
+In its simplest form, the ipaddr filter with no arguments accepts a single value. If the value is an IP address, then the filter returns the IP address. If it is not an IP address, then the filter returns False.
+
+If the value is a list, then the filter returns the valid IP addresses and not the invalid ones. If all if the items are invalid, it returns an empty list.
+
+{{ my_hosts_list | ipaddr }}
+However, you can also pass arguments to the ipaddr filter. These arguments can make the filter return different information based on the data input. For example, if my_network has the value 10.0.0.1/23 then the following Jinja2 expression will output the variable-length subnet mask (VLSN) 255.255.254.0:
+
+{{ my_network | ipaddr('netmask') }}
+The ipaddr filter accepts the following options:
+
+address
+Validates input values are valid IP addresses. If the input includes network prefix, it is stripped out.
+
+net
+Validates input values are network ranges and return them in CIDR format.
+
+host
+Ensures IP addresses conform to the equivalent CIDR prefix format.
+
+prefix
+Validates that the input host satisfies the host/prefix or CIDR format, and returns its prefix (size of the network's mask in bits)
+
+host/prefix
+Validates the input value is in host/prefix format. That is, the host part is a usable IP address on the network and the prefix is a valid CIDR prefix.
+
+network/prefix
+Validates the input value is in network/prefix format. That is, the network part is the network address (lowest IP address on the network), and the prefix is a valid CIDR prefix.
+
+public or private
+Validates input IP addresses or network ranges are in ranges that are reserved by IANA to be public or private, respectively.
+
+size
+Transform the input network range to the number of IP addresses in that range.
+
+Any integer number (n).
+Transform a network range to the n-th element in that range. Negative numbers return the n-th element from last.
+
+network, netmask, and broadcast
+Validates that the input host satisfies the host/prefix or CIDR format, and transforms it into the network address (applies the netmask to the host), netmask, or broadcast address, respectively.
+
+subnet
+Validates that the input host satisfies the host/prefix or CIDR format, and returns the subnet containing that host.
+
+ipv4 and ipv6
+Validates input are valid network ranges and transform them into IPv4 and IPv6 formats, respectively.
+
+The ipaddr filter accepts some other queries not listed here. Find more information about using this filter in the References note at the end of this section.
+
+Collecting Network Information with Plug-ins
+A number of lookup plug-ins are available that you can use to collect information about the network environment. These include dig to look up DNS information, dnstxt to get DNS TXT records, and more esoteric plug-ins such as aws_service_ip_ranges to get the IP ranges for Amazon AWS EC2 services and nios_next_ip to get the next available IP for a network from Infoblox.
+
+Looking Up DNS Information
+
+As implied by its name, the dig lookup is an interface for the dig command. The dig command runs queries against DNS servers and returns the resulting records. This lookup makes use of the dnspython python library, from the python3-dns package, that must be available in the controller node.
+
+In its simplest form, the dig lookup queries the DNS server configured in the controller for the A record of the provided fully-qualified domain name (FQDN).
+
+"{{ lookup('dig', 'example.com') }}"
+To obtain a different type of record, provide an additional qtype parameter to the lookup, or append a slash (/) and the record type to the FQDN. The following examples obtain the same MX record from the example.com domain.
+
+"{{ lookup('dig', 'example.com', 'qtype=MX') }}"
+"{{ lookup('dig', 'example.com/MX') }}"
+The dig lookup allows using different DNS servers than the ones configured in the controller. Provide an additional parameter with a comma-separated list of the DNS servers to use, prefixed by the @ sign as follows:
+
+"{{ lookup('dig', 'example.com', '@4.4.8.8,4.4.4.4) }}"
+NOTE
+Some DNS records may contain multiple values for the same record type. In this case, the dig lookup returns a single value, containing a comma-separated list of the returned values. To obtain a list of values, use query with the lookup filter.
+
+"{{ query('dig', 'example.com/MX') }}"
+The dig lookup can provide DNS text records (qtype=TXT), like any other kind. In case only TXT records are needed, the dnstxt lookup can replace the dig lookup. The dnstxt lookup provides a much simpler format and depends on the Python dns/dns.resolver library from the python3-dns RPM package in Red Hat Enterprise Linux 8.
+
+"{{ lookup('dnstxt', ['test.example.com']) }}"
+Here you can see an example of these filters and functions:
+
+---
+    - name: ipaddr example
+      hosts: lb_servers
+
+      tasks:
+        - name: Determinte if host's ip address is private
+          debug:
+            msg: "{{ lookup('dig', ansible_facts['hostname'] ) | ipaddr('private') }}"
+REFERENCES
+Ansible documentation for the ipaddr filter
+
+Ansible documentation for the dig filter
+
+Ansible documentation for the dnstxt filter
+
+
+Guided Exercise: Working with Network Addresses Using Filters
+In this exercise, you will use the ipaddr filter and dig lookup plug-in to manipulate networking data from managed hosts.
+
+Outcomes
+
+You should be able to use the ipaddr filter to derive networking information from IP data retrieved from gathered facts. You should be able to use the dig lookup plug-in to obtain DNS data.
+
+Log in as the student user on workstation and run lab data-netfilters start. This setup script installs the needed Python requirements and gather the lab exercise files.
+
+[student@workstation ~]$ lab data-netfilters start
+Review the project files in the ~/DO447/labs/data-netfilters directory. Use your preferred editor to open the ~/DO447/labs/data-netfilters/roles/netfilters/tasks/main.yml file. This file contains tasks that you complete with the ipaddr filter and dig lookup plug-in. Replace any occurrence of an ellipsis (...) in a fact definition with the expected value.
+
+Most of the tasks leverage the pre-populated ansible_facts.default_ipv4 fact. This fact contains several keys, as shown here:
+
+ansible_facts['default_ipv4']: {
+    address: "192.168.0.2",
+    alias: "eth0",
+    broadcast: "192.168.0.255",
+    gateway: "192.168.0.1",
+    interface: "eth0",
+    macaddress: "8a:f2:c0:66:b2:cb",
+    mtu: 1500,
+    netmask: "255.255.255.0",
+    network: "192.168.0.0",
+    type: "ether"
+}
+The first task verifies that the default_ipv4.address variable contains a properly formatted IP address. The ipaddr filter narrows down valid IPs if it receives no other parameter.
+
+server_address: "{{ ansible_facts.default_ipv4.address | ipaddr }}"
+If the input value (ansible_facts.default_ipv4.address) is valid, ipaddr assigns the same value to the resulting fact (server_address). Else, ipaddr returns an empty string.
+
+The third task's objective is to obtain the DNS name associated to the managed host. This is also known as reverse DNS, or PTR record resolution, and is commonly used to validate the DNS configuration of mail servers.
+
+To resolve the reverse DNS entry, provide the revdns parameter to the ipaddr filter:
+
+address_dns: "{{ server_address | ipaddr('revdns') }}"
+In this case, there is no explicit PTR record for the managed host, so an in-addr.arpa name is returned.
+
+The fifth task creates a fact containing a network definition by appending the ansible_facts.default_ipv4.network fact, a slash (/) and the ansible_facts.default_ipv4.netmask fact. This fact is used in the seventh task to generate the CIDR format for the network.
+
+Update the expression for the cidr variable in the seventh task. Add the ipaddr filter with the net parameter:
+
+cidr: "{{ net_mask | ipaddr('net') }}"
+In this case, the ipaddr filter transforms the network/mask value 172.25.250.0/255.255.255.0 to the CIDR equivalent value 172.25.250.0/24.
+
+Modify the expression for the address_in_range variable in the ninth task to check that the server_address variable belongs to the network:
+
+address_in_range: "{{ server_address | ipaddr(net_mask) }}"
+The ninth task validates that the managed host address obtained in the first task actually belongs to the network definition created in the fifth and seventh tasks. If the ipaddr filter receives a valid network definition, the filter checks that the input parameter IP address belongs to the provided network. Else, the IP address is filtered out, leaving an empty result.
+
+NOTE
+You can also check that the IP address belongs to the network with the CIDR specification:
+
+address_in_range: "{{ server_address | ipaddr(cidr) }}"
+The eleventh task obtains the broadcast address for a network definition. Use the broadcast parameter for the ipaddr filter, and provide the network definition in either network/mask or CIDR format:
+
+broadcast: "{{ cidr | ipaddr('broadcast') }}"
+NOTE
+In most cases, the broadcast for an IP4 network is just the last IP in its range. This can be calculated by using the -1 parameter for the ipaddr filter, but this practice is discouraged as it may fail in IP6 networks.
+
+The thirteenth task leverages the dig lookup plug-in to obtain a DNS record for the example.com domain.
+
+Use the dig lookup plug-in to set the value of the dig_record variable to the MX record associated with the example.com domain. To do this, the dig lookup plug-in requires the domain and record type as parameters:
+
+dig_record: "{{ lookup( 'dig', 'example.com.', 'qtype=MX') }}"
+If no qtype parameter is provided, then the dig filter returns the A record type.
+
+Execute the site.yml playbook to validate your changes. The role contains assert tasks to validate that each fact is set to the correct value.
+
+[student@workstation ~]$ cd DO447/labs/data-netfilters
+[student@workstation data-netfilters]$ ansible-playbook site.yml
+
+PLAY [Setup netfilter guided exercise] *****************************************
+...output omitted...
+PLAY RECAP *********************************************************************
+servera...: ok=15 changed=0 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+If playbook execution fails, you can find the solution file in the ~/DO447/solutions/data-netfilters directory.

@@ -1,0 +1,362 @@
+Chapter 8. Managing Inventories and Credentials
+Creating a Static Inventory
+Guided Exercise: Creating a Static Inventory
+Creating Machine Credentials for Access to Inventory Hosts
+Guided Exercise: Creating Machine Credentials for Access to Inventory Hosts
+Lab: Creating and Managing Inventories and Credentials
+Summary
+Abstract
+
+Goal	Create inventories of machines to manage, and set up credentials necessary for Red Hat Ansible Tower to log in and run Ansible jobs on those systems.
+Objectives	
+Create a static inventory of managed hosts, using the web UI.
+
+Create a machine credential for inventory hosts to allow Ansible Tower to run jobs on the inventory hosts using SSH.
+
+Sections	
+Creating a Static Inventory (and Guided Exercise)
+
+Creating Machine Credentials for Access to Inventory Hosts (and Guided Exercise)
+
+Lab	
+Managing Inventories and Credentials
+
+Creating a Static Inventory
+Objectives
+After completing this section, students should be able to create a static inventory of managed hosts, using the web UI.
+
+Ansible Inventory
+Ansible Playbooks run against an inventory of hosts and groups of hosts. Ansible can select parts or all of the inventory as target systems to manage through task execution. Without Red Hat Ansible Tower, Ansible defines this inventory as either a static file, or dynamically from external sources through a script.
+
+This section of the course focuses on static inventory configuration and management using the Red Hat Ansible Tower web interface. As a review, look at the following Ansible static inventory file in INI format. The file defines four hosts. The host london1.example.com is a member of no groups. The hosts raleigh1.example.com and atlanta1.example.com are members of the host group southeast. The host boston1.example.com is a member of the host group northeast. The host group east is a group of groups, including the southeast and northeast host groups.
+
+london1.example.com
+
+[southeast]
+raleigh1.example.com
+atlanta1.example.com
+
+[northeast]
+boston1.example.com
+
+[east:children]
+southeast
+northeast
+Two implicit groups also exist. The group all includes all the hosts in the inventory. The group ungrouped includes all hosts that are not part of any group other than all. In the preceding example, the only ungrouped host is london1.example.com.
+
+Inventories are managed as objects in Ansible Tower, and can be configured in two different ways. This section looks at how to set up the inventory as a static inventory, and use RBAC to control access to it, using the Tower web interface.
+
+Creating an Inventory in Ansible Tower
+Inventories are managed as objects in Ansible Tower. Each organization may have many inventories available. When job templates are created, they can be configured to use a specific inventory belonging to the organization. Which users on the Tower can use an inventory object is determined by the roles they have in the inventory.
+
+This section looks at how to use Tower's web user interface to create a new inventory object from nothing, using the preceding sample inventory file as a model. Later sections cover other methods of configuring an inventory.
+
+IMPORTANT
+Your Red Hat Ansible Tower license determines the maximum number of hosts you may define in your inventory. Clicking on Settings in the left pane and selecting License from the Settings page will display how many hosts your license supports (under HOSTS AVAILABLE) and how many are remaining (under HOSTS REMAINING).
+
+If more managed nodes are in your Ansible Tower inventory than are supported by the license, you will be unable to start any Jobs in Ansible Tower. If a dynamic inventory sync causes Ansible Tower to exceed the managed node count specified in the license, the dynamic inventory sync will fail.
+
+If you have multiple hosts in inventory that have the same name, such as webserver1, they will be counted for licensing purposes as a single node. Note that this differs from the Hosts count on the Dashboard, which counts hosts in separate inventories separately. Note that this behavior is case-sensitive; webserver1 and WebServer1 will be treated as different nodes.
+
+The following procedure illustrates how the example Ansible inventory previously shown can be implemented as a static inventory resource named Mail Servers, assigned to the Default organization.
+
+Log in as a user assigned the Admin role for the Default organization.
+
+Click the Inventories quick navigation link on the left of the screen.
+
+Create a new inventory. On the INVENTORIES screen, click the + button.
+
+Choose Inventory from the drop-down menu.
+
+On the NEW INVENTORY screen, the NAME of the inventory and its ORGANIZATION are required. For this example, use Mail Servers for NAME and click the magnifying glass icon to select the Default organization. Click SAVE.
+
+Add the host london1.example.com to the inventory.
+
+On the MAIL SERVERS detail screen, click the HOSTS button.
+
+On the HOSTS detail screen, click the + button. Enter london1.example.com for the HOST NAME, and then click SAVE.
+
+Add the east group to the inventory.
+
+Click the Inventories quick navigation link on the left of the screen. On the INVENTORIES screen, click the Mail Servers link.
+
+On the MAIL SERVERS inventory detail screen, click the GROUPS button. Click the + button. On the CREATE GROUP screen, enter east in the NAME field. Click the SAVE button on the CREATE GROUP screen to finalize the addition of the group to the inventory.
+
+
+Figure 8.1: New host group
+Add the northeast and southeast groups as child groups of the east group, previously added to the inventory.
+
+On the MAIL SERVERS inventory detail screen, click the GROUPS button. Click the east host group.
+
+On the east group detail screen, click the GROUPS button.
+
+
+Figure 8.2: Adding a child host group
+On the east group details screen, click the + button. Choose New Group from the drop-down menu. On the CREATE GROUP screen, enter southeast in the NAME field. Click the SAVE button on the CREATE GROUP screen to finalize the addition of the child group to the inventory.
+
+On the EAST group details screen, click the + button again and repeat for the northeast group.
+
+
+Figure 8.3: New child host groups
+Add the raleigh1.example.com and atlanta1.example.com hosts to the southeast child group, previously added to the inventory.
+
+On the east group details screen, click the southeast group link.
+
+On the southeast group details screen, click the HOSTS button. Click the + button, from the drop-down menu choose New Host. On the CREATE HOST screen, enter raleigh1.example.com in the NAME field. Click the SAVE button on the CREATE HOST screen to finalize the addition of the host to the child group.
+
+On the SOUTHEAST group details screen, click the + button again. Repeat the process to add the atlanta1.example.com host.
+
+
+Figure 8.4: Partially configured child groups
+Add the boston1.example.com host to the northeast child group.
+
+On the EAST group details screen, click the northeast group link.
+
+On the NORTHEAST group details screen, click the HOSTS button. Click the + button, and choose New Host from the drop-down menu. On the CREATE HOST screen, enter boston1.example.com in the NAME field. Click the SAVE button on the CREATE HOST screen to finalize the addition of the host to the child group.
+
+
+Figure 8.5: Completed host group detail screen
+The completed Mail Servers inventory screen looks similar to the following:
+
+
+Figure 8.6: Completed inventory detail screen
+All four hosts in the inventory are shown: the one in northeast, the two in southeast, and the ungrouped one. This provides an immediate overview of all the hosts in the inventory.
+
+Clicking on GROUPS displays a page showing all host groups in the Mail Servers inventory. Clicking on east displays a page showing the northeast and southeast child groups. Clicking on the GROUPS displays the ASSOCIATED GROUPS page and all the group members of east, providing an overview of the child groups in that group in the inventory. Clicking on the HOSTS displays all hosts in the east group.
+
+The document stack icon can be used to move a host or host group to another host group or to the top level of the inventory.
+
+If you click on a trash can icon next to a host, then it is deleted from all host groups in the inventory.
+
+If you click on a trash can icon next to a host group, then you are given a choice before the host group is deleted:
+
+Delete all children belonging to the host group.
+
+Promote children belonging to the host group to its parent object. For example, when deleting east, its child groups can be promoted to top level groups in the inventory.
+
+Inventory Roles
+A previous section covered how RBAC roles can be assigned to allow users and teams to view and manage teams and organizations. Roles can also be assigned to allow them to view and manage other objects, such as inventories.
+
+Users and teams can be assigned the ability to read, use, or manage an inventory by assigning appropriate roles for that inventory. In some cases, instead of directly assigning a role to the user or team, a role granting permissions to work with an inventory indirectly may be inherited.
+
+The following is a list of available roles for an inventory:
+
+Admin
+The inventory Admin role grants users full permissions over an inventory. These permissions include deletion and modification of the inventory. In addition, this role also grants permissions associated with the inventory roles Use, Ad Hoc, and Update, explained later in this chapter.
+
+Use
+The inventory Use role grants users the ability to use an inventory in a job template resource. This controls which inventory is used to launch jobs using the job template's playbook. Using an inventory in a job template is discussed in detail in a later chapter.
+
+Ad Hoc
+The inventory Ad Hoc role grants users the ability to use the inventory to execute ad hoc commands. Using Ansible Tower for ad hoc command execution is discussed in detail in Ansible Tower User Guide.
+
+Update
+The inventory Update role grants users the ability to update a dynamic inventory from its external data source. This is discussed in more detail later in this course.
+
+Read
+The inventory Read role grants users the ability to view the contents of an inventory.
+
+When an inventory is first created, it is only accessible by users who have the Admin, Inventory Admin, or Auditor roles for the organization to which the inventory belongs. All other access must be specifically configured.
+
+This is done by assigning users and teams appropriate roles as discussed above. The inventory must be created and saved before users and teams can be assigned roles on it.
+
+Roles are assigned through the PERMISSIONS section of the inventory's editor screen (accessible through the pencil icon next to its name). The following procedure details the steps to assign users and teams roles on an inventory:
+
+Log in as a user with Admin role on the organization in which the inventory was created.
+
+Click Inventories in the quick navigation links to display the organization's inventory list.
+
+Click the pencil icon for the inventory to enter the inventory's editor screen.
+
+On the inventory's editor screen, click the PERMISSIONS button to enter the permissions editor.
+
+A list appears, naming users and teams, with their assigned roles. If there is an X next to a role, click it to remove that role from the user.
+
+Click the + button to add permissions.
+
+In the ADD USERS / TEAMS selection screen, click either USERS or TEAMS. Select the check boxes next to the users or teams to be assigned new roles.
+
+Under Please assign roles to the selected users/teams, click the SELECT ROLES drop-down menu. Select the desired inventory role for each user or team.
+
+Click KEY for a list of inventory roles and their definitions.
+
+Click SAVE to finalize the new roles.
+
+Configuring Inventory Variables
+Ansible supports inventory variables that apply values to variables on particular hosts (host variables) or to host groups (group variables).
+
+If you are using Ansible by itself, the recommended way to set inventory variables is to use host_vars and group_vars directories in the same working directory as the inventory file. These directories contain YAML files named after the host or host group they represent, which define variables and values that apply to that host or host group. Variables can be assigned to all hosts in an inventory by defining them for the special all group.
+
+For example, the file group_vars/southeast might define the value of the ntp variable to ntp-se.example.com for the host group southeast:
+
+---
+ntp: ntp-se.example.com
+When you manage a static inventory in the Ansible Tower web UI, you may define inventory variables directly in the inventory object instead of using host_vars and group_vars directories.
+
+IMPORTANT
+If the project does have host_vars or group_vars files that set inventory variables applying to hosts in the play, then they are honored. However, you cannot edit those files in the Tower web UI.
+
+Furthermore, if the same host or group variable is defined in both the project files, and in a static inventory object managed through the web UI, and these have different values, then it is difficult to predict which value Tower will use.
+
+When using static inventories managed in the Tower web UI, avoid creating conflicts like this by setting inventory variables in one place or the other, not both.
+
+On the INVENTORIES screen, variables can be set by clicking the Edit inventory (pencil) icon next to the inventory's name. On the DETAILS screen for the inventory, you can set variables that affect all hosts in the inventory:
+
+
+Figure 8.7: Variables for all hosts
+When a host group is created within an inventory, group variables can be defined using either YAML or JSON in the VARIABLES field on the CREATE GROUP screen. The group variables can also be set by clicking on the Edit group (pencil) icon next to the host group's name in the inventory. These variables apply to all hosts that are part of the group:
+
+
+Figure 8.8: Variables for a host group
+Likewise, host variables can be defined using either YAML or JSON in the VARIABLES field on the CREATE HOST screen when an individual host is created within an inventory. Alternatively, click on the Edit host (pencil) icon next to the host's name in the inventory, once created, to define the host variables. Variables defined in this manner only apply to the specific host.
+
+
+Figure 8.9: Variables for an individual host
+IMPORTANT
+Inventory variables can be overridden by variables with a higher precedence. Extra variables defined in a job template and playbook variables both have higher precedence than inventory variables.
+
+REFERENCES
+Further information is available in the Inventories section of the Ansible Tower User Guide at https://docs.ansible.com/ansible-tower/latest/html/userguide/index.html
+
+Further information is available in the Built-in Roles section of the Ansible Tower User Guide at https://docs.ansible.com/ansible-tower/latest/html/userguide/index.html
+
+A discussion of how node counting works for licenses is available at https://docs.ansible.com/ansible-tower/latest/html/administration/license-support.html#node-counting-in-licenses
+
+
+
+
+Guided Exercise: Creating a Static Inventory
+In this exercise, you will create a static inventory in Ansible Tower and grant users permission to manage and use that inventory.
+
+Outcomes
+
+You should be able to create and manage a static Inventory containing hosts and groups and assign appropriate permissions to a team.
+
+You should have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab host-inventory start.
+
+[student@workstation ~]$ lab host-inventory start
+This setup script creates additional inventories, hosts, and groups needed for this exercise.
+
+Log in to the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Create a static Inventory named Prod.
+
+Open the Inventories page by clicking Inventories in the left quick navigation bar.
+
+Click the + button to add a new Inventory.
+
+From the drop-down menu, select the normal Inventory type.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Prod
+DESCRIPTION	Production Inventory
+ORGANIZATION	Default
+Click SAVE to create the new Inventory. You are redirected to the Inventory details page.
+
+Create the group prod-servers in the Prod Inventory.
+
+Click the GROUPS button.
+
+Click the + button to add a new group.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	prod-servers
+DESCRIPTION	Production servers
+Click SAVE to create the new group.
+
+Add the host servere.lab.example.com to the group prod-servers in the Prod Inventory.
+
+Click the HOSTS button to add hosts to the group you just created.
+
+Click the + button to add a new host to the group. From the drop-down menu, select New Host.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+HOST NAME	servere.lab.example.com
+DESCRIPTION	Server E
+Click SAVE to add the new host.
+
+Assign the Operations team Admin role to the Prod Inventory.
+
+Click Inventories in the left quick navigation bar.
+
+On the same line as the Prod Inventory entry, click the pencil icon to edit the Inventory.
+
+On the next page, click PERMISSIONS to manage the Prod Inventory's permissions.
+
+Click the + button to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, check the box next to the Operations team. This displays that team in the second section.
+
+In the second section below, select the Admin role from the drop-down menu.
+
+Click SAVE to finalize the role assignment. This redirects you to the list of permissions for the Prod Inventory, which now shows that all members of the Operations team are assigned the Admin role on the Prod Inventory.
+
+Verify access to the Prod Inventory with the user oliver, who belongs to the Operations team.
+
+Click the Log Out icon in the top right corner to log out. Then log back in as oliver with a password of redhat123. This user is assigned the Member role for the Operations team.
+
+Click Inventories in the left quick navigation bar.
+
+Click the link for the Prod Inventory created earlier.
+
+Review the contents of the Prod Inventory to see the hosts and group it contains.
+
+Add the host, serverf.lab.example.com, to the Prod Inventory while logged in as the user oliver.
+
+Click the link for the prod-servers group to enter the group.
+
+Click the HOSTS button.
+
+Click the + button to add a new host to the group. From the drop-down menu, select New Host.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+HOST NAME	serverf.lab.example.com
+DESCRIPTION	Server F
+Click SAVE to create the host.
+
+Assign the Use role on the Test Inventory to the Developers team.
+
+Click the Log Out icon in the top right corner to log out and then log back in as admin with a password of redhat.
+
+Click Inventories in the left navigation bar.
+
+On the same line as the Test Inventory, click the pencil icon to edit the Inventory.
+
+On the next page, click PERMISSIONS to manage the Inventory's permissions.
+
+Click the + button to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, check the box next to the Developers team. This displays that team in the second section underneath the first one.
+
+In the second section, select the Use role from the drop-down menu.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Test Inventory, which now shows that all members of the Developers team are assigned the Use role on the Test Inventory.
+
+Verify access to the Test Inventory with the daniel user who belongs to the Developers team.
+
+Click the Log Out icon in the top right corner to log out. Log back in as daniel with a password of redhat123. This user is assigned the Admin role for the Developers team.
+
+Click Inventories in the left navigation bar.
+
+Click the link for the Test Inventory.
+
+Review the contents of the Test Inventory to see the hosts and group it contains. Note that even though daniel is an Admin of the Developers team, he cannot manage the Test Inventory because you only granted the Use role for the Inventory to the Developers team.
+
+NOTE
+This is representative of a real world scenario where developers may have access to the list of systems in the testing environment but are not able to modify the list.
+
+Click the Log Out icon in the top right corner to log out of the Tower web interface.

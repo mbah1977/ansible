@@ -1,0 +1,620 @@
+
+Chapter 4. Transforming Data with Filters and Plugins
+Processing Variables Using Filters
+Guided Exercise: Processing Variables using Filters
+Templating External Data using Lookups
+Guided Exercise: Templating External Data using Lookups
+Implementing Advanced Loops
+Guided Exercise: Implementing Advanced Loops
+Working with Network Addresses Using Filters
+Guided Exercise: Working with Network Addresses Using Filters
+Lab: Transforming Data with Filters and Plug-ins
+Summary
+Abstract
+
+Goal	Populate, manipulate, and manage data in variables using filters and plugins.
+Objectives	
+Format, parse, and define the values of variables using filters.
+
+Populate variables with data from external sources using lookup plugins.
+
+Use filters and lookup plug-ins to implement iteration over complex data structures.
+
+Inspect, validate, and manipulate variables containing networking information with filters.
+
+Sections	
+Processing Variables using Filters (and Guided Exercise)
+
+Templating External Data Using Lookups (and Guided Exercise)
+
+Implementing Advanced Loops (and Guided Exercise)
+
+Working with Network Addresses Using Filters (and Guided Exercise)
+
+Lab	
+Transforming Data with Filters and Plugins
+
+Processing Variables Using Filters
+Objectives
+After completing this section, students should be able to format, parse, and define the values of variables using filters.
+
+Ansible Filters
+Ansible applies variable values to playbooks and templates using Jinja2 expressions. For example, the following Jinja2 expression replaces the name of the variable enclosed in double curly braces with its value:
+
+{{ variable }}
+Jinja2 expressions also support filters. Filters are used to modify or process the value from the variable that is being placed in the playbook or template. Some filters are provided by the Jinja2 language, and others are included with Red Hat Ansible Engine as plug-ins. It is also possible to create custom filters, although that is beyond the scope of this course. Filters can be incredibly useful to prepare data for use in your playbook or template.
+
+To understand filters, you must first know more about how variable values are handled by Ansible.
+
+Variable Types
+Ansible stores run-time data in variables. The YAML structure or the content of the value defines the exact type of data. Some of the value types include:
+
+Strings (a sequence of characters)
+
+Numbers (a numeric value)
+
+Booleans (true/false values)
+
+Dates (ISO-8601 calendar date)
+
+Null (sets the variable to undefined the variable)
+
+Lists or Arrays (a sorted collection of values)
+
+Dictionaries (a collection of key-value pairs)
+
+Strings
+A string is a sequence of characters and is the default data type in Ansible. Strings do not need to be wrapped in quotes or double quotes. Ansible trims trailing white spaces from unquoted strings.
+
+my_string: Those are the contents of the string
+YAML format allows you to define multiline strings. Use the pipe operator (|) to retain line breaks, or the greater than operator (>) to suppress them.
+
+string_with_breaks: |
+  This string
+  has several
+  line breaks
+
+string_without_breaks: >
+  This string will not
+  contain any line breaks.
+  Separated lines are joined
+  by a space character.
+Numbers
+When the variable contents conform to a number, Ansible (or YAML, to be precise) parses the string and generates a numeric value, either an Integer or a Float.
+
+Integers contain decimal characters, and optionally preceded by the + or - signs:
+
+answer: 42
+If a decimal point (.) is included within an integer-like value, it is parsed as a Float.
+
+float_answer: 42.0
+Scientific notation can also be used to write big Integers or Floats
+
+scientific_answer: 0.42e+2
+Hexadecimal numbers start with 0x, followed by hexadecimal characters only. The following example value is the hexadecimal number 2A (42 in decimal):
+
+hex_answer: 0x2A
+If you place a number in quotes, it is treated as a String
+
+string_not_number: "20"
+Booleans
+Boolean values contain yes, no, y, n, on, off, true, or false strings. Values are not case sensitive, but the Jinja2 documentation recommends that you use lowercase for consistency.
+
+Date
+If the string conforms to the ISO-8601 standard, Ansible converts the string into a date typed value.
+
+my_date_time: 2019-05-30T21:15:32.42+02:00
+my_simple_date: 2019-05-30
+Null
+The special null value declares a variable as undefined. The null string, or the tilde (~) character, assigns the null value to the variable.
+
+my_undefined: null
+Lists or Arrays
+A list, also known as an array, is a sorted collection of values. Lists are the basic structures for data collections and loops.
+
+Write lists as a comma-separated sequence of values, wrapped in square brackets, or one element per line, prefixed with a dash (-). The following examples are equivalent:
+
+my_list: ['Douglas', 'Marvin', 'Arthur']
+my_list:
+  - Douglas
+  - Marvin
+  - Arthur
+Like arrays in most programming languages, you can access specific elements of a list by using an index number starting from 0:
+
+- name: Confirm that the second list element is "Marvin"
+  assert:
+    that:
+      - my_list[1] == 'Marvin'
+Dictionaries
+Dictionaries, also called maps or hashes in other contexts, are structures that link string keys to values for direct access. Like lists, dictionaries can be written in a single line or across multiple lines with the colon (:) notation:
+
+my_dict: { Douglas: Human, Marvin: Robot, Arthur: Human }
+my_dict:
+  Douglas: Human
+  Marvin: Robot
+  Arthur: Human
+Access an item in a dictionary by its key, providing it immediately after the dictionary name, and wrapped in square brackets:
+
+assert:
+  that:
+    - my_dict['Marvin'] == 'Robot'
+NOTE
+You can also access the dictionary entry my_dict['Marvin'] with the syntax my_dict.Marvin. However, this dot notation is not recommended because it can collide with reserved names for attributes and methods of Python dictionaries. For more information see https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html#creating-valid-variable-names.
+
+Processing Data with Filters
+Filters allow you to process the value of a variable in order to extract information, transform it, or use it to calculate a new value. To apply a filter, follow the name of the variable with the pipe (|) character and the name of the filter to apply. Some filters might require optional arguments or options in parentheses. You can chain multiple filters in a single expression.
+
+As an example, the following expression filters the value of the variable myname, ensuring that the first letter of the value is capitalized by using a standard Jinja2 filter:
+
+{{ myname | capitalize }}
+This expression can also be used to convert a variable to a different type. The following example expression ensures that the result is a string, not an integer or a float:
+
+{{ mynumber | string }}
+The next example is more complex and shows a complete task. The assert module tests to see if expressions are true, and fails if they are not. The Jinja2 expression at the start of the test takes the list [ 1, 4, 2, 2 ], and uses the unique filter to remove duplicate elements, and then uses the sort filter to sort them. Note that this example uses a filter to manipulate hard-coded data instead of the value of a variable.
+
+- name: Test to see if the assertion is true, fail if not
+  assert:
+    that:
+      - "{{ [ 1, 4, 2, 2 ] | unique | sort }} is eq( [ 1, 2, 4 ] )"
+The output of the sort filter is compared for equality to the expected list, using the eq Jinja2 test. As both the result and the expected value are equal, the assert module succeeds.
+
+IMPORTANT
+Filters do not change the value stored in the variable. The Jinja2 expression processes that value and uses the result without changing the variable itself.
+
+Overview of Selected Filters
+There are a large number of filters available, both as standard filters from Jinja2 and as additional filters provided by Red Hat Ansible Engine. This section provides an overview of a number of useful filters, but not an exhaustive list.
+
+Links in the References section contain officially available filters from Ansible and Jinja2. In particular, the Jinja2 filters documented at http://jinja.pocoo.org/docs/2.10/templates/#builtin-filters provide a large number of useful utility functions.
+
+Checking if a Variable is Defined
+
+The first two Ansible-specific filters act on whether or not the input is defined. These filters are useful in roles to make sure that variables have reasonable values.
+
+mandatory
+Fails and aborts the Ansible Playbook if the variable is not defined with a value.
+
+{{ my_value | mandatory }}
+default
+If the variable is not defined with a value, then this filter will set it to the value specified in parentheses. If the second parameter in the parentheses is True, then the filter will also set the variable to the default value, if the initial value of the variable is an empty string or the Boolean value False.
+
+{{ my_value | default(my_default, True) }}
+The default filter can also take the special value omit, which causes the value to remain undefined if it had no value initially. If the variable already has a value, omit will not change the value.
+
+The following task to ensure the jonfoo user exists is an example of using the default(omit) filter. If the variable supplementary_groups['jonfoo'] is already defined, then the task will make sure that the user is a member of those groups. If it is not already defined, then the groups parameter for the user module will not be set in this task.
+
+- name: Ensure user jonfoo exists.
+  user:
+    name: jonfoo
+    groups: "{{ supplementary_groups['jonfoo'] | default(omit) }}"
+Performing Mathematical Calculations
+
+Jinja2 provides a number of mathematical filters that can operate on a number. You can also perform some basic mathematical calculations on numbers:
+
+Table 4.1. Arithmetic operations
+
+Operator	Purpose
++	Add two numbers
+-	Subtract two numbers
+/	Perform floating point division
+//	Perform integer division
+%	Get the remainder of integer division
+*	Multiply two numbers
+**	Raise the left number to the power of the right number
+
+In some cases, you might first need to convert the value to an integer with the int filter, or to a float with the float filter. For example, the following Jinja2 expression adds one to the current hour number, which is collected as a fact and stored as a string, not an integer:
+
+{{ ( ansible_facts['date_time']['hour'] | int ) + 1 }}
+There are also a number of filters that can perform a mathematical operation on a number: log, pow, root, abs, and round are examples.
+
+{{ 1764 | root }}
+Manipulating Lists
+
+There are many filters that you can use to analyze and manipulate lists.
+
+If the list consists of numbers, you can use max, min or sum to find the largest number, smallest number, and sum of all list items.
+
+{{ [2, 4, 6, 8, 10, 12] | sum }}
+Extracting list elements
+Information about the contents of the list can be obtained, such as the first or last elements, or the length of the list:
+
+- name: All three of these assertions are true
+  assert:
+    that:
+      - "{{ [ 2, 4, 6, 8, 10, 12 ] | length }} is eq( 6 )"
+      - "{{ [ 2, 4, 6, 8, 10, 12 ] | first }} is eq( 2 )"
+      - "{{ [ 2, 4, 6, 8, 10, 12 ] | last }} is eq( 12 )"
+The random filter returns a random element from the list:
+
+{{ ['Douglas', 'Marvin', 'Arthur'] | random }}
+Modifying the order of list elements
+A list can be reordered in several ways. The sort filter sorts the list in the natural order of its elements. The reverse filter returns a list where the order is the opposite of the original order. The shuffle filter returns a list with the same elements, but in a random order.
+
+- name: reversing and sorting lists
+  assert:
+    that:
+      - "{{ [ 2, 4, 6, 8, 10 ] | reverse | list }} is eq( [ 10, 8, 6, 4, 2] )"
+      - "{{ [ 4, 8, 10, 6, 2 ] | sort | list }} is eq( [ 2, 4, 6, 8, 10 ] )"
+Merging lists
+Some times it is useful to merge several lists into a single one to simplify iteration. The flatten filter recursively takes any inner list in the input list value, and adds the inner values out to the outer list.
+
+- name: Flatten turns nested lists on the left to list on the right
+  assert:
+    that:
+      - "{{ [ 2, [4, [6, 8]], 10 ] | flatten }} is eq( [ 2, 4, 6, 8, 10] )"
+Use flatten to merge lists values that come from iterating a parent list.
+
+Operating on lists as sets
+Make sure that a list has no duplicate elements with the unique filter. This can be useful if you are operating on a list of facts that you have collected, such as usernames or host names that might have duplicate entries.
+
+- name: 'unique' leaves unique elements
+  assert:
+    that:
+      - "{{ [ 1, 1, 2, 2, 2, 3, 4, 4 ] | unique | list }} is eq( [ 1, 2, 3, 4 ] )"
+If two lists have no duplicate elements, then you can use set theory operations on them.
+
+The union filter returns a set with elements from both input sets.
+
+The intersect filter returns a set with elements common to both sets.
+
+The difference filter returns a set with elements from first set that are not present in the second set.
+
+- name: 'difference' provides elements not in specified set
+  assert:
+    that:
+      - "{{ [ 2, 4, 6, 8, 10 ] | difference([2, 4, 6, 16])  }} is eq( [8, 10] )"
+Use the symmetric_difference filter to get items to address when operating with a set.
+
+Manipulating Dictionaries
+
+Unlike lists, dictionaries are not ordered in any way. They are just a collection of key-value pairs. But you can use filters to construct dictionaries, and you can convert them into lists or lists into dictionaries.
+
+Joining dictionaries
+Two dictionaries can be joined by the combine filter. Entries from the second dictionary have higher priority than entries from the first dictionary, as seen in the following task:
+
+- name: 'combine' combines two dictionaries into one
+  vars:
+    expected:
+      A: 1
+      B: 4
+      C: 5
+  assert:
+    that:
+      - "{{ {'A':1,'B':2} | combine({'B':4,'C':5}) }} is eq( expected )"
+Reshaping dictionaries
+A dictionary can be reshaped to a list of items with the dict2items filter, and a list of item can be reshaped back to a dictionary with the items2dict filter:
+
+- name: converting between dictionaries and lists
+  vars:
+    characters_dict:
+      Douglas: Human
+      Marvin: Robot
+      Arthur: Human
+    characters_items:
+      - key: Douglas
+        value: Human
+      - key: Marvin
+        value: Robot
+      - key: Arthur
+        value: Human
+  assert:
+    that:
+      - "{{ characters_dict | dict2items }} is eq( characters_items )"
+      - "{{ characters_items | items2dict }} is eq( characters_dict )"
+Hashing, Encoding, and Manipulating Strings
+
+A number of filters are available to manipulate the text of a value. You can take various checksums, create password hashes, and convert text to and from Base64 encoding, as used by a number of applications.
+
+Hashing strings and passwords
+The hash filter returns the hash value of the input string, using the provided hashing algorithm:
+
+- name: the string's SHA-1 hash
+  vars:
+    expected: '8bae3f7d0a461488ced07b3e10ab80d018eb1d8c'
+  assert:
+    that:
+      - "'{{ 'Arthur' | hash('sha1') }}' is eq( expected )"
+Use the password_hash filter to generate password hashes:
+
+{{ 'secret_password' | password_hash('sha512') }}
+Encoding strings
+Binary data can be translated to base64 by the b64encode filter, and translated back to binary format by the b64decode filter:
+
+- name: Base64 encoding and decoding of values
+  assert:
+    that:
+      - "'{{ 'âÉïôú' | b64encode }}' is eq( 'w6LDicOvw7TDug==' )"
+      - "'{{ 'w6LDicOvw7TDug==' | b64decode }}' is eq( 'âÉïôú' )"
+Before sending strings to the underlying shell, and to avoid parsing or code injection issues, it is a good practice to sanitize the string by using the quote filter:
+
+- name: Put quotes around 'my_string'
+  shell: echo {{ my_string | quote }}
+Formatting Text
+Use the lower, upper, or capitalize filters to enforce the case of an input string:
+
+- name: Change case of characters
+  assert:
+    that:
+      - "'{{ 'Marvin' | lower }}' is eq( 'marvin' )"
+      - "'{{ 'Marvin' | upper }}' is eq( 'MARVIN' )"
+      - "'{{ 'marvin' | capitalize }}' is eq( 'Marvin' )"
+Replacing text
+The replace filter is useful when you need to replace all occurrences of a substring inside the input string:
+
+- name: Replace 'ar' with asterisks
+  assert:
+    that:
+      - "'{{ 'marvin, arthur' | replace('ar','**') }}' is eq( 'm**vin, **thur' )"
+Much more complex searches and replacements are available by using regular expressions and the regex_search and regex_replace filters.
+
+- name: Test results of regex search and search-and-replace
+  assert:
+    that:
+      - "'{{ 'marvin, arthur' | regex_search('ar\S*r') }}' is eq( 'arthur' )"
+      - "'{{ 'arthur up' | regex_replace('ar(\S*)r','\\1mb') }}' is eq( 'thumb up' )"
+Manipulating JSON Data
+
+Many data structures used by Ansible are in JSON format. JSON and YAML notation are closely related, and Ansible data structures can be processed as JSON. Likewise, many APIs that Ansible Playbooks might interact with consume or provide information in JSON format. Because this format is widely used, JSON filters are particularly useful.
+
+JSON queries
+Use the json_query filter to extract information from Ansible data structures.
+
+- name: Get the 'name' elements from the list of dictionaries in 'hosts'
+  vars:
+    hosts:
+      - name: bastion
+        ip:
+          - 172.25.250.254
+          - 172.25.252.1
+      - name: classroom
+        ip:
+          - 172.25.252.254
+  assert:
+    that:
+      - "{{ hosts | json_query('[*].name') }} is eq( ['bastion','classroom'] )"
+  
+Parsing and encoding data structures
+Transforming data structures to and from text is useful for debugging and communication. Data structures serialize to JSON or YAML format with the to_json and to_yaml filters. Use to_nice_json and to_nice_yaml filters to obtain a formatted human-readable output.
+
+- name: Convert between JSON and YAML format
+  vars:
+    hosts:
+      - name: bastion
+        ip:
+          - 172.25.250.254
+          - 172.25.252.1
+    hosts_json: '[{"name": "bastion", "ip": ["172.25.250.254", "172.25.252.1"]}]'
+  assert:
+    that:
+      - "'{{ hosts | to_json }}' is eq( hosts_json )"
+In the sections and chapters that follow, other filters are introduced that are suited to specific scenarios. Review the official Ansible and Jinja2 documentation to discover more useful filters to meet your needs.
+
+REFERENCES
+Filters (Ansible documentation)
+
+Template Designer Documentation: Filters (Jinja2 documentation)
+
+
+
+Guided Exercise: Processing Variables using Filters
+In this exercise, you will add filters to tasks in two different roles to process variables.
+
+Outcomes
+
+You should be able to use filters to process and manipulate variables in a playbook or role.
+
+Open a terminal on workstation as the student user and run the following command:
+
+[student@workstation ~]$ lab data-filters start
+This command creates a git repository at http://git.lab.example.com:8081/git/data-filters.git that contains a partially complete playbook project, which you finish during this guided exercise.
+
+Change to the /home/student/git-repos directory and clone the project repository. In this exercise, you do not make changes to the deploy_haproxy.yml playbook or the haproxy role. Execute the deploy_haproxy.yml playbook to deploy the load balancer.
+
+Create the /home/student/git-repos directory if it does not exist, and then change to this directory.
+
+[student@workstation ~]$ cd /home/student/git-repos
+Clone the repository, and change to the project root directory:
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/data-filters.git
+[student@workstation git-repos]$ cd data-filters
+Execute the deploy_haproxy.yml playbook to deploy the load balancer. Because you have not deployed the web servers, requests to servera result in a 503 HTTP status code.
+
+[student@workstation data-filters]$ ansible-playbook deploy_haproxy.yml
+
+PLAY [Ensure HAProxy is deployed] ********************************************
+...output omitted...
+PLAY RECAP *******************************************************************
+loadbalancer_01   : ok=7    changed=6    unreachable=0    ...
+
+[student@workstation data-filters]$ curl servera
+<html><body><h1>503 Service Unavailable</h1>
+...output omitted...
+Carefully review the task list and variables for the apache role.
+
+Review the task list file for the apache role, roles/apache/tasks/main.yml.
+
+[student@workstation data-filters]$ cat roles/apache/tasks/main.yml
+...output omitted...
+- name: Calculate the package list
+  set_fact:
+    # TODO: Combine the apache_base_packages and
+    # apache_optional_packages variables into one list.
+    apache_package_list: "{{ apache_base_packages }}"
+
+- name: Ensure httpd packages are installed
+  yum:
+    name: "{{ apache_package_list }}"
+    state: present
+    #   TODO: omit the 'enablerepo' directive
+    #   below if the apache_enablerepos_list is empty;
+    #   otherwise use the list as the value for the
+    #   'enablerepo' directive.
+    #enablerepo: "{{ apache_enablerepos_list }}"
+...output omitted...
+The apache_package_list should be a combined list of of both base and optional packages to install the httpd service. You edit and correct the definition of this variable in a later step.
+
+The role's apache_base_packages variable is defined as a list containing one package, httpd. To prevent host group variables from overriding this value, the variable is defined in the vars/main.yml file:
+
+apache_base_packages:
+  - httpd
+The apache_optional_packages variable is defined as an empty list in the role's defaults/main.yml file:
+
+apache_optional_packages: []
+The apache_enabledrepos_list variable contains a list of YUM repository IDs. Any repository ID in this list is temporarily enabled to install any packages.
+
+The default value is an empty list, as defined in the roles/apache/defaults/main.yml file:
+
+apache_enablerepos_list: []
+Correct the Jinja2 expression that defines the apache_package_list variable in the apache role's first task. Remove the TODO comment section and save the role's task file.
+
+Define the apache_optional_packages variable for the web_servers host group to contain the list of values: git, php, and php-mysqlnd.
+
+Edit the Jinja2 expression in the apache role's first task that defines the apache_package_list variable. Add the union filter to create a single list from apache_base_packages and apache_optional_packages list.
+
+When you finish, remove the comments from this task. The first task of the roles/apache/tasks/main.yml file is the following:
+
+- name: Determine the package list
+  set_fact:
+    apache_package_list: "{{ apache_base_packages | union(apache_optional_packages) }}"
+WARNING
+The apache_package_list variable definition is a single line of text. Do not split Jinja2 filter expressions over multiple lines, or your playbook will fail.
+
+Save the file.
+
+Define the apache_optional_packages variable in a new file, group_vars/web_servers/apache.yml. The variable defines a list of three packages: git, php, and php-mysqlnd. This overrides the role's default value for this variable.
+
+The content of the group_vars/web_servers/apache.yml file follows:
+
+apache_optional_packages:
+  - git
+  - php
+  - php-mysqlnd
+Save the file.
+
+Remove comments from the enablerepo directive in the apache role's second task. Edit the directive's Jinja2 expression to use the default filter to omit this directive if the variable evaluates to a Boolean value of False. Remove the TODO comment section for the second task, and save the task file. The content of the second task displays as follows:
+
+- name: Ensure httpd packages are installed
+  yum:
+    name: "{{ apache_package_list }}"
+    state: present
+    enablerepo: "{{ apache_enablerepos_list | default(omit, true) }}"
+Execute the deploy_apache.yml playbook with the -v option. Verify that optional packages are present on the web servers.
+
+[student@workstation data-filters]$ ansible-playbook deploy_apache.yml -v
+...output omitted...
+TASK [apache : Calculate the package list] ***********************************
+ok: [webserver_01] => {"ansible_facts": {"apache_package_list": ["httpd", "git", "php", "php-mysqlnd"]}, "changed": false}
+...output omitted...
+
+TASK [apache : Ensure httpd packages are installed] **************************
+changed: [webserver_01] => {"changed": true, "msg": "", "rc": 0, "results": ["Installed: httpd", "Installed: git", "Installed: php", "Installed: php-mysqlnd", "..."]}
+...output omitted...
+Review the task list and variable definitions for the webapp role. The webapp role ensures that the correct web application content exists on each host. When correctly implemented, the role removes any content from the root web directory that does not belong to the web application.
+
+Edit the three tasks in the webapp role that have a TODO comment. Use filters to implement the functionality indicated in each comment.
+
+Review the tasks in the roles/webapp/tasks/main.yml file:
+
+---
+# tasks file for webapp
+
+- name: Ensure stub web content is deployed
+  copy:
+    content: "{{ webapp_message }} (version {{ webapp_version }})\n"
+    dest: "{{ webapp_content_root_dir }}/index.html"
+
+- name: Find deployed webapp files
+  find:
+    paths: "{{ webapp_content_root_dir }}"
+    recurse: yes
+  register: webapp_find_files
+
+- name: Compute webapp file list
+  set_fact:
+    # TODO: Use the map filter to extract
+    # the 'path' attribute of each entry
+    # in the 'webapp_find_files'
+    # variable 'files' list.
+    webapp_deployed_files: []
+
+- name: Compute relative webapp file list
+  set_fact:
+    # TODO: Use the 'map' filter, along with
+    # the 'relpath' filter, to create the
+    # 'webapp_rel_deployed_files' variable
+    # from the 'webapp_deployed_files' variable.
+    #
+    # Files in the 'webapp_rel_deployed_files'
+    # variable should have a path relative to
+    # the 'webapp_content_root_dir' variable.
+    webapp_rel_deployed_files: []
+
+- name: Remove Extraneous Files
+  file:
+    path: "{{ webapp_content_root_dir }}/{{ item }}"
+    state: absent
+  # TODO: Loop over a list of files
+  # that are in the 'webapp_rel_deployed_files'
+  # list, but not in the 'webapp_file_list' list.
+  # Use the difference filter.
+  loop: []
+The webapp_file_list variable is defined in the roles/webapp/vars/main.yml file. This variable defines a file manifest for the web application. For this version of the web application, the only file in the application is index.html.
+
+The webapp_content_root_dir variable defines the directory location of web application content on each web server. The default value is /var/www/html.
+
+Replace the empty list for the webapp_deployed_files variable in the third task of the webapp role with a Jinja2 expression. Start with the webapp_find_files['files'] variable and apply the map filter, followed by the list filter. Provide the map filter with an argument of attribute='path' to retrieve the path attribute from each entry in the list.
+
+After you remove the TODO comments, the third task displays as follows:
+
+- name: Compute the webapp file list
+  set_fact:
+    webapp_deployed_files: "{{ webapp_find_files['files'] | map(attribute='path') | list }}"
+WARNING
+The webapp_deployed_files variable definition is a single line of text. Do not split Jinja2 filter expressions over multiple lines, or your playbook will fail.
+
+Replace the empty list for the webapp_rel_deployed_files variable in the fourth task of webapp role with a Jinja2 expression. Start with the webapp_deployed_files variable and apply the map filter, followed by the list filter.
+
+The first argument to the map function is the 'relpath' string which executes the relpath function on each item of the webapp_deployed_files list. The second argument to the map function is the webapp_content_root_dir variable. This variable is passed as an argument to the relpath function.
+
+After you remove the TODO comments, the fourth task displays as follows:
+
+- name: Compute the relative webapp file list
+  set_fact:
+      webapp_rel_deployed_files: "{{ webapp_deployed_files | map('relpath', webapp_content_root_dir) | list }}"
+WARNING
+The webapp_rel_deployed_files variable definition is a single line of text. Do not split Jinja2 filter expressions over multiple lines, or your playbook will fail.
+
+Replace the empty loop list in the webapp role's fifth task with a Jinja2 expression. Start with the webapp_rel_deployed_files variable and apply the difference filter. Provide the webapp_file_list variable as an argument to the difference filter.
+
+After you remove the TODO comments, the fifth task displays as follows:
+
+- name: Remove Extraneous Files
+  file:
+    path: "{{ webapp_content_root_dir }}/{{ item }}"
+    state: absent
+  loop: "{{ webapp_rel_deployed_files | difference(webapp_file_list) }}"
+Save all of the changes to the roles/webapp/tasks/main.yml file.
+
+Execute the deploy_webapp.yml playbook with the -v option. Verify that playbook identifies a non-application file on webserver_01 and removes it.
+
+[student@workstation data-filters]$ ansible-playbook deploy_webapp.yml -v
+...output omitted...
+TASK [webapp : Compute the webapp file list] *********************************
+ok: [webserver_01] => {"ansible_facts": {"webapp_deployed_files": ["/var/www/html/test.html", "/var/www/html/index.html"]}, "changed": false}
+ok: [webserver_02] => {"ansible_facts": {"webapp_deployed_files": ["/var/www/html/index.html"]}, "changed": false}
+
+TASK [webapp : Compute the relative webapp file list] ************************
+ok: [webserver_01] => {"ansible_facts": {"webapp_rel_deployed_files": ["test.html", "index.html"]}, "changed": false}
+ok: [webserver_02] => {"ansible_facts": {"webapp_rel_deployed_files": ["index.html"]}, "changed": false}
+
+TASK [webapp : Remove Extraneous Files] **************************************
+changed: [webserver_01] => (item=test.html) => {"ansible_loop_var": "item", "changed": true, "item": "test.html", "path": "/var/www/html/test.html", "state": "absent"}
+
+PLAY RECAP *******************************************************************
+webserver_01   : ok=5  changed=2  unreachable=0  failed=0    skipped=0  ...
+webserver_02   : ok=4  changed=1  unreachable=0  failed=0    skipped=1  ...
+The webserver_01 host initially has two files deployed in the /var/www/html directory: test.html and index.html. Someone with access to the host may have installed a temporary test page on the web server.
+
+The playbook removes any web server file from the web content root directory that is not part of the actual web application.
+
+Finish

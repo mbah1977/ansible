@@ -1,0 +1,219 @@
+Creating Job Template Surveys to Set Variables for Jobs
+Objectives
+After completing this section, students should be able to create a job template survey to help users more easily launch a job with custom variable settings.
+
+Managing Variables
+Ansible users are encouraged to write playbooks that can be reused in different situations or when deploying to systems that should have slightly different behaviors, configurations, or work in different environments. One easy way to deal with this is to use variables.
+
+Variables can have values set in a number of ways by Ansible, and values can be overridden depending on how they were set. For example, a role can provide a default value for a variable that may in turn be overridden by values set for that variable by the inventory or by the playbook. However, in general it is best to set a value for a variable in exactly one place to help avoid issues with variable precedence.
+
+When running playbooks using ansible-playbook, users have two ways to set values for variables interactively. Firstly, they can pass extra variables by using the -e or --extra-vars option to the command. Extra variables always take precedence. Alternatively, the playbook may have a vars_prompt section that can interactively prompt users for input when they run a playbook. The values set by vars_prompt variables have a lower precedence than extra variables and can be overridden by various things.
+
+In Ansible Tower, this works a little differently. Extra variables can be set by the Job Template, users can be prompted for them when launching a Job Template, or they may be set automatically by rerunning a Job that was launched with extra variables defined. Playbooks with vars_prompt questions are not supported by Ansible Tower. The closest replacement for vars_prompt is the Surveys feature of Ansible Tower, which is discussed later in this section.
+
+IMPORTANT
+Ansible Tower does not support playbooks that use vars_prompt to interactively set variables.
+
+Defining Extra Variables
+In Ansible Tower, Job Templates can be used to directly set extra variables in two ways:
+
+Extra variables can be set by entering them in YAML or JSON format in the EXTRA VARIABLES field of the Job Template.
+
+If PROMPT ON LAUNCH is selected for the EXTRA VARIABLES field, then Ansible Tower users are prompted to interactively modify the list of extra variables used when they use the Job Template to launch a job.
+
+These extra variables are exactly like the variables specified by the -e or --extra-vars options for ansible-playbook, and their values override any values set for those variables. The values set through extra variables always take precedence.
+
+The following example demonstrates setting extra variables in the Job Template:
+
+
+Figure 10.3: Adding extra variables to a Job Template
+If PROMPT ON LAUNCH is selected for EXTRA VARIABLES, when a Job is launched using the Job Template a dialog box displays which allows Ansible Tower users to edit the extra variables for the job:
+
+
+Figure 10.4: Adjusting extra variables on job launch
+If the resulting Job is later relaunched, the same extra variables are used again. The extra variables for a Job cannot be changed when relaunching it. Instead, launch the job from the original Job Template with different extra variables set.
+
+Job Template Surveys
+Extra variables can be hard to use because the user launching the job needs to understand what variables are available and how they should be used with the Job Template's playbook. Job Template Surveys allow the Job Template to display a short form when used to launch a job, prompting users for information that is used to set values for extra variables.
+
+Prompting for user input offers several advantages over other ways to set extra variables. Users do not need to have detailed knowledge about how extra variables work or that they are even being used. They also do not need to have knowledge of the names of the extra variables that are used by the playbook.
+
+Because prompts can contain arbitrary text, they can be phrased in a manner that is user-friendly and easily understood by users who may not have detailed knowledge about Ansible.
+
+IMPORTANT
+Surveys set extra variables. In fact, the values set by Surveys for variables override the values set on variables of the same name in any other way. This includes the Job Template's EXTRA VARIABLES field or its PROMPT ON LAUNCH setting.
+
+Surveys and vars_prompt are not direct replacements for each other. Variables set through vars_prompt have a lower precedence than extra variables and can be overridden in a number of ways. Values set by Surveys are extra variables and always win.
+
+User-friendly Questions
+
+Surveys allow users to be prompted with customized questions. This allows for more user-friendly prompts for user input of extra variable values than the PROMPT ON LAUNCH method.
+
+Answer Type
+
+Aside from offering a user-friendly prompt, Surveys can also define rules for, and perform validation of, user inputs. User responses to survey questions can be restricted to one of the following seven answer types:
+
+Type	Description
+Text	Single-line text
+Textarea	Multiline text
+Password	Data is treated as sensitive information.
+Multiple Choice (single select)	A list of options from which only one option can be chosen as a response.
+Multiple Choice (multiple select)	A list of options from which one or more options can be chosen as a response.
+Integer	Integer number
+Float	Floating-point decimal number
+Answer Length
+
+You can also define rules for the size of user responses to survey questions. For the following non-list answer types, a survey can define the minimum and maximum allowable character length for user responses: Text, Textarea, Password, Integer, and Float.
+
+Default Answer
+
+A default answer can be provided for a question. The question can also be marked as REQUIRED, which indicates that an answer must be provided for the question.
+
+Creating a Job Template Survey
+During the creation of a Job Template, the addition of a Survey is not possible. A Survey can only be added to a Job Template after the Job Template has been created.
+
+The following procedure illustrates how to add a Survey to an existing Job Template.
+
+Click Templates in the left navigation bar to see the list of existing Job Templates.
+
+Click the desired Job Template to edit the Job Template.
+
+Click ADD SURVEY to enter the Survey creation interface.
+
+Add a question to the Survey.
+
+In the PROMPT field, enter the question to to display to the user.
+
+In the ANSWER VARIABLE NAME field, enter the name of the extra variable to assign the user's response to.
+
+From the ANSWER TYPE list, select the desired answer type for the user's response.
+
+If using a list answer type, define the list by entering one list item per line in the MULTIPLE CHOICE OPTIONS field.
+
+If using a non-list answer type, optionally specify the minimum and maximum character length for the user's response in the MINIMUM LENGTH and MAXIMUM LENGTH fields, respectively.
+
+If desired, optionally define a default value for the extra variable being surveyed in the DEFAULT ANSWER field. This value will be used if no user response are entered.
+
+Select REQUIRED to specify that a response is required. Clear this field if a response is optional.
+
+Click +ADD to add the question to the Survey. A preview of the added question appears under the PREVIEW section of the interface.
+
+Repeat the previous steps to add additional questions to the Survey. After you have added all your questions, scroll to the top of the screen. In the upper-left corner, next to SURVEY is a toggle button, which determines whether the Survey is enabled or disabled. By default, Surveys are enabled upon creation, so the button is set to ON. If the Survey should be disabled, set it to OFF.
+
+Lastly, click SAVE to save the Survey.
+
+
+Figure 10.5: Adding Surveys to a job template
+After you have added a Survey to a Job Template, users will be prompted for answers to the Survey's questions when they launch jobs with that Job Template. If the Job Template has extra variables or is configured to prompt the user to set extra variables, they will be set before the Survey is displayed to the user. Answers to the Survey override any extra variables that have already been set.
+
+
+Figure 10.6: Survey Prompt
+REFERENCES
+Ansible Tower User Guide https://docs.ansible.com/ansible-tower/latest/html/userguide/index.html
+
+
+
+Guided Exercise: Creating Job Template Surveys to Set Variables for Jobs
+In this exercise, you will add a Survey to an existing Job Template and launch a Job using that Survey.
+
+Outcomes
+
+You will be able to add a Survey to an existing Job Template and launch a Job using a Survey from the Ansible Tower web UI.
+
+You have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab project-survey start command. This script ensures that the workstation and tower virtual machines are started.
+
+[student@workstation ~]$ lab project-survey start
+Log in to the Ansible Tower web UI running on tower as admin using redhat as the password.
+
+Add a Survey to the DEV webservers setup Job Template.
+
+Click Templates on the navigation bar.
+
+In the list of available templates, click DEV webservers setup to edit the Job Template.
+
+Click ADD SURVEY to add a survey.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+PROMPT	What version are you deploying?
+DESCRIPTION	This version number will be displayed at the bottom of the index page.
+ANSWER VARIABLE NAME	deployment_version
+ANSWER TYPE	Text
+MINIMUM LENGTH	1
+MAXIMUM LENGTH	40
+DEFAULT ANSWER	v1.0
+REQUIRED	Checked
+Click +ADD to add that Survey Prompt to the Survey. This displays a preview of your Survey.
+
+IMPORTANT
+Before saving, make sure that the ON/OFF switch is set to ON at the top of the Survey editor window.
+
+Click SAVE to add the Survey to the Job Template.
+
+Modify the apache-setup playbook to use the variable from the survey.
+
+Open a terminal on workstation and change to the my_webservers_DEV Git repository.
+
+[student@workstation ~]$ cd ~/git-repos/my_webservers_DEV
+Pull the latest changes from the remote repository.
+
+[student@workstation my_webservers_DEV]$ git pull
+...output omitted...
+Edit the index.html.j2 template.
+
+[student@workstation my_webservers_DEV]$ vi templates/index.html.j2
+Append the following line to the bottom of the file.
+
+Deployment Version: {{ deployment_version }} <br>
+Save the file.
+
+Add, commit, and push the file to the remote repository.
+
+[student@workstation my_webservers_DEV]$ git add --all
+[student@workstation my_webservers_DEV]$ git commit \
+> -m "Display Deployment Version on index page"
+[master 1c520d5] Depl index page
+ 1 file changed, 1 insertion(+)
+[student@workstation my_webservers_DEV]$ git push
+Enumerating objects: 12, done.
+Counting objects: 100% (10/10), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (6/6), done.
+Writing objects: 100% (6/6), 712 bytes | 712.00 KiB/s, done.
+Total 6 (delta 3), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/my_webservers_DEV.git
+   8e5d54a..181ec3e  master -> master
+Update the local copy of the repository for the My Webservers DEV Project.
+
+Click Projects on the navigation bar.
+
+On the same line as the My Webservers DEV Project, click the double arrow icon on the right to launch an SCM update of the Project and wait for the status icon to be steady green.
+
+As a member of the Developers team, launch a Job using the updated DEV webservers setup Job Template.
+
+Click the Log Out icon in the upper-right corner to log out, and then log back in as daniel using redhat123 as the password.
+
+Click Templates on the navigation bar.
+
+On the same line as the DEV webservers setup Job Template, click the rocket icon on the right to launch the Job. This opens the Survey you just created and asks for your input.
+
+You can leave v1.0 in the text field and click NEXT followed by LAUNCH to launch the job. This redirects you to a detailed status page of the running job.
+
+Briefly observe the live output of the running Job.
+
+Verify that the STATUS of the job in the DETAILS section is Successful.
+
+Verify that the web servers have been updated on servera.lab.example.com and serverb.lab.example.com.
+
+Open a web browser and navigate to http://servera.lab.example.com and http://serverb.lab.example.com in separate tabs. You should see this line at the bottom of both pages:
+
+...output omitted...
+Deployment Version: v1.0
+Click the Log Out icon to log out of the Ansible Tower web UI.
+
+This concludes the guided exercise.
+
+

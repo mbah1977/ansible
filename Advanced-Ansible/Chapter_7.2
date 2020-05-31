@@ -1,0 +1,260 @@
+Managing Users Efficiently with Teams
+Objectives
+After completing this section, students should be able to create new teams in the web user interface, assign users to them, and explain the different roles that can be assigned to users.
+
+Teams
+Teams are groups of users. Teams make managing roles on Ansible Tower objects such as Inventories, Projects, and Job Templates, more efficient than managing them for each user separately. Users, who are members of a Team, inherit the roles assigned to that Team.
+
+Rather than assigning the same roles to multiple users, an Ansible Tower administrator can assign roles to the Team representing a group of users.
+
+In Ansible Tower, users exist as objects at a Tower-wide level. A user can have roles in multiple Organizations. A Team belongs to exactly one Organization, but an Ansible Tower System Administrator can assign the Team roles on resources belonging to other Organizations.
+
+IMPORTANT
+A Team belongs to a particular Organization, but it cannot be assigned roles on an Organization object, like individual users can. To manage an Organization object, roles must be assigned directly to specific users.
+
+Teams can be assigned roles on resources which belong to a particular Organization, such as Projects, Inventories, or Job Templates.
+
+Creating Teams
+Teams are created within each Organization using the following procedure.
+
+Log in to the Ansible Tower web interface as the admin user or as a user assigned the admin role for the Organization in which you intend to create the new Team.
+
+Click the Teams link on the left navigation bar.
+
+Click the + button.
+
+On the New Team screen, enter a name for the new Team in the NAME field.
+
+If desired, enter a description in the DESCRIPTION field.
+
+For the required ORGANIZATION field, click the magnifying glass icon to get a list of the Organizations within Ansible Tower. In the SELECT ORGANIZATION screen, select the Organization to create the Team in, and then click SAVE.
+
+Click SAVE to finalize the creation of the new Team.
+
+Team Roles
+Users can be assigned roles for a particular Team. These roles control whether the user is considered part of that Team, can administer it, or can view its membership.
+
+A user can be assigned one or more of the following Team roles:
+
+member
+
+The Team member role allows users to inherit roles on Ansible Tower resources granted to the Team. It also grants users the ability to see the Team's users and associated Team roles.
+
+admin
+
+The Team admin role grants users full control of the Team. Users with this Team role can manage the Team's users and their associated Team roles. Users with Team admin roles can also manage the Team's roles on resources for which the Team has been assigned admin role.
+
+Users with Team admin roles can only manage the Team's roles on a resource when the resource also grants the Team admin role on itself. Just because a Team admin can manage Team membership, it does not imply that the Team admin has any rights to manage roles on objects to which the team has access.
+
+For example, for a user to grant a Team the use role for a Project, the user must have the admin role for both the Team and the Project.
+
+read
+
+The Team read role gives users the ability to see the Team's users and their associated Team roles. A user assigned a Team read role does not inherit roles that the Team has been granted on Ansible Tower resources.
+
+NOTE
+In practice, most organizations do not use Team roles other than member, and the current Red Hat Ansible Tower web UI makes it more difficult to set these other roles. Instead, Team membership is managed through an external authentication source, or the Organization Administrator and System Administrator roles are used for administrative purposes and System Auditor for auditing requirements (instead of read on individual Teams.
+
+Adding Users to a Team
+After Team creation is complete, you can add users to the Team. To add users with the Member role to a Team in an Organization, execute the following procedure:
+
+Log in to the Ansible Tower web interface as the admin user or a user assigned the admin role for the Organization to which the team belongs.
+
+Click the Organizations link on the left navigation bar.
+
+Click the TEAMS link under the Organization which the Team belongs to.
+
+On the Teams screen, click the name of the Team to add the user to.
+
+On the Team details screen, click the USERS button.
+
+Click the + button.
+
+
+Figure 7.4: Add a user to a team with the Member role
+On the ADD USERS screen, select one or more users to add to Team. Then, click SAVE to save your edits, adding the user to the Team.
+
+Setting Team Roles
+
+Since Red Hat Ansible Tower 3.4, adding users with either the admin or the read roles to a Team in an Organization requires the tower-cli tool, a command-line tool for the Red Hat Ansible Tower REST API, or directly with the Red Hat Ansible Tower API. The tower-cli role grant command grants a user, specified with the --user flag, a role, specified with the --type flag, on a team, specified with the --target-team flag. The following example grants the admin role to joe on the Operators team.
+
+[student@workstation ~]$ tower-cli role grant --user 'joe' \
+> --target-team 'Operators' --type 'admin'
+The following example grants the read role to jennifer on the Architects team.
+
+[student@workstation ~]$ tower-cli role grant --user 'jennifer' \
+> --target-team 'Architects' --type 'read'
+NOTE
+To use tower-cli, you need to run the tower-cli config command to specify the host for Red Hat Ansible Tower, and the username and password to access it. You can allow unverified SSL connections with the tower-cli config verify_ssl false command.
+
+REFERENCES
+You can find further information in the Teams section of the Ansible Tower User Guide http://docs.ansible.com/ansible-tower/latest/html/userguide
+
+You can find further information in the Introduction to tower-cli section of the Ansible Tower API Guide https://docs.ansible.com/ansible-tower/latest/html/towerapi/
+
+
+
+
+
+Guided Exercise: Managing Users Efficiently with Teams
+In this exercise, you will organize users into Teams and explore the access provided by different Team roles.
+
+Outcomes
+
+You will be able to organize users into Teams and explain the different roles that users can have on a Team.
+
+Before you begin
+
+You have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Perform the following steps using the Default Organization.
+
+Open a terminal on workstation as the student user and run the following command:
+
+[student@workstation ~]$ lab org-team start
+This script configures the environment to use the tower-cli tool.
+
+Create a new Team called Developers.
+
+Log in to the Tower web interface as the admin user with the redhat password.
+
+Click Teams in the left navigation bar to manage Teams.
+
+Click the + button to add a new Team.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Developers
+DESCRIPTION	Dev Team
+ORGANIZATION	Default
+Click SAVE to create the new Team.
+
+Create a user which will be the administrator for the newly created Developers Team.
+
+Click Users in the left navigation bar to manage users.
+
+Click + to add a new user.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Daniel
+LAST NAME	George
+ORGANIZATION	Default
+EMAIL	daniel@lab.example.com
+USERNAME	daniel
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	Normal User
+NOTE
+We are creating an administrator of the Developers Team, not a System Administrator. This is why the User Type is set here to Normal User.
+
+Click SAVE to create the new user.
+
+Open a terminal, and use the tower-cli tool to assign the admin role on the Developers Team to the daniel user.
+
+[student@workstation ~]$ tower-cli role grant --user 'daniel' \
+> --target-team 'Developers' --type 'admin'
+== ==== ===== ===========
+id user type  target_team
+== ==== ===== ===========
+38    5 admin N/A
+== ==== ===== ===========
+In the previous output, N/A is expected in the target_team column.
+
+Create the donnie user and grant her the Read role for the Developers Team.
+
+Back in the Tower web interface, click Users in the left navigation bar to manage users.
+
+Click + to add a new user.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	Donnie
+LAST NAME	Jameson
+ORGANIZATION	Default
+EMAIL	donnie@lab.example.com
+USERNAME	donnie
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	Normal User
+Click SAVE to create the new user.
+
+Open a terminal, and use the tower-cli tool to assign the donnie user the read role for the Developers Team.
+
+[student@workstation ~]$ tower-cli role grant --user 'donnie' \
+> --target-team 'Developers' --type 'read'
+Create a user, david, to be granted Member role to the Developers Team.
+
+Back in the Tower web interface, click Users in the left navigation bar to manage users.
+
+Click + to add a new user.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+FIRST NAME	David
+LAST NAME	Jackobs
+ORGANIZATION	Default
+EMAIL	david@lab.example.com
+USERNAME	david
+PASSWORD	redhat123
+CONFIRM PASSWORD	redhat123
+USER TYPE	Normal User
+Click SAVE to create the new user.
+
+Assign the Member role on the Developers Team to david.
+
+Click Teams in the left navigation bar to manage Teams.
+
+Click the link for the Developers Team you created previously.
+
+Click the USERS button to manage the Team's users.
+
+Click + to add a new user to the Team.
+
+Check the box next to david to select this user.
+
+Click SAVE and click the Log Out icon to exit the Tower web interface.
+
+Verify the permissions for the daniel user.
+
+Log in to the Tower web interface as daniel with a password of redhat123.
+
+Click Teams in the left navigation bar to manage Teams.
+
+Click the link for the Developers Team.
+
+Click the USERS button to manage the users assigned to the Team.
+
+Click the + button. As you can see, daniel can add and manage role assignments for himself in this team. Click Cancel.
+
+Click the Log Out icon to exit the Tower web interface.
+
+Verify the permissions for the donnie user.
+
+Log in to the Tower web interface as donnie with a password of redhat123.
+
+Click Teams in the left navigation bar to manage Teams.
+
+Click the link for the Developers Team you created previously. The user, donnie, can view the settings for the Team that she has been assigned the Read role to.
+
+Click the USERS button and you should see that donnie sees all users that are part of the Developers Team (including the System Auditor and System Administrators) but has no rights to manage users or user roles in that Team.
+
+Click the Log Out icon to exit the Tower web interface.
+
+Verify the permissions for the david user.
+
+Log in to the Tower web interface as david with a password of redhat123.
+
+Click Teams in the left navigation bar to manage Teams.
+
+Click the link for the Developers Team you created previously.
+
+Click the USERS button and you should see that, like donnie, david sees all users that are part of the Developers Team, including the System Auditor and System Administrators, but has no rights to manage users or user roles in that Team.
+
+Click the Log Out icon to exit the Tower web interface.
+
+This concludes the guided exercise.

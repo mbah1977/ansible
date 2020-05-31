@@ -1,0 +1,267 @@
+Creating Machine Credentials for Access to Inventory Hosts
+Objectives
+After completing this section, students should be able to create a machine credential for inventory hosts to allow Ansible Tower to run jobs on the inventory hosts using SSH.
+
+Credentials
+Credentials are Ansible Tower objects used to authenticate to remote systems. They may provide secrets, such as passwords and SSH keys, or other supporting information needed to successfully access or use a remote resource.
+
+Ansible Tower is responsible for maintaining secure storage for the secrets in these Credential objects. Credential passwords and keys are encrypted before they are saved to the Tower database, and can not be retrieved in clear text from the Tower user interface. Although users and teams can be assigned privileges to use Credentials, the secrets are not exposed to them. This means that when a user changes teams or leaves the organization, the credentials and systems do not need to be re-keyed. When a Credential is needed by Tower, it decrypts the data internally and passes it to SSH or other program directly.
+
+IMPORTANT
+Once sensitive authentication data is entered into a Credential and encrypted, it can no longer be retrieved in decrypted form through the Tower web interface.
+
+Credential Types
+Ansible Tower has a number of different types of Credentials that it can manage. Some of these include:
+
+Machine credentials are used to authenticate playbook logins and privilege escalation for Inventory hosts.
+
+Network credentials are used when Ansible network modules are used to manage networking equipment.
+
+Source Control (or SCM) credentials are used by Projects to clone and update Ansible project materials from a remote version control system such as Git, Subversion, or Mercurial/
+
+Vault credentials are used to decrypt sensitive information stored in project files protected by Ansible Vault.
+
+Several types of inventory credentials are available to update dynamic inventory information from one of Ansible Tower's built-in dynamic inventory sources. There are separate credential types for each inventory source in question: Amazon Web Services, VMware vCenter, Red Hat Satellite 6, Red Hat CloudForms, Google Compute Engine, Microsoft Azure Resource Manager, OpenStack, and so on.
+
+It is also possible for Tower administrators to create custom credential types that may be used like the built-in credential types, specified using a YAML definition. For more information on custom credential types, see the Ansible Tower User Guide.
+
+This section focuses on how to set up machine credentials that provide appropriate login and privilege escalation information for use with hosts in an inventory. Some of the other types of credentials are discussed in more detail elsewhere in this course.
+
+Creating Machine Credentials
+Credentials are managed through the CREDENTIALS page under Tower's Credentials link on the left navigation bar.
+
+Any user can create a Credential, and is considered the owner of that Credential. If the Credential is not assigned to an Organization, it is a private Credential. This means that only the user that owns the Credential and users with the Tower System Administrator singleton role can use it, and only they and users with the Tower System Auditor singleton role can see it.
+
+On the other hand, if the Credential is assigned to an Organization, then it is an Organization Credential. Only Tower System Administrators and Users with Admin on an Organization can create Credentials assigned to an Organization. Users and teams in the Organization can be granted roles on a Credential assigned to the Organization to use or manage the Credential.
+
+In summary, the main distinctions between private Credentials and those assigned to an Organization are:
+
+Any user can create a private Credential, but only Tower System Administrators and users with Organization Admin can create an Organization Credential.
+
+If a Credential belongs to an Organization, users and teams can be granted roles on it, and it can be shared. Private Credentials not assigned to an Organization can only be used by the owner and the Tower singleton roles. Other users and teams cannot be granted roles.
+
+IMPORTANT
+The Tower Admin user can assign an Organization to an existing private Credential, converting it into an Organization Credential.
+
+The following procedure details how Machine Credentials are created.
+
+Login as a user with the appropriate role assignment. If creating a private Credential, there are no specific role requirements. If creating an Organization Credential, login as a user with the Admin role for the Organization.
+
+Click Credentials to enter the Credentials management interface.
+
+On the CREDENTIAL screen, click + to create a new Credential.
+
+On the NEW CREDENTIAL screen, enter the required information for the new Credential.
+
+A NAME is required, and the TYPE drop-down menu should be used to select Machine.
+
+If the user has Organization Admin privileges, then the ORGANIZATION can be set to assign this Credential to an Organization. If the user does not have admin privileges, then the ORGANIZATION field is not present and only private Credentials can be created.
+
+For Machine Credentials, additional fields appear in the TYPE DETAILS section as shown in the following illustration:
+
+
+Figure 8.10: New machine Credential (after save)
+These fields can contain the information needed to authenticate to and escalate privileges on the machines that use this Credential. Many of them are mapped to settings, which might be in an ansible.cfg file:
+
+USERNAME is the username used to log in to the managed hosts (remote_user in ansible.cfg).
+
+PASSWORD is the SSH password to use for this user. Leave this blank if private key authentication is used.
+
+The SSH PRIVATE KEY field contains an SSH private key that can be used to log in as USERNAME on the managed hosts. It is easier to cut and paste the text from the file rather than to manually type it in. If you are administering Ansible Tower from a Firefox browser running under GNOME 3, you can drag and drop the private key file from the Files application window into this field in your web browser window.
+
+Once the Credential is saved, this is encrypted by Tower, so the field reads ENCRYPTED.
+
+PRIVATE KEY PASSPHRASE is used if the SSH key in SSH PRIVATE KEY is encrypted by SSH for protection. It accepts a passphrase to decrypt the key. Otherwise, this field can be blank.
+
+PRIVILEGE ESCALATION METHOD is a drop-down menu that specifies what type of privilege escalation, if any, is needed (become_method). This affects other fields that may appear.
+
+For sudo privilege escalation, PRIVILEGE ESCALATION USERNAME is the privileged user that Ansible should use on the managed host (become_user). PRIVILEGE ESCALATION PASSWORD is the sudo password to use. This can be blank if no password is needed.
+
+Click the SAVE button to finalize the creation of the new Machine Credential.
+
+Editing Machine Credentials
+Once Machine Credentials are created, they can be edited, if needed, using the Credential editor interface. The following procedure details how Credentials are modified.
+
+Log in as a user with the appropriate role assignment. If editing a private Credential, then login as the user who created the Credential. If editing an Organization Credential, then login as a user with Admin role on the Organization Credential.
+
+Click the Credentials link to enter the Credentials management interface.
+
+On the CREDENTIAL screen, click the name of the Credential to edit.
+
+On the Credential editor screen, make the necessary changes to the desired Credential properties.
+
+Click SAVE button to finalize the changes made to the Credential.
+
+Credential Roles
+As discussed earlier, private Credentials (Credentials that are not assigned to an Organization) are only accessible to their creators or to Users that have the System Administrator or System Auditor user type. Other users cannot be assigned roles on private Credentials.
+
+To assign roles to Credentials, the Credential must have an Organization. Then Users and Teams in that Organization can share that Credential through role assignments.
+
+The following is the list of available Credential roles.
+
+Admin
+
+The Credential admin role grants Users full permissions on a Credential. These permissions include deletion and modification of the Credential, as well as the ability to use the Credential in a Job Template.
+
+Use
+
+The Credential use role grants Users the ability to use a Credential in a Job Template. Use of a Credential in a Job Template is discussed later in this course.
+
+Read
+
+The Credential read role grants Users the ability to view the details of a Credential. This still does not allow them to decrypt the secrets which belong to that Credential through the web interface.
+
+Managing Credential Access
+When an Organization Credential is first created, it is only accessible by the owner and users with either the Admin or Auditor role in the Organization in which the Credential was created. Additional access, if desired, must be specifically configured.
+
+Additional roles cannot be assigned until it is first saved, after which they can be set by editing the Credential.
+
+Roles are assigned through the PERMISSIONS section of the Credential editor screen.
+
+The following procedure details the steps for granting permissions to an Organization Credential after its creation.
+
+Log in as a user with Admin role on the Organization in which the Credential was created.
+
+Click Credentials to enter the Credentials management interface.
+
+Click the name of the Credential to edit in order to enter the Credential editor screen.
+
+On the Credential editor screen, click the PERMISSIONS button to enter the permissions editor.
+
+Click the + button to add permissions.
+
+On the user and team selection screen, click either USERS or TEAMS and then select the check boxes for the users or teams to be assigned roles.
+
+Under Please assign roles for the selected users/teams, click KEY to display the list of Credential roles and their definitions.
+
+Click the SELECT ROLES drop-down menu and select the desired Credential role for each user or team.
+
+Click SAVE to finalize the changes to permissions.
+
+IMPORTANT
+Permissions for Credentials can also be added through either the user or team management screens.
+
+Common Credential Scenarios
+To help you understand ways in which Credentials are used, here are some common Credential scenarios:
+
+Credentials Protected by Tower, Not Known to Users
+
+One common scenario for the use of Tower Credentials is the delegation of task execution from administrators to Tier 1 support staff.
+
+For example, suppose that the support staff needs to be delegated the ability to run a playbook ensuring a web application has been restarted to restore service when outages occur outside of business hours. The support staff's Credential uses a shared account, support, and a passphrase-protected private key for SSH authentication to managed hosts. The support account needs to escalate privileges using sudo, with a sudo password, in order to run the playbook.
+
+Since the Credential is shared by the support staff's team, an Organization Credential resource should be created to store the username, SSH private key, and SSH key passphrase needed to authenticate SSH sessions to the managed hosts. The Credential also stores the privilege escalation method, username, and sudo password information. Once created, the Credential can be used by the support staff to launch Jobs on the managed hosts without needing to know the SSH key passphrase or sudo password.
+
+
+Figure 8.11: Organization Credential for shared account
+Credential Prompts for Sensitive Password, Not Stored in Tower
+
+Another scenario is to use Credentials to store username authentication information while still prompting interactively for a sensitive password when the Credential is used.
+
+Suppose that a database administrator wants to run a playbook managed in Tower to execute tasks on a database server that houses sensitive data for the company financials. Due to the highly sensitive nature of the data, the company's financial compliance regulations forbid the storage of the account's password.
+
+A machine Credential is still used to configure the database administrator's authentication to the database server. Since the Credential is not to be shared, a private Credential can be used to store the SSH USERNAME. It is also configured to prompt the user for the account's password when the Credential is used by a Job, by selecting the Prompt on launch check box for PASSWORD.
+
+
+Figure 8.12: Private Credential with password prompting
+IMPORTANT
+Ansible Tower has a feature that allows playbooks to be run automatically on a schedule, much like a cron job. Credentials configured to prompt interactively for password information at runtime can not be used with scheduled jobs, since Tower can not provide that information without user interaction.
+
+REFERENCES
+Further information is available in the Credentials section of the Ansible Tower User Guide at https://docs.ansible.com/ansible-tower/latest/html/userguide/index.html
+
+Further information is available in the Built-in Roles section of the Ansible Tower User Guide at https://docs.ansible.com/ansibl
+
+
+
+
+Guided Exercise: Creating Machine Credentials for Access to Inventory Hosts
+In this exercise, you will create a machine credential and assign roles to users that permit them to use it.
+
+Outcomes
+
+You should be able to create and manage Machine Credentials to be used against hosts and groups in an Inventory.
+
+You should have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in to the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Create a new credential called Operations.
+
+Click Credentials in the left navigation bar.
+
+Click the + button to add a new credential.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Operations
+DESCRIPTION	Operations Credential
+ORGANIZATION	Default
+CREDENTIAL TYPE	Machine
+USERNAME	devops
+PASSWORD	redhat
+PRIVILEGE ESCALATION METHOD	sudo
+PRIVILEGE ESCALATION USERNAME	root
+PRIVILEGE ESCALATION PASSWORD	redhat
+Leave the other fields untouched and click SAVE to create the new credential.
+
+Assign the Operations team the Admin role on the Operations credential.
+
+Click Credentials in the left navigation bar.
+
+On the same line as the Operations credential, click the pencil icon to edit the Operations credential.
+
+On the next page, click PERMISSIONS to manage the permissions for the credential.
+
+Click the + button to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, check the box next to the Operations team. This causes the team to display in the second section underneath the first one.
+
+In the second section below, select the Admin Role from the drop-down menu.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Operations credential, which now shows that all members of the Operations team, oliver and ophelia, are assigned the Admin role on the Operations credential.
+
+Verify the permissions of the Admin role to the Operations credential with the user oliver, who belongs to the Operations team.
+
+Click the Log Out icon in the top right corner to log out and sign back in as oliver with password of redhat123. This user is a Member of the Operations team.
+
+Click Credentials in the left navigation bar.
+
+Click the link for the Operations credential created earlier. Note how oliver can modify the credential.
+
+Assign the Developers team the Use role on the Operations credential.
+
+Click the Log Out icon in the top right corner to log out and log back in as admin with a password of redhat.
+
+Click Credentials in the left navigation bar.
+
+On the same line as the Operations credential entry, click the pencil icon to edit the credential.
+
+On the next page, click PERMISSIONS to manage the permissions.
+
+Click the + button to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, select the check box next to the Developers team. This causes the team to display in the second section underneath the first one.
+
+In the second section below, select the Use role from the drop-down menu.
+
+Click SAVE to finalize the role assignment. This redirects you to the list of permissions for the Operations credential which now shows that all members of the Developers team, daniel and david are assigned the Use role on the Operations credential.
+
+Verify the Use role for the Operations credential with the user daniel, who belongs to the Developers team.
+
+Click the Log Out icon in the top right corner to log out and log back in as daniel with redhat123 as the password. This user has an Admin role for the Developers team.
+
+Click Credentials in the left navigation bar.
+
+Click the link for the Operations credential created earlier. Note that daniel cannot modify the credential even though he has an Admin role for the team.
+
+Click the Log Out icon in the top right corner to log out of the Tower web interface.
+
+This concludes the guided exercise.
+
+

@@ -1,0 +1,260 @@
+Chapter 10. Constructing Advanced Job Workflows
+Improving Performance with Fact Caching
+Guided Exercise: Improving Performance with Fact Caching
+Creating Job Template Surveys to Set Variables for Jobs
+Guided Exercise: Creating Job Template Surveys to Set Variables for Jobs
+Creating Workflow Job Templates and Launching Workflow Jobs
+Guided Exercise: Creating Workflow Job Templates and Launching Workflow Jobs
+Scheduling Jobs and Configuring Notifications
+Guided Exercise: Scheduling Jobs and Configuring Notifications
+Lab: Constructing Advanced Job Workflows
+Summary
+Abstract
+
+Goal	Use additional features of Job Templates to improve performance, simplify customization of Jobs, launch multiple Jobs, schedule automatically recurring Jobs, and provide notification of Job results.
+Objectives	
+Speed up Job execution by using and managing Fact Caching.
+
+Create a Job Template Survey to help users more easily launch a Job with custom variable settings.
+
+Create a Workflow Job Template and launch multiple Ansible jobs as a single workflow.
+
+Schedule automatic Job execution and configure notification of Job completion.
+
+Sections	
+Improving Performance with Fact Caching (and Guided Exercise)
+
+Creating Job Template Surveys to Set Variables for Jobs (and Guided Exercise)
+
+Creating Workflow Job Templates and Launching Workflow Jobs (and Guided Exercise)
+
+Scheduling Jobs and Configuring Notifications (and Guided Exercise)
+
+Lab	
+Constructing Advanced Job Workflows
+
+Improving Performance with Fact Caching
+Objectives
+After completing this section, students should be able to speed up job execution by using and managing fact caching.
+
+Fact Caching
+Ansible facts are variables that are automatically discovered by Ansible on a managed host. Facts contain host-specific information that can be used just like regular variables in plays, conditionals, loops, or any other statement that depends on a value collected from a managed host.
+
+Normally, every play automatically runs the setup module before the first task, in order to gather facts from each managed host matching the play's host pattern. This ensures that the play has current facts, but also has some negative consequences.
+
+Running the setup module to collect facts for every play has obvious performance consequences, especially on a large inventory of managed hosts. If you are not using any facts in the play, one way you could speed up execution would be to turn off automatic fact gathering. You can do this by setting gather_facts: no in the play. Note that you might not be able to do this if you are actually using facts in the play.
+
+Playbooks can also reference another host's facts by using the "magic" variable hostvars. For example, a task running on the managed host servera can access the value of the fact ansible_facts['default_ipv4']['address'] for serverb by referencing the variable hostvars['serverb']['ansible_facts']['default_ipv4']['address']. However, this only works if facts have already been gathered from serverb by this play or by an earlier play in the same playbook.
+
+You can use fact caching to address both of these problems. One playbook can collect facts for all hosts in the inventory and cache those facts so that subsequent playbooks may use them without fact gathering or manually running the setup module.
+
+Enabling Fact Caching in Ansible Tower
+
+Red Hat Ansible Tower 3.2 and later include integrated support for fact caching and a database for the fact cache. You need to manage timeouts for the fact cache at a global level. Fact caching control is determined by the job template.
+
+There is a global setting in Ansible Tower that controls when facts expire, per host. On the left-side navigation bar of the web UI, select Settings to display the Configure Tower pane, and then click JOBS. The setting Per-Host Ansible Fact Cache Timeout controls how long Ansible facts in the cache are considered to be valid after they have been collected. This is measured in seconds.
+
+The default value is set to 0, meaning that the information stored in the cache is always valid. However, if you do not periodically gather facts to update the cache, you risk facts becoming outdated due to changes on the managed hosts.
+
+
+Figure 10.1: Setting Ansible Fact Cache Timeout
+To optimize fact caching, set gather_facts: no to disable automatic fact gathering in the play. You will also need to enable Use Fact Cache for any Ansible Tower job templates that use playbooks containing those plays. The plays then depend on the information in the fact cache to use facts.
+
+You will also need to periodically run a play that populates the fact cache to keep the cached facts current. The Ansible Tower job template for this playbook also needs to enable Use Fact Cache. One good way to do this in Ansible Tower is to set up a playbook that gathers facts as a scheduled job (discussed elsewhere in this course). That job could run a normal playbook that gathers facts, or you could set up a minimal playbook to gather facts, such as the following example:
+
+- name: Refresh fact cache
+  hosts: all
+  gather_facts: yes
+Note that because there is no tasks or roles section, the only thing this playbook does is gather facts.
+
+NOTE
+You do not need to gather facts for all your hosts at the same time. It might make sense to gather facts for smaller sets of your hosts to spread the load. The important thing is to make sure you gather facts for all of your hosts before they expire or become stale.
+
+The following procedure shows how to enable fact caching in the Ansible Tower interface:
+
+Click Templates in the left navigation bar.
+
+Choose the appropriate job template and click its name to edit the settings.
+
+In the OPTIONS section of the page, select the check box next to Use Fact Cache.
+
+
+Figure 10.2: Enabling fact caching
+Click SAVE to save the modified job template configuration.
+
+Now whenever you run a new job based on a template that has the Use Fact Cache option enabled, the job will use the fact cache. If the Ansible Playbook also has the gather_facts variable set to yes, the job will gather facts, retrieve them, and store them in the fact cache.
+
+NOTE
+When a job is launched, Ansible Tower injects all ansible_facts for each of the managed hosts from the running job into memcache. After finishing the job, Ansible Tower retrieves all the records for a particular host from memcache, and then saves each fact that has an update time later than the cached copy in the fact cache database.
+
+REFERENCES
+Ansible User Guide: Caching Facts
+
+Ansible Tower User Guide: Fact Caching
+
+
+Guided Exercise: Improving Performance with Fact Caching
+In this exercise, you will use fact caching to speed up job execution and explore how to manage the fact cache.
+
+Outcomes
+
+You should be able to use fact caching in job templates.
+
+You should have an Ansible Tower instance installed, configured and running on the tower system.
+
+Log in to workstation as student and run lab project-facts start.
+
+[student@workstation ~]$ lab project-facts start
+Log in to the Ansible Tower web UI running on the tower system as daniel using redhat123 as the password.
+
+Change the My Webservers DEV project so that it automatically triggers an SCM update.
+
+In the left navigation bar, click Projects.
+
+Click My Webservers DEV to edit the project settings.
+
+Under SCM UPDATE OPTIONS, select UPDATE REVISION ON LAUNCH and then click SAVE.
+
+Launch a job using the DEV webservers setup Job Template. (This template was set up for you by the setup command.)
+
+The job will fail. Watch the job's output screen and try to identify why it failed.
+
+In the left navigation bar, click Templates.
+
+Click the rocket icon for the DEV webservers setup Job Template to launch a job. This will redirect you to a detailed status page of the running job.
+
+Briefly observe the output of the running job.
+
+When the job completes, verify that the STATUS of the job in the DETAILS section displays Failed.
+
+Look at the output of the completed job in the right pane. Scroll down to the section that shows the output of the task that failed.
+
+The job failed because the playbook it ran uses a variable that gets its value from the ansible_distribution Ansible fact. The playbook used for the job does not gather facts, and the Job Template does not use fact caching, so the task failed.
+
+Fix the issue by setting the value of the gather_facts variable to yes in the apache_setup.yml Ansible Playbook.
+
+On workstation, open a terminal and change to the git-repos directory, where you stored your Git repositories from the previous chapter.
+
+[student@workstation ~]$ cd ~/git-repos
+Change to the my_webservers_DEV directory.
+
+[student@workstation git-repos]$ cd my_webservers_DEV
+Use the git pull command to pull the latest version from the Git server.
+
+[student@workstation my_webservers_DEV]$ git pull
+...output omitted...
+Fast-forward
+ apache-setup.yml | 1 +
+ 1 file changed, 1 insertion(+)
+Edit the apache-setup.yml playbook and change the gather_facts: variable value to yes to enable fact gathering.
+
+Open the apache-setup.yml playbook for editing.
+
+[student@workstation my_webservers_DEV]$ vi apache-setup.yml
+Change the value of the gather_facts variable to yes.
+
+---
+- hosts: all
+  name: Install the web server and start it
+  become: yes
+  gather_facts: yes
+  vars:
+  ...output omitted...
+Save and close the file.
+
+Use the git add --all command to add all files to the staging area.
+
+[student@workstation my_webservers_DEV]$ git add --all
+Use git commit to commit the changes; use the comment Enabling facts gathering.
+
+[student@workstation my_webservers_DEV]$ git commit -m "Enabling facts gathering"
+[master 6910be1] Enabling facts gathering
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+Push the changes to the remote repository.
+
+[student@workstation my_webservers_DEV]$ git push
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 297 bytes | 297.00 KiB/s, done.
+Total 3 (delta 2), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/my_webservers_DEV.git
+   1cab808..6910be1  master -> master
+From the Ansible Tower web UI, edit the DEV webservers setup Job Template to enable the USE FACT CACHE option. Launch a job using that edited Job Template.
+
+Because the modified playbook has gather_facts: yes set in one of its plays, it will gather Ansible facts. Because the Job Template has USE FACT CACHE set, the gathered facts will be stored in the fact cache for future use.
+
+In the left navigation bar, click Templates.
+
+Click the DEV webservers setup Job Template to edit the Template.
+
+Select Use Fact Cache to enable the Fact Caching option.
+
+Click SAVE.
+
+Scroll down and click the rocket icon for the DEV webservers setup Job Template. This redirects you to a detailed status page of the running job.
+
+Briefly observe the output of the running job.
+
+Verify that the STATUS of the job in the DETAILS section displays Successful.
+
+This time the job succeeds and stores the Ansible facts for all hosts specified in the Dev inventory in the cache.
+
+Set the gather_facts variable to no in the apache_setup.yml playbook.
+
+Open the apache-setup.yml playbook for editing.
+
+[student@workstation my_webservers_DEV]$ vi apache-setup.yml
+Change the gather_facts variable by setting its value to no.
+
+---
+- hosts: all
+  name: Install the web server and start it
+  become: yes
+  gather_facts: no
+  ...output omitted...
+Save and close the file.
+
+Use git add --all to add all files to the staging area.
+
+[student@workstation my_webservers_DEV]$ git add --all
+Use git commit to commit the changes; use the comment Disabling facts gathering. Push the changes to the remote repository.
+
+[student@workstation my_webservers_DEV]$ git commit -m "Disabling facts gathering"
+[master 58ba9ea] Disabling facts gathering
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+[student@workstation my_webservers_DEV]$ git push
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 299 bytes | 299.00 KiB/s, done.
+Total 3 (delta 2), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/my_webservers_DEV.git
+   6910be1..58ba9ea  master -> master
+Launch another job using the DEV webservers setup Job Template. Go back to the Ansible Tower web UI.
+
+As a member of the Developers team, launch a job using the DEV webservers setup Job Template.
+
+Even though fact gathering is turned off, the job still succeeds because the fact used by the variable in the playbook can use the fact cache. This job should also run more quickly because it does not need to gather facts.
+
+In the left navigation bar, click Templates.
+
+On the same line as the DEV webservers setup Job Template, click the rocket icon on the right to launch the job. This will redirect you to a detailed status page of the running job.
+
+Briefly observe the live output of the running job.
+
+Verify that the STATUS of the job in the DETAILS section displays Successful.
+
+In the right pane, scroll down to the section that shows the output of the playbook. Notice that no facts were gathered and the task that previously failed succeeded this time. The cached facts were used to set the correct value for the variable that sets its own value from the Ansible facts.
+
+Verify that the Ansible facts have been stored in the Ansible Tower fact cache.
+
+Click Inventories in the left navigation bar.
+
+Click HOSTS and then click the servera.lab.example.com link.
+
+Click FACTS. Scroll down and verify that all the Ansible facts from servera.lab.example.com server have been stored in the Ansible Tower database.
+
+Log out from the Ansible Tower web UI.

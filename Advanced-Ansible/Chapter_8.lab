@@ -1,0 +1,131 @@
+Lab: Creating and Managing Inventories and Credentials
+Performance Checklist
+
+In this lab, you will create inventories and credentials and assign roles to users that permit the users to manage them.
+
+Outcomes
+
+You should be able to manage Inventories and Credentials in order for a team to be able to run a playbook against an inventory.
+
+You should have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in to the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Create a new Inventory called Dev within the Default Organization.
+
+Click Inventories in the left quick navigation bar.
+
+Click the + button. From the drop-down list, select Inventory to add a new Inventory.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Dev
+DESCRIPTION	Development Inventory
+ORGANIZATION	Default
+Click SAVE to create the new Inventory. You are redirected to the Inventory details page.
+
+Create a group called dev-servers in the Dev Inventory.
+
+Click the GROUPS button.
+
+Click the + button to add the new group.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	dev-servers
+DESCRIPTION	Development servers
+Click SAVE to create the new group.
+
+Add two hosts with the host names servera.lab.example.com and serverb.lab.example.com to the dev-servers group.
+
+Click the HOSTS button, within the group you just created.
+
+Click the + button. From the drop-down menu, select New Host to add a new host to the group.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+HOST NAME	servera.lab.example.com
+DESCRIPTION	Server A
+Click SAVE to create the new host.
+
+Click the + button. From the drop-down menu, select New Host to add a new host to the group.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+HOST NAME	serverb.lab.example.com
+DESCRIPTION	Server B
+Click SAVE to create the new host.
+
+Grant the Admin role on the Dev Inventory to the Developers team.
+
+Click Inventories in the left quick navigation bar.
+
+On the same line as the Dev Inventory, click the pencil icon to edit the Inventory.
+
+On the next screen, click PERMISSIONS button to manage the Inventory's permissions.
+
+Click the + button to add permissions.
+
+Click TEAMS to display the list of available Teams.
+
+In the first section, check the box next to the Developers Team. This displays that team in the second section underneath the first one.
+
+In the second section, select the Admin role from the drop-down menu.
+
+Click SAVE to finalize the role assignment. You are redirected to the list of permissions for the Dev Inventory, which now shows that all members of the Developers team are assigned the Admin role on the Dev Inventory.
+
+Create a new Credential, Developers, with the following information:
+
+Field	Value
+NAME	Developers
+DESCRIPTION	Developers Credential
+ORGANIZATION	Default
+TYPE	Machine
+USERNAME	devops
+PASSWORD	redhat
+PRIVILEGE ESCALATION	sudo
+PRIVILEGE ESCALATION USERNAME	root
+PRIVILEGE ESCALATION PASSWORD	redhat
+Click Credentials in the left quick navigation bar.
+
+Click the + button to add a new Credential.
+
+Create a new Credential, Developers, with the following information:
+
+Field	Value
+NAME	Developers
+DESCRIPTION	Developers Credential
+ORGANIZATION	Default
+TYPE	Machine
+USERNAME	devops
+PASSWORD	redhat
+PRIVILEGE ESCALATION	sudo
+PRIVILEGE ESCALATION USERNAME	root
+PRIVILEGE ESCALATION PASSWORD	redhat
+Leave the other fields untouched and click SAVE to create the new Credential.
+
+Grant the Admin role on the Developers Credential to the Developers team.
+
+Click Credentials in the left quick navigation bar.
+
+On the same line as the Developers Credential, click the pencil icon to edit the Credential.
+
+On the next page, click PERMISSIONS to manage the Credential's permissions.
+
+Click the + button to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, check the box next to the Developers team. This causes the team to display in the second section underneath the first one.
+
+In the second section below, select the Admin Role from the drop-down menu.
+
+Click SAVE to finalize the role assignment. This redirects you to the list of permissions for the Developers Credential which now shows that the users, daniel and david are assigned the Admin role on the Developers Credential.
+
+Click the Log Out icon to exit the Tower web interface.
+
+

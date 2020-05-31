@@ -1,0 +1,188 @@
+Lab: Managing Projects and Launching Ansible Jobs
+Performance Checklist
+
+In this exercise, you will create a new project and job template, and assign an appropriate role for a team to be able to launch a job.
+
+Outcomes
+
+You should be able to manage Projects and Job Templates in order for a team to be able to launch a Job.
+
+You should have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab provision-review start. This setup script creates a new Git repository needed for the exercise.
+
+[student@workstation ~]$ lab provision-review start
+Log in to the Ansible Tower web interface running on the tower system using the admin account and the redhat password.
+
+Create a new Project called My Webservers TEST with the following information:
+
+Field	Value
+NAME	My Webservers TEST
+DESCRIPTION	Test Webservers Project
+ORGANIZATION	Default
+SCM TYPE	Git
+SCM URL	ssh://git.lab.example.com/var/opt/gitlab/git-data/repositories/git/my_webservers_TEST.git
+SCM CREDENTIAL	student-git
+Click Projects in the left navigation bar.
+
+Click the + button to add a new Project.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	My Webservers TEST
+DESCRIPTION	Test Webservers Project
+ORGANIZATION	Default
+SCM TYPE	Git
+SCM URL	ssh://git.lab.example.com/var/opt/gitlab/git-data/repositories/git/my_webservers_TEST.git
+SCM CREDENTIAL	student-git
+Click SAVE to create the new Project.
+
+Verify that the status icon of the SCM update job for the Project, My Webservers TEST, becomes green before proceeding.
+
+Give the Developers team both the Use and the Update roles on the Project, My Webservers TEST.
+
+Click Projects in the left navigation bar.
+
+Click My Webservers TEST to edit the Project settings.
+
+On the next page, click PERMISSIONS to manage the Project’s permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, check the box next to the Developers team. This causes the team to display in the second section underneath the first one.
+
+In the second section below, select the Use role from the drop-down menu. Repeat that by clicking in the second section in the empty field after the Use role and selecting the Update role from the drop-down menu.
+
+Click SAVE to make the role assignment.
+
+Create a new Job Template called TEST webservers setup with the following information:
+
+Field	Value
+NAME	TEST webservers setup
+DESCRIPTION	Setup apache on TEST webservers
+JOB TYPE	Run
+INVENTORY	Test
+PROJECT	My Webservers TEST
+PLAYBOOK	apache-setup.yml
+CREDENTIAL	Operations
+
+
+
+
+
+Give the Developers team the Execute role on the Job Template, TEST webservers setup.
+
+Click PERMISSIONS to manage the Job Template's permissions.
+
+Click the + button on the right to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, click to select the box next to the Developers team. This causes the team to display in the second section underneath the first one.
+
+In the second section below, select the Execute role from the drop-down menu.
+
+Click SAVE to make the role assignment. This redirects you to the list of permissions for the Job Template TEST webservers setup, which now shows that all members of the Developers team are assigned the Execute role on the Job Template.
+
+A new Git repository has been created under http://git.lab.example.com:8081/git/my_webservers_TEST.git. Clone the repository called my_webservers_TEST into the git-repos directory. Add the following two lines to the index.html.j2 template and commit your changes to the remote repository.
+
+...output omitted...
+Current Memory: {{ ansible_facts.memtotal_mb }} <br>
+Current Free Memory: {{ ansible_facts.memfree_mb }} <br>
+Current Host: {{ ansible_hostname }} <br>
+Server list: <br>
+{% for host in groups['all'] %}
+{{ host }} <br>
+{% endfor %}
+Change directory to the git-repos directory, where you store your Git repositories.
+
+[student@workstation ~]$ cd ~/git-repos
+Clone the my_webservers_TEST repository using git clone. This creates a directory called my_webservers_TEST in your current directory. This new directory contains a playbook intended to setup an Apache web server.
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/my_webservers_TEST.git
+Cloning into 'my_webservers_TEST'...
+remote: Enumerating objects: 6, done.
+remote: Counting objects: 100% (6/6), done.
+remote: Compressing objects: 100% (6/6), done.
+remote: Total 6 (delta 0), reused 0 (delta 0)
+Receiving objects: 100% (6/6), done.
+Change directory to the new directory. This is the root directory of the Git repository.
+
+[student@workstation git-repos]$ cd my_webservers_TEST
+Using your favorite editor, open the templates/index.html.j2 template file for editing.
+
+[student@workstation my_webservers_TEST]$ vim templates/index.html.j2
+Add two additional lines that make use of Ansible facts. The index.html.j2 file should look like this after the modification:
+
+{{ apache_test_message }} {{ ansible_distribution }} {{ ansible_distribution_version }} <br>
+Current Memory: {{ ansible_facts.memtotal_mb }} <br>
+Current Free Memory: {{ ansible_facts.memfree_mb }} <br>
+Current Host: {{ ansible_hostname }} <br>
+Server list: <br>
+{% for host in groups['all'] %}
+{{ host }} <br>
+{% endfor %}
+Save the changes made to the file and then exit from the editor.
+
+Use git add to add the template to the staging area.
+
+[student@workstation my_webservers_TEST]$ git add templates/index.html.j2
+Commit your changes and check the status of your modifications. Use git commit with the comment message "Added Ansible facts".
+
+[student@workstation my_webservers_TEST]$ git commit -m "Added Ansible facts"
+[master 05c6726] Added Ansible facts
+ 1 file changed, 2 insertions(+)
+Push the changes to the remote repository using git push.
+
+[student@workstation my_webservers_TEST]$ git push
+Enumerating objects: 7, done.
+Counting objects: 100% (7/7), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (4/4), 462 bytes | 462.00 KiB/s, done.
+Total 4 (delta 1), reused 0 (delta 0)
+To http://git.lab.example.com:8081/git/my_webservers_TEST.git
+   57c4e1b..d4be168  master -> master
+Update the My Webservers TEST project and launch a Job using the Job Template, TEST webservers setup, as the user, david, who is a member of the Developers team.
+
+Click the Log Out icon in the top right corner to log out. Log back in as david with a password of redhat123.
+
+Click the Projects in the left navigation bar.
+
+On the same line as the My Webservers TEST project, click the double arrow icon. Wait for the update process to finish.
+
+Click the Templates in the left navigation bar.
+
+On the same line as the Job Template, TEST webservers setup, click the rocket icon on the right to launch the Job. This redirects you to a detailed status page of the running job.
+
+Observe the live output of the running job for a minute.
+
+Verify that the STATUS of the job in the DETAILS section displays Successful.
+
+Log out of the Tower web interface and then verify that the web servers are up and running on serverc.lab.example.com and serverd.lab.example.com.
+
+Click the Log Out icon in the top right corner to logout of the Tower web interface.
+
+Open a web browser and go to http://serverc.lab.example.com. You should see the following output:
+
+This is a test message RedHat 8.0
+Current Memory: 991
+Current Free Memory: 530
+Current Host: serverc
+Server list:
+serverd.lab.example.com
+serverc.lab.example.com
+Open a web browser and go to http://serverd.lab.example.com. You should see the following output:
+
+This is a test message RedHat 8.0
+Current Memory: 991
+Current Free Memory: 529
+Current Host: serverd
+Server list:
+serverd.lab.example.com
+serverc.lab.example.com
+

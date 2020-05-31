@@ -1,0 +1,242 @@
+
+Chapter 12. Managing Advanced Inventories
+Importing External Static Inventories
+Guided Exercise: Importing External Static Inventories
+Creating and Updating Dynamic Inventories
+Guided Exercise: Creating and Updating Dynamic Inventories
+Filtering Hosts with Smart Inventories
+Guided Exercise: Filtering Hosts with Smart Inventories
+Lab: Managing Advanced Inventories
+Summary
+Abstract
+
+Goal	Manage inventories that are loaded from external files or generated dynamically from scripts or the Ansible Tower smart inventory feature.
+Objectives	
+Import a static inventory into Ansible Tower from an external file and use static inventories managed in a Git repository.
+
+Create a dynamic inventory that uses a custom inventory script to set hosts and host groups.
+
+Create a smart inventory that is dynamically constructed from the other inventories on your Ansible Tower server using a filter.
+
+Sections	
+Importing Static Inventories (and Guided Exercise)
+
+Creating and Updating Dynamic Inventories (and Guided Exercise)
+
+Filtering Hosts with Smart Inventories (and Guided Exercise)
+
+Lab	
+Managing Advanced Inventories
+
+Importing External Static Inventories
+Objectives
+After completing this section, students should be able to import a static inventory into Ansible Tower from an external file, and use static inventories managed in a Git repository.
+
+Importing Existing Static Inventories
+If you are adding an existing Ansible project that you have been managing from a traditional control node into Red Hat Ansible Tower, you might already have a large static inventory file for that project. It can be inconvenient to add that static inventory manually through the web UI. You might also want to continue to manage that static inventory outside of Ansible Tower rather than through the web UI. There are a number of ways to handle these situations. In this section, you will learn about two of them.
+
+The first solution is to import the static inventory into Ansible Tower so that it can be managed through the web UI. The advantage of importing the static inventory is that Ansible Tower users can manage the inventory normally through the Ansible Tower interface.
+
+The second solution is to configure Ansible Tower to retrieve the static inventory file from a source control project. In this scenario, the inventory could be stored in a Git repository like a playbook, and is periodically synchronized to Ansible Tower like a Project update. The advantage of this approach is that you can continue to use a version control system to manage changes to your inventory file and inventory variables, just like you manage your playbooks. The disadvantage is that you will not be able to make changes to the inventory's contents through the Ansible Tower web UI.
+
+Uploading a Static Inventory
+Ansible Tower comes with the awx-manage command-line utility, which can be used to access detailed internal Ansible Tower information. The awx-manage command must be run as root or as the awx (Ansible Tower) user.
+
+This utility is most commonly used to import an existing static inventory from a file directly into the Ansible Tower server. The variables set in the group_vars or host_vars directories that are associated with the inventory file will also be imported with the inventory file.
+
+To use this feature of the awx-manage command, you must first set up a destination inventory in Ansible Tower. Ansible Tower imports the inventory file and associated inventory variables into this destination inventory.
+
+Before importing your static inventory file and its host and group variables, you should organize the files you plan to import into a directory structure like the following example:
+
+[root@towerhost ~]# tree inventory/
+inventory/
+|-- group_vars
+|   `-- mygroup
+|-- host_vars
+|   `-- myhost
+`-- hosts
+  
+Run awx-manage inventory_import to import these inventory hosts and variables into Ansible Tower. Specify the source directory containing your inventory files with the --source option, and the name of the existing destination inventory in Ansible Tower with the --inventory-name option.
+
+[root@towerhost ~]# awx-manage inventory_import --source=inventory/ \
+> --inventory-name="My Tower Inventory"
+If your inventory is simply a single flat file, the --source option can point directly to the inventory file itself rather than to a directory:
+
+[root@towerhost ~]# awx-manage inventory_import --source=./my_inventory_file \
+> --inventory-name="My Tower Inventory"
+If the destination inventory in Ansible Tower is not empty, then imported data does not overwrite the existing data by default, but is combined with it. This default behavior adds any new variables from the imported inventory to any variable already in the imported inventory. You can overwrite any existing data by specifying the --overwrite_vars option.
+
+[root@towerhost ~]# awx-manage inventory_import --source=inventory/ \
+> --inventory-name="My Tower Inventory" \
+> --overwrite
+IMPORTANT
+Remember, if the destination inventory is not empty, then by default awx-manage inventory_import combines the existing information in that inventory in Ansible Tower with the data that you are uploading. Although this behavior can be convenient, be aware that it can also make a big mess if done by accident.
+
+Storing an Inventory in a Project
+Red Hat Ansible Tower can use inventory files that you manage in a source code management (SCM) repository. This allows you to continue to store your inventory in a Git repository, and use commits, pull requests, and other features of Git or your repository server to manage updates. You can also use any other type of SCM supported by Projects in Ansible Tower.
+
+To configure this functionality, start by setting up a Project that points to your Git repository. This is done in exactly the same way as when you are setting up a Project to be part of a Job Template. Specify the SCM Type (such as Git, Mercurial, or SVN) and SCM URL of the repository containing the inventory file or files. You may also need to specify the SCM Credential that contains the authentication information for that repository. You can specify a particular branch, tag, or commit to use, and whether the contents of the Project should Update Revision on Launch just like any other Project.
+
+
+Figure 12.1: Configuring Git-based projects
+Once you have set up the Project, you can configure the inventory in Ansible Tower. Create the inventory normally and open it for editing. Click on the SOURCES button, and then click the + button to add a new source.
+
+On the CREATE SOURCE page, give the source a name and then under SOURCE select Sourced from a Project. This will add a few fields to the page. Specify the new PROJECT that contains your inventory. Select the inventory file from the INVENTORY FILE combo box, typing in the name of the file if it does not appear on the combo box's drop-down list.
+
+You can enter an SCM credential in the Credential field if one is needed to access the Project repository. You can also check the Update on Project Change check box to refresh the inventory after every project update that involves a Git revision update.
+
+
+Figure 12.2: Inventory sourced from a project
+REFERENCES
+Ansible Tower User Guide
+
+Ansible Tower Administration Guide
+
+
+
+
+Guided Exercise: Importing External Static Inventories
+In this exercise, you will import an existing static inventory file into Ansible Tower, and you will also use an existing static inventory file stored in a Git repository.
+
+Outcomes
+
+You should be able to:
+
+Use the awx-manage utility to import an existing inventory file.
+
+Use an existing static inventory file stored in a Git repository.
+
+Ensure that the workstation and tower virtual machines are started.
+
+Log in to workstation as student using student as the password.
+
+From workstation, run lab advinventory-import start, to verify that Ansible Tower services are running and all required resources are available.
+
+[student@workstation ~]$ lab advinventory-import start
+Import the static inventory file /root/example-inventory into Ansible Tower with the awx-manage command.
+
+On workstation, open a terminal. Use ssh to log in to the tower server as root.
+
+[student@workstation ~]$ ssh root@tower
+[root@tower ~]# 
+On tower, list the contents of the root user home directory, to confirm that the static inventory file for Ansible Tower is available.
+
+[root@tower ~]# ls /root
+...output omitted...
+example-inventory
+...output omitted...
+Import the example-inventory static inventory file using the command awx-manage inventory_import. Use the existing inventory named Exercise as the destination for the import. After the import has completed, log out of the tower system.
+
+[root@tower ~]# awx-manage inventory_import \
+> --source=/root/example-inventory \
+> --inventory-name="Exercise"
+    2.570 INFO     Updating inventory 5: Exercise
+    3.719 INFO     Reading Ansible inventory source: /root/example-inventory
+    3.723 INFO     Using VIRTUAL_ENV: /var/lib/awx/venv/ansible
+    3.723 INFO     Using PATH: /var/lib/awx/venv/ansible/bin:/var/lib/...
+    3.723 INFO     Using PYTHONPATH: /var/lib/awx/venv/ansible/lib/...
+    4.633 ERROR    ansible-inventory 2.8.0
+...output omitted...
+    4.635 ERROR    Parsed /root/example-inventory inventory source with ini plugin
+    4.635 INFO     Processing JSON output...
+    4.636 INFO     Loaded 2 groups, 5 hosts
+    4.967 INFO     Inventory import completed for  (Exercise - 15) in 2.4s
+[root@tower ~]# exit
+Ignore the error messages as long as the last message indicates that the inventory import has completed.
+
+Log in to the Ansible Tower web interface as the admin user with redhat as password. In the Ansible Tower web interface, click Inventories in the left navigation bar to display the list of Inventories. You should see an Inventory named Exercise, which was used in a previous step for the import.
+
+Click the Exercise link to view the details of the imported static Inventory. Look at the available GROUPS and HOSTS sections. You should see that the inventory is composed of multiple groups and hosts, confirming that the static inventory has been successfully imported and is accessible.
+
+Create a new project named MyProjectGit using the Git repository located at http://git.lab.example.com:8081/git/inventory.git.
+
+Click Projects in the left navigation bar.
+
+Click + to add a new Project.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	MyProjectGit
+DESCRIPTION	Project Based on Git
+ORGANIZATION	Default
+SCM TYPE	Git
+SCM URL	http://git.lab.example.com:8081/git/inventory.git
+Check the UPDATE REVISION ON LAUNCH checkbox.
+
+Click SAVE to add the project.
+
+Create a new inventory named ExerciseGit with the git-inventory file available through the MyProjectGit project.
+
+Click Inventories in the left navigation bar.
+
+Click +, and select Inventory to add a new Inventory.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	ExerciseGit
+DESCRIPTION	Static Inventory from Git
+ORGANIZATION	Default
+Click SAVE to add the inventory.
+
+Go to the SOURCES section, and click + to add a new source.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	git-inventory
+DESCRIPTION	Static Inventory from Git
+SOURCE	Sourced from a Project
+PROJECT	MyProjectGit
+INVENTORY FILE	git-inventory
+NOTE
+Make sure you manually enter git-inventory in the INVENTORY FILE field. The file may not display in the drop-down menu because of a known product issue.
+
+Select the UPDATE ON PROJECT CHANGE checkbox.
+
+Click SAVE to add the inventory.
+
+Scroll down to verify that the cloud icon next to git-inventory is static and green.
+
+Verify that the filesrv host group is available in the GROUPS section, and the servere.lab.example.com host is available under the HOSTS section.
+
+Add the serverf.lab.example.com host to the filesrv host group in the Git-based inventory.
+
+On workstation, clone the http://git.lab.example.com:8081/git/inventory.git Git repository in the /home/student/git-repos directory, and change to the cloned project directory.
+
+[student@workstation ~]$ cd /home/student/git-repos
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/inventory.git
+[student@workstation git-repos]$ cd inventory
+Add the serverf.lab.example.com host to the filesrv host group in the git-inventory file. When done, commit the changes.
+
+[student@workstation inventory]$ vi git-inventory
+ [filesrv]
+ servere.lab.example.com
+ serverf.lab.example.com
+[student@workstation inventory]$ git add git-inventory
+[student@workstation inventory]$ git commit -m "adding serverf"
+[student@workstation inventory]$ git push
+In the Ansible Tower web interface, click Projects in the left navigation bar.
+
+Click the double-arrow icon in the row for MyProjectGit to get the latest version of the Git-based inventory file. Wait until the dot icon next to MyProjectGit is static.
+
+Click Inventories in the left navigation bar
+
+Click on the ExerciseGit link and go to SOURCES.
+
+Click the double-arrow icon in the row for the git-inventory source to retrieve the changes. Wait until the cloud icon next to git-inventory is static and green.
+
+Verify that the serverf.lab.example.com host is available under the HOSTS section.
+
+Click the Log Out icon to log out of the Tower web interface.
+
+Finish
+
+From workstation, run the lab advinventory-import finish script to clean up this exercise.
+
+[student@workstation ~]$ lab advinventory-import finish
+This concludes the guided exercise.
+
+

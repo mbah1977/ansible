@@ -1,0 +1,530 @@
+Interacting with APIs using Ansible Playbooks
+Objectives
+After completing this section, students should be able to write playbooks that interact with a REST API to get information from a web service and trigger events.
+
+Interacting with an API
+Red Hat Ansible Engine can interact with any HTTP API provided by a service, including RESTful APIs. This interaction may be required for a variety of reasons. For example, the service might be external to the network running the Ansible managed systems, there might be no specific Ansible module to interact with the service, or the Ansible module might not expose needed functionality.
+
+To access these APIs, Ansible offers the uri module. This module connects to a given URL, controlling the parameters of the connection and operating on the response. The only required parameter is url, which indicates the full HTTP or HTTPS URL to which to connect.
+
+This is a very simple example task using the uri module:
+
+- name: Check that the page is reachable and returns a status 200 using GET
+  uri:
+    url: http://www.example.com
+However, usually you must specify the method parameter to the Ansible module, which is used to specify the HTTP method to use to connect to the server. The most common options available for the method parameter are:
+
+GET
+Method to obtain an entity from a service identified by the URL of the request. This is the default value.
+
+POST
+Ask the service to store the entity contained in the body of the request under the resource identified by the URL.
+
+PUT
+Ask the service to store the entity sent in the body of the request as the resource identified by the URL, modifying it if exists.
+
+DELETE
+Deletes an entity in the service identified by the URL of the request.
+
+PATCH
+Modify the entity identified the by the request URL with the values in the body. Only modified values must be in the body.
+
+The next option available to control how to connect to the service uses the headers parameter. This parameter is a dictionary where custom HTTP headers can be added to the request. For example:
+
+headers:
+  Cookie: type=Test
+The following is a more advanced example, using the parameters covered so far:
+
+- name: Get an entity and set a Cookie
+  uri:
+    url: https://example.com/entity/1
+    method: GET
+    headers:
+      Cookie: type=TEST
+Send Information to an API
+Now that you know how to call an API, you can start sending information to any API. There are two mutually exclusive parameters to send this information: src and body.
+
+The src option points to a file that contains the body of the HTTP request that you want to make. Alternatively, you can use the body option, which defines the body of the HTTP request in your playbook in YAML syntax.
+
+Depending on the format expected by the receiving service, you might need to use the parameter body_format. The options for this parameter are: raw, json and form-urlencoded. For REST APIs, use json, and for traditional form-based pages use form-urlencoded.
+
+For example, login into a service could be achieved with the following:
+
+- name: Login to a form-based webpage
+  uri:
+    url: https://example.com/login.php
+    method: POST
+    body_format: form-urlencoded
+    body:
+      name: your_username
+      password: your_password
+      enter: Sign in
+Handling API Responses
+The first kind of information returned by any HTTP service is the status code of the response. Use the status_code option to tell the uri module the status code you expect on success. If the status code in the response is different, the task will fail.
+
+Secondly, you must handle the response itself.
+
+If you want to save the response as a file, specify that with the dest parameter.
+
+To use the response in the playbook, use the return_content option to indicate that the body of the response should be added to the result dictionary. Save that in a variable by using register.
+
+Here you can see an example of how to use the response of a request:
+
+- name: Check the contents of the response
+  uri:
+    url: http://www.example.com
+    return_content: yes
+  register: response
+  failed_when: "'SUCCESS' not in response.content"
+The following is another practical example that parses data returned from a GitLab APIv4 call as variables in Ansible. The variable my_private_token is a Personal Access Token set up in the GitLab interface, and presumably loaded into the play from a file protected with Ansible Vault. The JSON the API call returns is a list of dictionaries, where each dictionary contains information about one user; the key username contains the user's username.
+
+    - name: Use GitLab API to get user data
+      uri:
+        url: https://git.lab.example.com/api/v4/users/
+        method: GET
+        headers:
+          Private-Token: "{{ my_private_token }}"
+        return_content: yes
+      register: gitlab_api_result
+
+    - name: Print user names
+      debug:
+        msg: A valid username is {{ item['username'] }}
+      loop: "{{ gitlab_api_result['json'] }}"
+HTTP Security Settings
+The uri module also supports Digest, Basic or WSSE authentication, which can be controlled by using the url_username and url_password parameters. If the remote service supports Basic authentication but this module fails to authenticate, then try forcing Basic authentication using the force_basic_auth parameter.
+
+A more secure option is to use private keys to establish secure connections to the server. Refer to the PEM certificate chain file by using the client_cert parameter. If the certificate chain file does not contain the key, point the module to the file storing the key using the client_key parameter.
+
+Finally, if you must avoid TLS certificate validation, then set the validate_certs parameter to false. This setting reduces the security of your connection.
+
+Preparing and Parsing Data with Filters
+In previous chapters, you have seen how to use filters to transform data. There are several filters that are useful when dealing with HTTP and REST APIs.
+
+URLs support a limited subset of the US-ASCII character set. To ensure that a URL is correctly encoded, use the urlencode filter.
+
+---
+- name: Using the uri module with urlencode
+  hosts: localhost
+  vars:
+    entity_name: Test spaces
+  tasks:
+    - name: URL call
+      uri:
+        url: "http://example.com?name={{ entity_name | urlencode }}"
+The to_json and from_json filters can also be useful when marshaling data to and from an API.
+
+The xml module can also be useful, in conjunction with filters, to process data from some APIs.
+
+REFERENCES
+URI Module
+
+HTTP Methods Definitions
+
+HTTP Status Code Definitions
+
+Filters
+
+
+
+
+Guided Exercise: Interacting with APIs using Ansible Playbooks
+In this exercise, you will write playbooks that interact with the REST API of a Red Hat Ansible Tower server, in order to operate with jobs and templates.
+
+Outcomes
+
+You should be able to use the Tower REST API to perform operations that are not available in the Ansible plugins.
+
+Open a terminal on the workstation machine as the student user, and run the following command:
+
+[student@workstation ~]$ lab api-interaction start
+Clone the Git repository http://git.lab.example.com:8081/git/api-interaction.git in the /home/student/git-repos directory.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos/
+Change to this directory:
+
+[student@workstation ~]$ cd git-repos/
+Clone the repository:
+
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/api-interaction.git
+Cloning into 'api-interaction'...
+remote: Enumerating objects: 15, done.
+remote: Counting objects: 100% (15/15), done.
+remote: Compressing objects: 100% (15/15), done.
+remote: Total 15 (delta 7), reused 0 (delta 0)
+Unpacking objects: 100% (15/15), done.
+[student@workstation git-repos]$ cd api-interaction
+Review the contents of the inventory.yml file.
+
+tower: 1
+  hosts:
+    tower.lab.example.com:
+  vars:
+    template_name: DEV ftpservers setup 2
+    copy_template_name: Exact copy of DEV ftpservers setup 3
+    tower_fqdn: tower.lab.example.com 4
+    tower_user: admin 5
+    tower_password: redhat 6
+1
+
+Host group to execute the calls.
+
+2
+
+Name of the existing template.
+
+3
+
+Name of the template to create.
+
+4
+
+API URL.
+
+5
+
+User to login.
+
+6
+
+Password of the user.
+
+Modify the tower_copy_template.yml playbook to add the tasks to copy and launch job templates. For your convenience, the already edited file is available under the ~/DO447/solutions/api-interaction/ directory.
+
+[student@workstation api-interaction]$ vi tower_copy_template.yml
+The first task in the playbook calls the Tower API to copy a template. The URL of that action is /api/v2/job_templates/<template-name>/copy/. The task should look like:
+
+- name: Copy an existing Ansible Tower Job Template using the uri module
+  uri:
+    url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ template_name | urlencode 1 }}/copy/"
+    validate_certs: no
+    method: POST
+    return_content: yes
+    force_basic_auth: yes
+    user: "{{ tower_user }}"
+    password: "{{ tower_password }}"
+    status_code: [201, 202]
+    body:
+      name: "{{ copy_template_name }}"
+    body_format: json
+  register: copy 2
+1
+
+Notice how the name of the template is encoded to use in a URL. Also notice that URLs for the Ansible Tower API must always end with a final / character.
+
+2
+
+Register API call result for later use.
+
+The second task of the playbook launches a job in the newly created template. The URL for this actions is /api/v2/job_templates/<template-name>/launch/. The task should look like:
+
+- name: Start a new Ansible Tower Job using the uri module
+  uri:
+    url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name 1 | urlencode }}/launch/"
+    validate_certs: no
+    method: POST
+    return_content: yes
+    force_basic_auth: yes
+    user: "{{ tower_user }}"
+    password: "{{ tower_password }}"
+    status_code: [201, 202]
+    body:
+      inventory: "{{ copy.json.inventory }}" 2
+    body_format: json
+1
+
+Now use the name of the copied template.
+
+2
+
+Use the inventory ID returned by the copy call.
+
+The whole file should look like this:
+
+---
+- name: Using the uri module to connect to tower
+  hosts: tower
+  gather_facts: false
+
+  tasks:
+    - name: Copy an existing Ansible Tower Job Template using the uri module
+      uri:
+        url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ template_name | urlencode }}/copy/"
+        validate_certs: no
+        method: POST
+        return_content: yes
+        force_basic_auth: yes
+        user: "{{ tower_user }}"
+        password: "{{ tower_password }}"
+        status_code: [201, 202]
+        body:
+          name: "{{ copy_template_name }}"
+        body_format: json
+      register: copy
+
+    - name: Start a new Ansible Tower Job using the uri module
+      uri:
+        url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name | urlencode }}/launch/"
+        validate_certs: no
+        method: POST
+        return_content: yes
+        force_basic_auth: yes
+        user: "{{ tower_user }}"
+        password: "{{ tower_password }}"
+        status_code: [201, 202]
+        body:
+          inventory: "{{ copy.json.inventory }}"
+        body_format: json
+Verify the syntax and execute the playbook using the ansible-playbook command:
+
+[student@workstation api-interaction]$ ansible-playbook --syntax-check \
+> tower_copy_template.yml
+
+playbook: tower_copy_template.yml
+[student@workstation api-interaction]$ ansible-playbook tower_copy_template.yml
+
+PLAY [Using the uri module to connect to tower] ****************************
+
+TASK [Copy an existing Ansible Tower Job Template using the uri module] ****
+ok: [tower.lab.example.com]
+
+TASK [Start a new Ansible Tower Job using the uri module] ******************
+ok: [tower.lab.example.com]
+
+PLAY RECAP *****************************************************************
+tower.lab.example.com      : ok=2    changed=0  ...
+NOTE
+The tower_copy_template.yml playbook is not idempotent. In case you have made an error and the template was incorrectly created, delete the template, before running the corrected playbook again.
+
+Modify the tower_add_survey.yml playbook to add a survey to the job template and activate it. For your convenience, the already edited file is available under the ~/DO447/solutions/api-interaction/ directory.
+
+[student@workstation api-interaction]$ vi tower_add_survey.yml
+Add a task to the playbook that creates a survey for the new template. The URL for this action is /api/v2/job_templates/<template-name>/survey_spec/. The task should look like:
+
+- name: Add a survey to the existing Ansible Tower Job Template using the uri module
+  uri:
+    url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name | urlencode }}/survey_spec/"
+    validate_certs: no
+    method: POST
+    return_content: yes
+    force_basic_auth: yes
+    user: "{{ tower_user }}"
+    password: "{{ tower_password }}"
+    status_code: 200
+    body:
+      name: "What is the purpose of this deployment?"
+      description: "This purpose will be displayed in the welcoming message"
+      spec:
+        - type: "text"
+          question_name: "What is the purpose of this deployment?"
+          question_description: "This purpose will be displayed in the welcoming message"
+          variable: "deployment_purpose"
+          required: true
+          choices: ""
+          new_question: true
+          min: 1
+          max: 40
+          default: "Testing"
+    body_format: json
+Then, add a second task to enable the survey in the job template. This is done modifying the survey status in the template. The task should look like this:
+
+- name: Enable the survey
+  uri:
+    url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name | urlencode }}/"
+    validate_certs: no
+    method: PATCH 1
+    return_content: yes
+    force_basic_auth: yes
+    user: "{{ tower_user }}"
+    password: "{{ tower_password }}"
+    status_code: 200
+    body:
+      survey_enabled: true 2
+    body_format: json
+1
+
+Use PATCH to modify the state of an object in a REST API.
+
+2
+
+Only the state of the survey is modified.
+
+The whole file should look like:
+
+---
+- name: Using the uri module to add a survey
+  hosts: tower
+  gather_facts: false
+
+  tasks:
+    - name: Add a survey to the existing Ansible Tower Job Template using the uri module
+      uri:
+        url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name | urlencode }}/survey_spec/"
+        validate_certs: no
+        method: POST
+        return_content: yes
+        force_basic_auth: yes
+        user: "{{ tower_user }}"
+        password: "{{ tower_password }}"
+        status_code: 200
+        body:
+          name: "What is the purpose of this deployment?"
+          description: "This purpose will be displayed in the welcoming message"
+          spec:
+            - type: "text"
+              question_name: "What is the purpose of this deployment?"
+              question_description: "This purpose will be displayed in the welcoming message"
+              variable: "deployment_purpose"
+              required: true
+              choices: ""
+              new_question: true
+              min: 1
+              max: 40
+              default: "Testing"
+        body_format: json
+
+    - name: Enable the survey
+      uri:
+        url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name | urlencode }}/"
+        validate_certs: no
+        method: PATCH
+        return_content: yes
+        force_basic_auth: yes
+        user: "{{ tower_user }}"
+        password: "{{ tower_password }}"
+        status_code: 200
+        body:
+          survey_enabled: true
+        body_format: json
+Verify the syntax and execute the playbook using the ansible-playbook command:
+
+[student@workstation api-interaction]$ ansible-playbook --syntax-check \
+> tower_add_survey.yml
+
+playbook: tower_add_survey.yml
+[student@workstation api-interaction]$ ansible-playbook tower_add_survey.yml
+
+PLAY [Using the uri module to add a survey] ********************************
+
+TASK [Add a survey to the existing Job Template using the uri module] ******
+ok: [tower.lab.example.com]
+
+TASK [Enable the survey] ***************************************************
+ok: [tower.lab.example.com]
+
+PLAY RECAP *****************************************************************
+tower.lab.example.com      : ok=2    changed=0   ...
+Add a new task to the tower_add_survey.yml playbook that executes the job template adding the variable for the survey. Tag the new task so it can be executed separately. The new task should look like this:
+
+- name: Start a new Ansible Tower Job using the uri module
+  uri:
+    url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name | urlencode }}/launch/"
+    validate_certs: no
+    method: POST
+    return_content: yes
+    force_basic_auth: yes
+    user: "{{ tower_user }}"
+    password: "{{ tower_password }}"
+    status_code: [201, 202]
+    body:
+      inventory: 4
+      extra_vars:
+        deployment_purpose: "Testing" 1
+    body_format: json
+  tags: with_variable 2
+1
+
+Extra variables needed for the survey.
+
+2
+
+Tag to execute separately.
+
+Verify the syntax and execute the playbook using the ansible-playbook command:
+
+[student@workstation api-interaction]$ ansible-playbook --syntax-check \
+> tower_add_survey.yml
+
+playbook: tower_add_survey.yml
+[student@workstation api-interaction]$ ansible-playbook tower_add_survey.yml \
+> --tags with_variable
+
+PLAY [Using the uri module to connect to tower] ****************************
+
+TASK [Start a new Ansible Tower Job using the uri module] ******************
+ok: [tower.lab.example.com]
+
+PLAY RECAP *****************************************************************
+tower.lab.example.com      : ok=1    changed=0   ...
+Modify the tower_template_cleanup.yml playbook to delete the copied template. For your convenience, the already edited file is available under the ~/DO447/solutions/api-interaction/ directory.
+
+[student@workstation api-interaction]$ vi tower_template_cleanup.yml
+Add a task to the playbook that deletes the template created at the beginning of the exercise. The task should look like:
+
+- name: Delete an existing Ansible Tower Job Template using the uri module
+  uri:
+    url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name | urlencode }}/"
+    validate_certs: no
+    method: DELETE1
+    return_content: yes
+    force_basic_auth: yes
+    user: "{{ tower_user }}"
+    password: "{{ tower_password }}"
+    status_code: 204
+1
+
+Use the DELETE method to delete the template.
+
+The whole file should look like this:
+
+---
+- name: Using the uri module to delete a Job Template
+  hosts: tower
+  gather_facts: false
+
+  tasks:
+    - name: Delete an existing Job Template using the uri module
+      uri:
+        url: "https://{{ tower_fqdn }}/api/v2/job_templates/{{ copy_template_name | urlencode }}/"
+        validate_certs: no
+        method: DELETE
+        return_content: yes
+        force_basic_auth: yes
+        user: "{{ tower_user }}"
+        password: "{{ tower_password }}"
+        status_code: 204
+Verify the syntax and execute the playbook using the ansible-playbook command:
+
+[student@workstation api-interaction]$ ansible-playbook --syntax-check \
+> tower_template_cleanup.yml
+
+playbook: tower_template_cleanup.yml
+[student@workstation api-interaction]$ ansible-playbook tower_template_cleanup.yml
+PLAY [Using the uri module to delete a Job Template] ***********************
+
+TASK [Delete an existing Job Template using the uri module] ****************
+ok: [tower.lab.example.com]
+
+PLAY RECAP *****************************************************************
+tower.lab.example.com      : ok=1    changed=0  ...
+Commit the changes back to the repository:
+
+[student@workstation api-interaction]$ git add .
+[student@workstation api-interaction]$ git commit -m "Tower API interaction"
+[master a1fd4d7] Tower API interaction
+ 3 files changed, 94 insertions(+), 3 deletions(-)
+[student@workstation api-interaction]$ git push
+Enumerating objects: 9, done.
+Counting objects: 100% (9/9), done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (5/5), done.
+Writing objects: 100% (5/5), 1.09 KiB | 1.09 MiB/s, done.
+...output omitted...
+Finish
+
+On workstation, run the lab api-interaction finish script to complete this lab.
+
+[student@workstation api-interaction]$ lab api-interaction finish 

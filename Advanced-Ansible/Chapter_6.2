@@ -1,0 +1,187 @@
+Installing Red Hat Ansible Tower
+Objectives
+After completing this section, you should be able to install Red Hat Ansible Tower in a single-server configuration.
+
+Installation Requirements
+Red Hat Ansible Tower can be installed and is supported on 64-bit x86_64 versions of Red Hat Enterprise Linux and CentOS. The following are the requirements for installing Ansible Tower on a Red Hat Enterprise Linux 8 system. Details may vary slightly for other supported operating systems.
+
+Operating System
+
+For Red Hat Enterprise Linux installations, the Red Hat Ansible Tower 3.5 server is supported on systems running Red Hat Enterprise Linux 8.0 or later, or Red Hat Enterprise Linux 7.4 or later, on the 64-bit x86_64 processor architecture.
+
+Web Browser
+
+The current supported version of Mozilla Firefox or Google Chrome is required for connecting to the Red Hat Ansible Tower web UI. Other HTML5-compliant web browsers may work but are not fully tested or supported.
+
+Memory
+
+A minimum of 4 GB of RAM is required on the Red Hat Ansible Tower host.
+
+The actual memory requirement depends on the maximum number of hosts that Red Hat Ansible Tower is expected to configure in parallel. This is managed by the forks configuration parameter in the job template or system configuration. Red Hat recommends that 100 MB of memory be available for each additional fork, and 2 GB for the Red Hat Ansible Tower services.
+
+Disk Storage
+
+At least 20 GB of hard disk space is required for Red Hat Ansible Tower, and 10 GB of this space must be available to the /var directory.
+
+NOTE
+If you are installing in an Amazon EC2 instance, then use at least the m4.large instance type; use m4.xlarge if you are managing more than 100 hosts.
+
+Red Hat Ansible Engine
+
+Installation of Red Hat Ansible Tower is performed by executing a shell script that runs an Ansible Playbook. The current installation process automatically attempts to install Red Hat Ansible Engine and its dependencies if they are not already present.
+
+For Red Hat Ansible Tower to work correctly, the latest stable version of Red Hat Ansible Engine should be installed using your distribution's package manager (such as yum). The installation is ideally performed by the Red Hat Ansible Tower installation program.
+
+SELinux
+
+Red Hat Ansible Tower supports the targeted SELinux policy, which can be set to enforcing mode, permissive, or disabled. Other SELinux policies are not supported.
+
+Managed Hosts
+
+The installation requirements above apply to the Red Hat Ansible Tower server, not to the machines it manages with Ansible. Those systems should meet the requirements for machines that are managed with the version of Ansible that is installed on the Red Hat Ansible Tower server.
+
+NOTE
+If you are deploying Red Hat Ansible Tower as a pod to a Red Hat OpenShift cluster, then the cluster will need 6 GB of memory and 3 CPU cores per pod.
+
+For more information on the container-based installation process, see OpenShift Deployment and Configuration in the Ansible Tower Administration Guide.
+
+Red Hat Ansible Tower Licensing and Support
+Administrators interested in evaluating Red Hat Ansible Tower can obtain a trial license at no cost. Instructions on how to get started are available at https://www.ansible.com/tower-trial.
+
+As of June 1, 2019, Red Hat Ansible Tower is included as part of the simplified Red Hat Ansible Automation subscription. This subscription includes support for Red Hat Ansible Tower and Red Hat Ansible Engine, as well as support for use cases related to network devices and servers.
+
+Licenses for Ansible Tower Components
+
+Red Hat Ansible Tower makes use of various software components, some of which may be provided under varying open source licenses. Licenses for each of these specific components are provided under the /usr/share/doc/ansible-tower directory.
+
+Red Hat Ansible Tower Installers
+Two different installation packages are available for Ansible Tower.
+
+The standard setup Ansible Tower installation program can be downloaded from http://releases.ansible.com/ansible-tower/setup/. The latest version of Red Hat Ansible Tower is always located at https://releases.ansible.com/ansible-tower/setup/ansible-tower-setup-latest.tar.gz. This archive is smaller, but requires internet connectivity to download Ansible Tower packages from various package repositories.
+
+A bundled installer for RHEL 8 is available at http://releases.ansible.com/ansible-tower/setup-bundle/ansible-tower-setup-bundle-latest.el8.tar.gz. This archive includes an initial set of RPM packages for Red Hat Ansible Tower for RHEL 8, so that it may be installed on systems disconnected from the internet. Those systems may need to get software packages for Red Hat Enterprise Linux 8 channel from reachable sources. Administrators in high security environments may prefer to limit access to online package repositories. A RHEL 7 bundled installer is also available.
+
+Installing Ansible Tower
+The following procedure applies to the bundled installer used to install Ansible Tower on a single Red Hat Enterprise Linux 8.0 or later system. The subsequent exercise provides additional details.
+
+As the root user, download the Ansible Tower setup bundle.
+
+Extract the Ansible Tower setup bundle and then change to the directory containing the extracted contents.
+
+[root@towerhost ~]# tar xzf ansible-tower-setup-bundle-latest.el8.tar.gz
+[root@towerhost ~]# cd ansible-tower-setup-bundle-3.5.0-1.el8
+Edit the inventory file to set passwords for the Ansible Tower admin account (admin_password), the PostgreSQL database user account (pg_password), and the RabbitMQ messaging user account (rabbitmq_password).
+
+[tower]
+localhost ansible_connection=local
+
+[database]
+
+[all:vars]
+admin_password='myadminpassword'
+
+pg_host=''
+pg_port=''
+
+pg_database='awx'
+pg_username='awx'
+pg_password='somedatabasepassword'
+
+rabbitmq_port=5672
+rabbitmq_vhost=tower
+rabbitmq_username=tower
+rabbitmq_password='and-a-messaging-password'
+rabbitmq_cookie=cookiemonster
+
+# Needs to be true for fqdns and ip addresses
+rabbitmq_use_long_name=false
+WARNING
+No restrictions apply to these passwords but you should set them to something secure. The admin user has full control of the Ansible Tower server, and the ports for PostgreSQL and the RabbitMQ service are exposed to external hosts by default.
+
+Run the setup.sh script to start the Ansible Tower installer.
+
+[root@towerhost ansible-tower-setup-bundle-3.5.0-1.el8]# ./setup.sh
+[warn] Will install bundled Ansible
+...output omitted...
+The setup process completed successfully.
+Setup log saved to /var/log/tower/setup-2019-05-27-10:52:44.log
+After the installer finishes successfully, connect to the Ansible Tower system with a web browser. You should be redirected to an HTTPS login page.
+
+The web browser may generate a warning regarding a self-signed HTTPS certificate presented by the Ansible Tower website. Replacing the default self-signed HTTPS certificate for the Ansible Tower web UI with a properly CA-signed certificate is discussed later in this course.
+
+Log in to the Ansible Tower web UI as the Ansible Tower administrator with the admin account and the password you set in the installer's inventory file.
+
+When logging in to the Ansible Tower web UI for the first time, you are prompted to enter a license and accept the end-user license agreement. Enter the Ansible Tower license provided by Red Hat and accept the end-user license agreement.
+
+The Ansible Tower Dashboard should display. The next section provides a more detailed orientation to the Ansible Tower interface.
+
+REFERENCES
+Ansible Tower Quick Installation Guide
+
+Ansible Tower Installation and Reference Guide
+
+OpenShift Deployment and Configuration
+
+Ansible Tower User Guide
+
+Ansible Tower Administration Guide
+
+
+
+
+Guided Exercise: Installing Red Hat Ansible Tower
+In this exercise, you will install a single-node Red Hat Ansible Tower instance.
+
+Outcomes
+
+You should be able to successfully install Ansible Tower and configure it with a license, resulting in a running Ansible Tower server.
+
+Log in to workstation as student using student as the password. Run lab tower-install start to configure tower.lab.example.com with a Yum repository containing package dependencies from the Red Hat Enterprise Linux and Extras repositories, as required for Ansible Tower installation.
+
+[student@workstation ~]$ lab tower-install start
+Download the Ansible Tower setup bundle to the tower system.
+
+Log in to the tower system as the root user.
+
+[student@workstation ~]$ ssh root@tower
+Use the curl --remote-name command to download the Ansible Tower setup bundle.
+
+[root@tower ~]# curl --remote-name \
+> http://content.example.com/ansible2.8/x86_64/dvd/setup-bundle/ansible-tower-setup-bundle-latest.el8.tar.gz
+Extract the Ansible Tower setup bundle. Change to the directory that contains the extracted contents.
+
+[root@tower ~]# tar xzf ansible-tower-setup-bundle-latest.el8.tar.gz
+[root@tower ~]# cd ansible-tower-setup-bundle-3.5.0-1.el8
+Edit the inventory file and set the passwords for the Ansible Tower administrator account, database user account, and messaging user account to redhat. This file is used by the Ansible Tower installer playbook.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# vi inventory
+admin_password='redhat'
+pg_password='redhat'
+rabbitmq_password='redhat'
+Run the Ansible Tower installer by executing the setup.sh script. The script may take up to 15 minutes to complete. Ignore the errors in the script output because they are related to verification checks performed by the installer playbook.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# ./setup.sh
+[warn] Will install bundled Ansible
+...output omitted...
+The setup process completed successfully.
+Setup log saved to /var/log/tower/setup-2018-10-18-10:52:44.log
+After the installer finishes successfully, exit the console session on the tower system.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# exit
+Launch the Firefox web browser on workstation and navigate to Ansible Tower at https://tower.lab.example.com. Firefox warns you that the Ansible Tower server's security certificate is not secure. Add and confirm the security exception for the self-signed certificate.
+
+Log in to the Ansible Tower web UI as admin using redhat as the password.
+
+When logging in to the Ansible Tower web UI for the first time, you must enter a license and accept the end-user license agreement.
+
+Upload the Ansible Tower license and accept the end-user license agreement.
+
+On workstation, download the Ansible Tower license provided at http://materials.example.com/tower/install/Ansible-Tower-license.txt.
+
+In the Ansible Tower web UI, click BROWSE and then select the license file downloaded in the preceding step.
+
+Select the check box next to I agree to the End User License Agreement.
+
+Click SUBMIT to submit the license and accept the license agreement.
+
+This concludes the guided exercise.

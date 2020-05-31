@@ -1,0 +1,657 @@
+Optimizing Execution for Speed
+Objectives
+After completing this section, you should be able to optimize your playbook to run more efficiently, and use callback plug-ins to profile and analyze which tasks consume the most time.
+
+Optimizing Playbook Execution
+There are a number of ways in which you can optimize your Ansible Playbooks. Writing playbooks to run efficiently becomes increasingly important as the number of hosts you manage increases.
+
+Optimizing the Infrastructure
+
+Each release of Red Hat Ansible Engine adds enhancements and improvements. Running the latest version of Ansible may help increase the speed of your playbooks as the core components of Ansible and especially the modules provided with it are optimized over time.
+
+An architectural optimization that you can make is to keep your control node "close" to the managed nodes from a networking perspective. Ansible relies heavily on network communication and transfer of data. High latency connections or low bandwidth between the control node and its managed hosts will degrade the execution time of playbooks.
+
+Disabling Fact Gathering
+
+Each play has a hidden task which runs first, using the setup module to collect facts from each host. Those facts provide some information about the nodes that plays can use through the ansible_facts variable.
+
+Collecting the facts on each remote host takes time. If you do not use those facts in your play, skip the facts gathering task by setting the gather_facts directive to False (or no).
+
+The following play disables facts gathering:
+
+---
+- name: Demonstrate disabling the facts gathering
+  hosts: web_servers
+  gather_facts: False
+
+  tasks:
+    - debug:
+        msg: "gather_facts is set to False"
+The following example uses the Linux time command to compare the execution time of the previous playbook when facts gathering is enabled, and when it is disabled.
+
+[user@demo ~]$ time ansible-playbook speed_facts.yml
+
+PLAY [Demonstrate activating the facts gathering] ************************
+
+TASK [Gathering Facts] ***************************************************
+ok: [www1.example.com]
+ok: [www2.example.com]
+ok: [www3.example.com]
+
+TASK [debug] *************************************************************
+ok: [www1.example.com] => {
+    "msg": "gather_facts is set to True"
+}
+ok: [www2.example.com] => {
+    "msg": "gather_facts is set to True"
+}
+ok: [www3.example.com] => {
+    "msg": "gather_facts is set to True"
+}
+
+PLAY RECAP ***************************************************************
+www1.example.com    : ok=1    changed=0    unreachable=0  ...
+www2.example.com    : ok=1    changed=0    unreachable=0  ...
+www3.example.com    : ok=1    changed=0    unreachable=0  ...
+
+real	0m6.171s
+user	0m2.146s
+sys	0m1.118s
+[user@demo ~]$ time ansible-playbook speed_nofacts.yml
+
+PLAY [Demonstrate disabling the facts gathering]**************************
+
+TASK [debug] *************************************************************
+ok: [www1.example.com] => {
+    "msg": "gather_facts is set to False"
+}
+ok: [www2.example.com] => {
+    "msg": "gather_facts is set to False"
+}
+ok: [www3.example.com] => {
+    "msg": "gather_facts is set to False"
+}
+
+PLAY RECAP ***************************************************************
+www1.example.com    : ok=1    changed=0    unreachable=0  ...
+www2.example.com    : ok=1    changed=0    unreachable=0  ...
+www3.example.com    : ok=1    changed=0    unreachable=0  ...
+
+real	0m1.336s
+user	0m1.116s
+sys	0m0.246s
+NOTE
+To get the execution time of a playbook you can also use the Ansible timer callback plug-in, instead of using the time command. Callback plug-ins will be discussed later in this section.
+
+Playbooks often use the ansible_facts['hostname'], ansible_hostname, ansible_facts['nodename'], or ansible_nodename variables to refer the host currently processed. Those variables come from the facts gathering task, but you can usually replace them with the inventory_hostname and inventory_hostname_short magic variables.
+
+You can also choose to collect facts manually by running the setup module as a task on selected hosts as part of a play, and those facts will be available for subsequent plays in the playbook.
+
+Increasing Parallelism
+
+When Ansible is running a play, it will run the first task on every host in the current batch, then run the second task on every host in the current batch, and so on until the play completes. The forks parameter controls how many connections Ansible can have active at the same time. By default, this is set to 5, which means that even if there are 100 hosts to process on the current task, Ansible will communicate with them in groups of five. Once it has communicated with all 100, then Ansible will move to the next task.
+
+By increasing the forks value, Ansible runs each task simultaneously on more hosts at a time, and the playbook usually completes in less time. For example, if you set forks to 100, Ansible can attempt to open connections to all 100 hosts in the previous example simultaneously. This will place more load on the control node, which still needs enough time to communicate with each of the hosts.
+
+Specify the number of forks to use in the Ansible configuration file, or by passing a -f option to ansible-playbook.
+
+The following example shows the forks parameter set to 100 under the [defaults] section of the ansible.cfg configuration file.
+
+[user@demo ~]$ cat ansible.cfg
+[defaults]
+inventory=inventory
+remote_user=devops
+forks=100
+Because the forks value tells Ansible how many worker processes to start, a number that is too high may hurt your control node and your network. Try first with a conservative value, 20 or 50 for example, and increase that number step by step, each time monitoring the system.
+
+NOTE
+The cgroup_perf_recap callback plug-in can help you monitor the CPU and memory usage on your control node during a playbook run. Callback plug-ins will be discussed later in this section.
+
+Avoiding Loops with the Package Manager Modules
+
+Some modules accept a list of items to work on and do not require the use of a loop. This approach can increase efficiency, since the module will be called once rather than multiple times.
+
+The modules for managing operating system packages work this way. The following example uses the yum module to install several packages in a single transaction, which is the most efficient way to install a group of packages.
+
+---
+- name: Install the packages on the web servers
+  hosts: web_servers
+  become: True
+  gather_facts: False
+
+  tasks:
+    - name: Ensure the packages are installed
+      yum:
+        name:
+          - httpd
+          - mod_ssl
+          - httpd-tools
+          - mariadb-server
+          - mariadb
+          - php
+          - php-mysqlnd
+        state: present
+The preceding playbook would be equivalent to running the following command from the shell prompt:
+
+[root@demo ~]# yum install httpd mod_ssl httpd-tools \
+> mariadb-server mariadb php php-mysqlnd
+The following example is not efficient. It uses a loop to install the packages one at a time:
+
+---
+- name: Install the packages on the web servers
+  hosts: web_servers
+  become: True
+  gather_facts: False
+
+  tasks:
+    - name: Ensure the packages are installed
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - httpd
+        - mod_ssl
+        - httpd-tools
+        - mariadb-server
+        - mariadb
+        - php
+        - php-mysqlnd
+The second example is equivalent to running multiple yum commands:
+
+[root@demo ~]# yum install httpd
+[root@demo ~]# yum install mod_ssl
+[root@demo ~]# yum install httpd-tools
+[root@demo ~]# yum install mariadb-server
+[root@demo ~]# yum install mariadb
+[root@demo ~]# yum install php
+[root@demo ~]# yum install php-mysqlnd
+The second example is slower and less efficient because Ansible runs the yum module seven times, starting a process for the module seven times, and doing dependency resolution seven times.
+
+Not all Ansible modules accept a list for the name parameter. For example, the service module only accepts a single value for its name parameter, and you need a loop to operate on multiple items:
+
+- name: Starting the services on the web servers
+  hosts: web_servers
+  become: True
+  gather_facts: False
+
+  tasks:
+    - name: Ensure the services are started
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - httpd
+        - mariadb
+Use the ansible-doc command to get information about what types of values different module arguments will accept:
+
+[user@demo ~]$ ansible-doc yum
+...output omitted...
+- name
+        A package name or package specifier with version, like
+        `name-1.0'.
+        If a previous version is specified, the task also needs to
+        turn `allow_downgrade' on. See the `allow_downgrade'
+        documentation for caveats with downgrading packages.
+        When using state=latest, this can be `'*'' which means run
+        `yum -y update'.
+        You can also pass a url or a local path to a rpm file (using
+        state=present). To operate on several packages this can accept
+        a comma separated string of packages or (as of 2.0) a list of
+        packages.
+        (Aliases: pkg)[Default: (null)]
+...output omitted...
+[user@demo ~]$ ansible-doc service
+...output omitted...
+= name
+        Name of the service.
+
+        type: str
+...output omitted...
+Efficiently Copy Files to Managed Hosts
+
+The copy module recursively copies directories to managed hosts. When the directory is large, with a lot of files, the copy can take a long time. If you run the playbook multiple times, subsequent copies will take less time because the module only copies the files that are different.
+
+However, it is generally more efficient to use the synchronize module to copy large numbers of files to managed hosts. This module uses rsync in the background and is faster than the copy module in most cases.
+
+The following playbook uses the synchronize module to copy the web_content directory to the web servers recursively.
+
+---
+- name: Deploy the web content on the web servers
+  hosts: web_servers
+  become: True
+  gather_facts: False
+
+  tasks:
+    - name: Ensure web content is updated
+      synchronize:
+        src: web_content/
+        dest: /var/www/html
+Using Templates
+
+The lineinfile module inserts or removes lines in a file, such as configuration directives in a configuration file. The following playbook example updates the Apache HTTP Server configuration file by replacing several lines.
+
+---
+- name: Configure the Apache HTTP Server
+  hosts: web_servers
+  become: True
+  gather_facts: False
+
+  tasks:
+
+    - name: Ensure proper configuration of the Apache HTTP Server
+      lineinfile:
+        dest: /etc/httpd/conf/httpd.conf
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+       - regexp: '^Listen 80$'
+         line: 'Listen 8181'
+       - regexp: '^ServerAdmin root@localhost'
+         line: 'ServerAdmin support@example.com'
+       - regexp: '^DocumentRoot "/var/www/html"'
+         line: 'DocumentRoot "/var/www/web"'
+       - regexp: '^<Directory "/var/www/html">'
+         line: '<Directory "/var/www/web">'
+When used with a loop, lineinfile is not very efficient (and can be error-prone). In this situation, use either the template or the copy module instead.
+
+---
+- name: Configure the Apache HTTP Server
+  hosts: web_servers
+  become: True
+  gather_facts: False
+
+  tasks:
+    - name: Ensure proper configuration of the Apache HTTP Server
+      template:
+        src: httpd.conf.j2
+        dest: /etc/httpd/conf/httpd.conf
+The httpd.conf.j2 template file in the previous example is the customized version of the httpd.conf file.
+
+Optimizing SSH connections
+
+Establishing an SSH connection can be a slow process. When a play has many tasks and targets a large set of nodes, the overall time Ansible spends establishing these connections can significantly increase the global execution time of your playbook.
+
+To mitigate this issue, Ansible relies on two features that SSH provides:
+
+ControlMaster
+The ControlMaster SSH directive allows multiple simultaneous SSH sessions with a remote host to use a single network connection. The first SSH session establishes the connection, and the additional sessions to the same host reuse that connection, bypassing the slow initial process. SSH destroys the shared connection as soon as the last session is closed.
+
+ControlPersist
+The ControlPersist SSH directive keeps the connection open in the background, rather than destroying the connection after the last session. This directive allows a later SSH session to reuse the connection. ControlPersist indicates how long SSH should keep an idle connection opened; each new session resets this idle timer.
+
+Ansible enables the ControlMaster and ControlPersist features with the ssh_args directive under the [ssh_connection] section of the Ansible configuration file. The default value for ssh_args is as follows.
+
+[ssh_connection]
+ssh_args = -o ControlMaster=auto -o ControlPersist=60s
+With this value, Ansible keeps SSH connections open for 60 seconds after the last session completes. You can increase the value of ControlPersist when you have a large set of hosts, resulting in tasks taking more than 60 seconds to complete.
+
+With the default value of 60 seconds, SSH has already closed the connection with the first host by the time the next task starts, and must re-establish the connection. You may also increase the value of the forks directive for tasks to complete faster, before the idle timer expires.
+
+If your forks value or the ControlPersist setting is large, the control node may use more simultaneous connections. Make sure that the control node is configured with enough file handles available to support many active network connections.
+
+Enabling Pipelining
+
+To run a task on a remote node, Ansible performs several SSH operations to copy the module and all its data to the remote node and to execute the module. To increase the performance of your playbook, you can activate the pipelining feature. With pipelining, Ansible establishes fewer SSH connections.
+
+To activate pipelining, set the pipelining directive to True in the [ssh_connection] section of the Ansible configuration file.
+
+[ssh_connection]
+pipelining = True
+Ansible does not use pipelining by default because the feature requires that the requiretty sudo option on all the remote nodes is disabled. On Red Hat Enterprise Linux 8, that sudo option is disabled by default, but it may be active on other systems..
+
+To disable the option, use the visudo command to edit the /etc/sudoers file on your managed nodes and disable the requiretty flag:
+
+[root@demo ~]# visudo
+...output omitted...
+Defaults !requiretty
+...output omitted...
+Profiling Playbook Execution with Callback plug-ins
+Callback plug-ins extend Ansible by adjusting how it responds to various events. Some of these plug-ins modify the output of the command-line tools, such as the ansible-playbook command, to provide additional information. For example, the timer plug-in shows the playbook execution time in the output of the ansible-playbook command.
+
+IMPORTANT
+Red Hat Ansible Tower logs some information about jobs (playbook runs), which it extracts from the output of the ansible-playbook. Because some of the callback plug-ins modify this output, you should use them with caution or avoid using them with Red Hat Ansible Tower.
+
+Ansible comes with a collection of callback plug-ins that you can enable in the ansible.cfg file through the callback_whitelist directive.
+
+[user@demo ~]$ cat ansible.cfg
+[defaults]
+inventory=inventory
+remote_user=devops
+callback_whitelist=timer, profile_tasks, cgroup_perf_recap
+To list the available plug-ins, use the ansible-doc -t callback -l command. To access the documentation for a specific plug-in, run the ansible-doc -t callback plug-in-name command.
+
+[user@demo ~]$ ansible-doc -t callback -l
+actionable           shows only items that need attention
+aws_resource_actions summarizes all "resource:actions" completed
+cgroup_memory_recap  Profiles maximum memory usage of tasks and full ...
+cgroup_perf_recap    Profiles system activity of tasks and full ...
+context_demo         demo callback that adds play/task context
+...output omitted...
+[user@demo ~]$ ansible-doc -t callback cgroup_perf_recap
+> CGROUP_PERF_RECAP (/usr/lib/python3.6/site-packages/ansible/plugins/...)
+
+        This is an ansible callback plugin utilizes cgroups to profile
+        system activity of ansible and individual tasks, and display a
+        recap at the end of the playbook execution
+
+  * This module is maintained by The Ansible Community
+OPTIONS (= is mandatory):
+
+= control_group
+        Name of cgroups control group
+...output omitted...
+Profiling the Control Node CPU and Memory
+
+The cgroup_perf_recap callback plug-in profiles the control node during a playbook run. At the end of the playbook execution, it displays a global summary and a summary per task. Those summaries include the CPU and memory consumption, and the maximum number of processes launched during the playbook and tasks executions.
+
+...output omitted...
+PLAY RECAP ***************************************************************
+www1.example.com    : ok=9    changed=7    unreachable=0 ...
+www2.example.com    : ok=10   changed=9    unreachable=0 ...
+www3.example.com    : ok=10   changed=9    unreachable=0 ...
+
+
+CGROUP PERF RECAP ********************************************************
+Memory Execution Maximum: 102.26MB
+cpu Execution Maximum: 146.44%
+pids Execution Maximum: 17.00
+
+memory:
+Gathering Facts (5254...002c): 96.85MB
+firewall : Ensure Firewall Sources Configuration (5254...0010): 102.13MB
+haproxy : Ensure haproxy packages are present (5254...0014): 95.81MB
+haproxy : Ensure haproxy is started and enabled (5254...0015): 98.93MB
+haproxy : Ensure haproxy configuration is set (5254...0016): 98.04MB
+Ensure required packages are installed (5254...001e): 80.90MB
+Ensure firewall allows the services (5254...001f): 83.33MB
+Ensure the services are enabled (5254...0020): 85.73MB
+
+cpu:
+Gathering Facts (5254...002c): 127.22%
+firewall : Ensure Firewall Sources Configuration (5254...0010): 144.22%
+haproxy : Ensure haproxy packages are present (5254...0014): 136.78%
+haproxy : Ensure haproxy is started and enabled (5254...0015): 139.32%
+haproxy : Ensure haproxy configuration is set (5254...0016): 146.44%
+Ensure required packages are installed (5254...001e): 89.34%
+Ensure firewall allows the services (5254...001f): 95.06%
+Ensure the services are enabled (5254...0020): 99.86%
+
+pids:
+Gathering Facts (5254...002c): 12.00
+firewall : Ensure Firewall Sources Configuration (5254...0010): 14.00
+haproxy : Ensure haproxy packages are present (5254...0014): 14.00
+haproxy : Ensure haproxy is started and enabled (5254...0015): 14.00
+haproxy : Ensure haproxy configuration is set (5254...0016): 13.00
+Ensure required packages are installed (5254...001e): 14.00
+Ensure firewall allows the services (5254...001f): 17.00
+Ensure the services are enabled (5254...0020): 17.00
+You can use this plug-in to identify the tasks that are consuming your control node resources. cgroup_perf_recap is also useful to monitor the system activity when you are tuning the forks parameter in the ansible.cfg file. This way, you can make sure that the value you select does not saturate the system.
+
+The cgroup_perf_recap callback plug-in relies on the Linux control groups (cgroup) feature to monitor and profile the ansible-playbook command. On a Linux system, you can use the control groups to limit and monitor the resources, such as memory or CPU, that a group of processes can consume. To set these limits, create a new group, set limits, and add your processes to the group.
+
+To use the cgroup_perf_recap callback plug-in, you must first create a dedicated control group running the ansible-playbook command. The plug-in uses the monitoring features of the control group to collect the performance metrics of the ansible-playbook process and its children.
+
+To create the dedicated control group, use the cgcreate command as the root user.
+
+[user@demo ~]$ sudo cgcreate -a user:user -t user:user \
+> -g cpuacct,memory,pids:ansible_profile
+ 
+The -a and -t options display the user and group that can access and manage the control group. Use the user and the group of the account you are using to run the ansible-playbook command. The -g option gives the name of the new control group. The example uses ansible_profile for the name. Control groups you create with the cgcreate command do not persist across reboots.
+
+The next step is to enable the plug-in in the ansible.cfg file.
+
+[user@demo ~]$ cat ansible.cfg
+[defaults]
+inventory=inventory
+remote_user=devops
+callback_whitelist=cgroup_perf_recap
+
+[callback_cgroup_perf_recap]
+control_group=ansible_profile
+The control_group directive under the [callback_cgroup_perf_recap] section gives the name of your control group.
+
+With this setup, you can now profile your playbook. To do so, run the ansible-playbook command in your new control group using the cgexec command.
+
+[user@demo ~]$ cgexec -g cpuacct,memory,pids:ansible_profile \
+> ansible-playbook deploy_webservers.yml
+...output omitted...
+PLAY RECAP ***************************************************************
+www1.example.com    : ok=9    changed=7    unreachable=0 ...
+www2.example.com    : ok=10   changed=9    unreachable=0 ...
+www3.example.com    : ok=10   changed=9    unreachable=0 ...
+
+
+CGROUP PERF RECAP ********************************************************
+Memory Execution Maximum: 102.26MB
+cpu Execution Maximum: 146.44%
+pids Execution Maximum: 17.00
+...output omitted...
+Timing Tasks and Roles
+
+The timer, profile_tasks, and profile_roles callback plug-ins are useful to identify slow tasks and roles.
+
+The timer plug-in displays the duration of the playbook execution.
+
+The profile_tasks adds the start time of each task and displays at the end of the playbook execution the time spent in each task, sorted in descending order.
+
+The profile_roles displays at the end the time spent in each role, sorted in descending order.
+
+To activate these plug-ins, add or update the callback_whitelist directive in the ansible.cfg file.
+
+[user@demo ~]$ cat ansible.cfg
+[defaults]
+inventory=inventory
+remote_user=devops
+callback_whitelist=timer, profile_tasks, profile_roles
+You do not have to enable all three plug-ins: select the ones that you need.
+
+The following example shows the output of the ansible-playbook command when you activate the three plug-ins.
+
+[user@demo ~]$ ansible-playbook deploy_webservers.yml
+...output omitted...
+PLAY RECAP ***************************************************************
+www1.example.com    : ok=9    changed=7    unreachable=0 ...
+www2.example.com    : ok=10   changed=9    unreachable=0 ...
+www3.example.com    : ok=10   changed=9    unreachable=0 ...
+
+Thursday 16 May 2019  12:35:32 +0000 (0:00:06.018)   0:01:29.772 *********
+==
+yum --------------------------------------------------------------- 30.18s
+firewall ---------------------------------------------------------- 19.27s
+haproxy ----------------------------------------------------------- 16.58s
+firewalld --------------------------------------------------------- 10.43s
+service ----------------------------------------------------------- 10.39s
+gather_facts ------------------------------------------------------- 2.85s
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+total ------------------------------------------------------------- 89.70s
+Thursday 16 May 2019  12:35:32 +0000 (0:00:06.018)   0:01:29.772 *********
+==
+Ensure required packages are installed ---------------------------- 30.18s
+firewall : reload firewalld --------------------------------------- 17.70s
+Ensure firewall allows the services ------------------------------- 10.43s
+Ensure the services are enabled ----------------------------------- 10.39s
+haproxy : reload haproxy ------------------------------------------- 6.02s
+haproxy : Ensure haproxy packages are present ---------------------- 4.32s
+haproxy : Ensure haproxy configuration is set ---------------------- 4.15s
+Gathering Facts ---------------------------------------------------- 2.85s
+haproxy : Ensure haproxy is started and enabled -------------------- 2.09s
+firewall : Ensure Firewall Sources Configuration ------------------- 1.57s
+Playbook run took 0 days, 0 hours, 1 minutes, 29 seconds
+REFERENCES
+ssh_config(5) and sudoers(5) man pages
+
+Ansible Configuration Settings — Ansible Documentation
+
+Callback Plugins — Ansible Documentation
+
+
+Guided Exercise: Optimizing Execution for Speed
+In this exercise, you will modify a playbook to optimize it for more efficient execution, analyzing the playbook's performance with callback plug-ins.
+
+Outcomes
+
+You should be able to:
+
+Activate Ansible callback plug-ins in the configuration file.
+
+Profile a playbook execution time.
+
+Optimize a playbook.
+
+Log in as the student user on workstation and run lab task-speed start.
+
+[student@workstation ~]$ lab task-speed start
+This script creates an Ansible project in ~/DO447/labs/task-speed/.
+
+From a terminal, change to the ~/DO447/labs/task-speed/ directory and review the deploy_webservers.yml playbook.
+
+Change to the ~/DO447/labs/task-speed/ directory.
+
+[student@workstation ~]$ cd ~/DO447/labs/task-speed
+[student@workstation task-speed]$ 
+Review the contents of the deploy_webservers.yml playbook.
+
+[student@workstation task-speed]$ cat deploy_webservers.yml
+---
+- name: Deploy the web servers
+  hosts: web_servers
+  become: True
+
+  tasks:
+    - name: Ensure required packages are installed
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - httpd
+        - mod_ssl
+        - httpd-tools
+        - mariadb-server
+        - mariadb
+        - php
+        - php-mysqlnd
+
+    - name: Ensure the services are enabled
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: True
+      loop:
+        - httpd
+        - mariadb
+
+    - name: Ensure the web content is installed
+      copy:
+        src: web_content/
+        dest: /var/www/html
+The playbook installs packages, start services, and recursively copies a local directory to the managed nodes.
+
+Activate the timer and the profile_tasks callback plug-ins, and then run the deploy_webservers.yml playbook.
+
+Edit the ansible.cfg file, and then add the callback_whitelist directive with the two callback plug-ins to activate.
+
+[student@workstation task-speed]$ vi ansible.cfg
+[defaults]
+inventory=inventory.yml
+remote_user=devops
+callback_whitelist=timer, profile_tasks
+Run the deploy_webservers.yml playbook, and then take note of the total elapsed time.
+
+[student@workstation task-speed]$ ansible-playbook deploy_webservers.yml
+...output omitted...
+PLAY RECAP *************************************************************
+serverb.lab.example.com    : ok=4    changed=3    unreachable=0   ...
+serverc.lab.example.com    : ok=4    changed=3    unreachable=0   ...
+
+Friday 17 May 2019  07:49:55 +0000 (0:00:50.723)       0:01:23.269 *****
+
+
+Ensure the web content is installed ----------------------------- 50.72s
+Ensure required packages are installed -------------------------- 26.58s
+Ensure the services are enabled ---------------------------------- 3.93s
+Gathering Facts -------------------------------------------------- 1.98s
+Playbook run took 0 days, 0 hours, 1 minutes, 23 seconds
+The playbook and tasks execution times are probably different on your system. However, web content deployment and package installations should be the most time-consuming tasks.
+
+Optimize the deploy_webservers.yml playbook. To do so, disable facts gathering, because the playbook does not use facts. Also, remove the loop in the package installation task and replace the copy module with the synchronize module.
+
+If you make a mistake, you can restore the original file from its backup in deploy_webservers.yml.backup.
+
+Edit the deploy_webservers.yml playbook. Add the gather_facts directive and set it to False. Do not close the file yet.
+
+[student@workstation task-speed]$ vi deploy_webservers.yml
+---
+- name: Deploy the web servers
+  hosts: web_servers
+  become: True
+  gather_facts: False
+
+...output omitted...
+Remove the loop from the package installation task. To do so, move the list of packages under the name variable and remove the loop directive.
+
+...output omitted...
+  tasks:
+    - name: Ensure required packages are installed
+      yum:
+        name:
+          - httpd
+          - mod_ssl
+          - httpd-tools
+          - mariadb-server
+          - mariadb
+          - php
+          - php-mysqlnd
+        state: present
+
+...output omitted...
+The next task uses the service module to start the httpd and mariadb services. This task also uses a loop. However, in contrast to the yum module, the service module does not accept a list of services in its name attribute. Leave this task as it is.
+
+In the last task, replace the copy module with the synchronize module, which is more efficient when deploying large directories.
+
+...output omitted...
+    - name: Ensure the web content is installed
+      synchronize:
+        src: web_content/
+        dest: /var/www/html
+Save and close the file when done.
+
+Run the deploy_webservers.yml optimized playbook and compare the execution time with its first execution. Before proceeding, run the clean.yml playbook. This playbook removes the packages and the web content from the managed hosts.
+
+Run the clean.yml playbook.
+
+[student@workstation task-speed]$ ansible-playbook clean.yml
+Run the deploy_webservers.yml playbook.
+
+[student@workstation task-speed]$ ansible-playbook deploy_webservers.yml
+...output omitted...
+PLAY RECAP *************************************************************
+serverb.lab.example.com    : ok=3    changed=3    unreachable=0   ...
+serverc.lab.example.com    : ok=3    changed=3    unreachable=0   ...
+
+Friday 17 May 2019  08:22:48 +0000 (0:00:24.010)       0:00:42.727 *****
+
+Ensure the web content is installed ----------------------------- 24.01s
+Ensure required packages are installed -------------------------- 13.56s
+Ensure the services are enabled ---------------------------------- 5.09s
+Playbook run took 0 days, 0 hours, 0 minutes, 42 seconds
+Notice that the fact gathering task is absent. The playbook and tasks execution times should also be reduced.
+
+Ansible Tower is not compatible with the timer and the profile_tasks callback plug-ins, so disable them. When done, change to your home directory.
+
+Disable the timer and the profile_tasks callback plug-ins by deleting the callback_whitelist line in ansible.cfg.
+
+[student@workstation task-speed]$ cat ansible.cfg
+[defaults]
+inventory=inventory.yml
+remote_user=devops
+Change to your home directory.
+
+[student@workstation task-speed]$ cd
+[student@workstation ~]$ 
+Finish
+
+On workstation, run the lab task-speed finish command to complete this exercise.
+
+[student@workstation ~]$ lab task-speed finish

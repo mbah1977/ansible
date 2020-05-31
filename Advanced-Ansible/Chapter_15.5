@@ -1,0 +1,139 @@
+
+Lab: Creating a Custom Dynamic Inventory
+In this review, you will create a dynamic inventory using a custom script.
+
+Outcomes
+
+You should be able to:
+
+Install custom inventory script.
+
+Create a dynamic inventory in Red Hat Ansible Tower.
+
+The previous exercises in this comprehensive review chapter must be completed before starting this exercise.
+
+Instructions
+
+Configure your Ansible Tower server with a custom dynamic inventory script, ldap-freeipa.py, based on the following specification:
+
+Add a custom inventory script to Tower with a name of ldap-freeipa.py. The Python script can be downloaded from http://materials.example.com/classroom/ansible/ipa-setup/ldap-freeipa.py. Using the Default organization, give the inventory script a description of Dynamic Inventory for IPA Server.
+
+Create a new Inventory called Dynamic Inventory. Using Default organization, give the inventory a description of Dynamic Inventory for IPA Server. For Source, choose the ldap-freeipa.py custom inventory script. Also configure the OVERWRITE update option for the inventory.
+
+Update the dynamic inventory. When finished, review every group synchronized from the IPA Server to ensure that all groups contain hosts.
+
+Create a new machine credential called Devops. Use the following information:
+
+Field	Value
+NAME	Devops
+DESCRIPTION	Devops Credential
+ORGANIZATION	Default
+CREDENTIAL TYPE	Machine
+USERNAME	devops
+PASSWORD	redhat
+PRIVILEGE ESCALATION METHOD	sudo
+PRIVILEGE ESCALATION USERNAME	root
+PRIVILEGE ESCALATION PASSWORD	redhat
+Grant the Admin role on the Devops Credential to the Devops team.
+
+To add the ldap-freeipa.py custom inventory script to Ansible Tower:
+
+Log in to the Ansible Tower as the admin user.
+
+Click Inventory Scripts in the left navigation bar to manage custom inventory scripts.
+
+Click + to add a custom inventory script.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	ldap-freeipa.py
+DESCRIPTION	Dynamic Inventory for IPA Server
+ORGANIZATION	Default
+Copy the contents of the ldap-freeipa.py script located at http://materials.example.com/classroom/ansible/ipa-setup/ldap-freeipa.py into the CUSTOM SCRIPT field.
+
+Click SAVE to add the custom inventory script.
+
+Click the Inventories in the left quick navigation bar.
+
+Click the + button to add a new inventory, and select Inventory from the drop-down list.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Dynamic Inventory
+DESCRIPTION	Dynamic Inventory from IPA server
+ORGANIZATION	Default
+Click SAVE to create the Inventory. This redirects you to the Dynamic Inventory details page.
+
+Within the inventory Dynamic Inventory, add the ldap-freeipa.py script as a new source for the Inventory.
+
+Click SOURCES in the top bar for the Inventory details pane.
+
+Click the + button to add a new source.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Custom Script
+DESCRIPTION	Custom Script for Dynamic Inventory
+SOURCE	Custom Script
+CUSTOM INVENTORY SCRIPT	ldap-freeipa.py
+Under the UPDATE OPTIONS section, select the checkbox next to the OVERWRITE option.
+
+Click SAVE to create the Source.
+
+Update the dynamic inventory.
+
+Scroll down to the lower pane and click the double-arrow button in the row for Custom Script. Wait until the cloud becomes green and static.
+
+Use the top breadcrumb menu to navigate back to the Inventory details pane, and then click the GROUPS section. Observe that it now contains four Groups: development, ipaservers, production, and testing. Each of these groups contains hosts.
+
+To create new machine credentials:
+
+Click Credentials in the left navigation bar, to manage credentials.
+
+Click the + button to add a new credential.
+
+Create a new Credential, Devops, with the following information:
+
+Field	Value
+NAME	Devops
+DESCRIPTION	Devops Credential
+ORGANIZATION	Default
+CREDENTIAL TYPE	Machine
+USERNAME	devops
+PASSWORD	redhat
+PRIVILEGE ESCALATION METHOD	sudo
+PRIVILEGE ESCALATION USERNAME	root
+PRIVILEGE ESCALATION PASSWORD	redhat
+Leave the other fields untouched and click SAVE to create the new Credential.
+
+To grant the Admin role to the Credential:
+
+Click Credentials in the left navigation bar, to manage credentials.
+
+Click the Devops Credential to edit the Credential.
+
+On the next page, click PERMISSIONS to manage the Credential's permissions.
+
+Click the + button to add permissions.
+
+Click TEAMS to display the list of available teams.
+
+In the first section, select the box next to the Devops team. The team displays in the second section, beneath the first one.
+
+In the second section, select the Admin Role from the drop-down list.
+
+Click SAVE to finalize the role assignment. This redirects you to the list of permissions for the Devops Credential, which now shows that the Users, anny and robert, are assigned the Admin role on the Devops Credential.
+
+Evaluation
+
+Use the Tower interface to verify that the dynamic inventory script is correctly configured.
+
+NOTE
+There is a grading script that you will run at the end of all the comprehensive review labs. That script evaluates your work in this lab.
+
+This concludes the comprehensive review.
+
+

@@ -1,0 +1,297 @@
+
+Lab: Developing with Recommended Practices
+Performance Checklist
+
+In this lab, you will update an existing Ansible project to implement better practices and commit changes to the remote project repository.
+
+Outcomes
+
+You should be able to:
+
+Implement style guidelines for task and variable names in roles and playbooks.
+
+Create roles with appropriate names.
+
+Commit changes to a Git repository.
+
+Log in as the student user on workstation and run the lab development-review start command. This script downloads files required for the lab.
+
+[student@workstation ~]$ lab development-review start
+Clone the Git repository http://git.lab.example.com:8081/git/development-review.git in the /home/student/git-repos directory.
+
+From a terminal, create the directory /home/student/git-repos if it does not already exist. Then, change to this directory and clone the repository:
+
+[student@workstation ~]$ mkdir -p git-repos; cd git-repos
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/development-review.git
+Cloning into 'development-review'...
+remote: Enumerating objects: 107, done.
+remote: Counting objects: 100% (107/107), done.
+remote: Compressing objects: 100% (88/88), done.
+remote: Total 107 (delta 31), reused 0 (delta 0)
+Receiving objects: 100% (107/107), 12.32 KiB | 3.08 MiB/s, done.
+Resolving deltas: 100% (31/31), done.
+[student@workstation git-repos]$ cd development-review
+Review the site.yml playbook as well as any other playbooks referenced in the site.yml playbook. Verify that the site.yml playbook executes without any errors.
+
+NOTE
+After executing the site.yml playbook, servera distributes requests to the back-end web servers:
+
+[student@workstation ~]$ curl servera
+This is serverb.lab.example.com. (version v1.0)
+[student@workstation ~]$ curl servera
+This is serverc.lab.example.com. (version v1.0)
+[student@workstation ~]$ curl servera
+This is serverb.lab.example.com. (version v1.0)
+[student@workstation ~]$ curl servera
+This is serverc.lab.example.com. (version v1.0)
+[student@workstation development-review]$ ansible-playbook site.yml
+
+PLAY [Ensure HAProxy is deployed] ********************************************
+
+...output omitted...
+
+PLAY [Ensure Apache is deployed] *********************************************
+
+...output omitted...
+
+PLAY [web_servers] ***********************************************************
+
+...output omitted...
+
+PLAY RECAP *******************************************************************
+servera.lab.example.com    : ok=6    ...output omitted...
+serverb.lab.example.com    : ok=6    ...output omitted...
+serverc.lab.example.com    : ok=6    ...output omitted...
+The deploy_apache.yml playbook uses the my_role role to deploy a web server. This role does not have a suitable name. Rename this role to apache, and update all project references to the new role name. When you have updated all project references to the new role name, the deploy_apache.yml playbook will execute without errors.
+
+Commit these changes to your local repository.
+
+NOTE
+Use the git rm command to remove the my_role files from the repository.
+
+Rename the roles/my_role subdirectory to roles/apache.
+
+[student@workstation development-review]$ cd roles
+[student@workstation roles]$ ls
+firewall  haproxy  my_role  webapp
+[student@workstation roles]$ mv -v my_role apache
+renamed 'my_role' -> 'apache'
+[student@workstation roles]$ cd ..
+[student@workstation development-review]$ 
+Edit the name of the role in the deploy_apache.yml playbook from my_role to apache. Save the file. The content of the deploy_apache.yml file displays as follows:
+
+- name: Ensure Apache is deployed
+  hosts: web_servers
+  force_handlers: True
+  gather_facts: no
+
+  roles:
+    # The "apache" role has a dependency
+    # on the "firewall" role. The
+    # "firewall" role requires a
+    # "firewall_rules" variable be defined.
+    - role: apache
+      firewall_rules:
+
+        # Allow http requests from the
+        # internal zone.
+        - zone: internal
+          service: http
+
+        # Add the load balancer IP to
+        # the internal zone.
+        - zone: internal
+          source: 172.25.250.10
+Execute the deploy_apache.yml playbook to test your changes.
+
+[student@workstation development-review]$ ansible-playbook deploy_apache.yml
+...output omitted...
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com    : ok=4    ...output omitted...
+serverc.lab.example.com    : ok=4    ...output omitted...
+Commit these changes to your local repository.
+
+[student@workstation development-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+  modified:   deploy_apache.yml
+  deleted:    roles/my_role/meta/main.yml
+  deleted:    roles/my_role/tasks/main.yml
+  deleted:    roles/my_role/vars/main.yml
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+
+  roles/apache/
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Use the git rm command to remove the my_role role from the repository:
+
+[student@workstation development-review]$ git rm roles/my_role/*
+rm 'roles/my_role/meta/main.yml'
+rm 'roles/my_role/tasks/main.yml'
+rm 'roles/my_role/vars/main.yml'
+Use the git add command to add the files for the new apache role:
+
+[student@workstation development-review]$ git add roles/apache
+Stage the changes to the deploy_apache.yml file:
+
+[student@workstation development-review]$ git add deploy_apache.yml
+Verify that correct set of files are staged to be committed:
+
+[student@workstation development-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+  modified:   deploy_apache.yml
+  renamed:    roles/my_role/meta/main.yml -> roles/apache/meta/main.yml
+  renamed:    roles/my_role/tasks/main.yml -> roles/apache/tasks/main.yml
+  renamed:    roles/my_role/vars/main.yml -> roles/apache/vars/main.yml
+Commit the staged changes:
+
+[student@workstation development-review]$ git commit \
+> -m "Renamed my_role role to apache."
+[master 69b6cc5] Renamed my_role role to apache.
+ 4 files changed, 2 insertions(+), 2 deletions(-)
+ rename roles/{my_role => apache}/meta/main.yml (100%)
+ rename roles/{my_role => apache}/tasks/main.yml (100%)
+ rename roles/{my_role => apache}/vars/main.yml (100%)
+Push the changes to the remote repository:
+
+[student@workstation development-review]$ git push
+...output omitted...
+To http://git.lab.example.com:8081/git/development-review.git
+   8c918b1..6db348e  master -> master
+The output of the deploy_webapp.yml playbook does not contain good summaries of the playbook's actions.
+
+Edit the deploy_webapp.yml playbook to add an appropriate name to the only play in the playbook.
+
+The output of each task for the webapp role indicates the Ansible module for the task. Add a descriptive task name to the only task in the in webapp role. Execute the deploy_webapp.yml playbook to test your changes.
+
+Commit these changes to your local repository.
+
+Edit the deploy_webapp.yml file, and add a name attribute to the play. You can use any value for the name, but it should describe the intent of the play:
+
+- name: Ensure the web application is deployed
+  hosts: web_servers
+  gather_facts: no
+  vars:
+    version: v1.0
+    message: "This is {{ inventory_hostname }}."
+
+  roles:
+    - role: webapp
+Edit the roles/webapp/tasks/main.yml file, and add a name attribute to the task. You can use any value for the name, but the name should describe the intent of the task:
+
+---
+# tasks file for webapp
+
+- name: Ensure placeholder content is deployed
+  copy:
+    content: "{{ message }} (version {{ version }})\n"
+    dest: /var/www/html/index.html
+With these changes, verify that the deploy_webapp.yml playbook executes without errors:
+
+[student@workstation development-review]$ ansible-playbook deploy_webapp.yml
+...output omitted...
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com    : ok=1    changed=0    unreachable=0    ...
+serverc.lab.example.com    : ok=1    changed=0    unreachable=0    ...
+Commit the changes:
+
+[student@workstation development-review]$ git status
+...output omitted...
+
+  modified:   deploy_webapp.yml
+  modified:   roles/webapp/tasks/main.yml
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[student@workstation development-review]$ git add deploy_webapp.yml
+[student@workstation development-review]$ git add roles/webapp/*
+[student@workstation development-review]$ git commit \
+> -m "Added names to webapp playbook and role."
+[master eb9dde9] Added names to webapp playbook and role.
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+[student@workstation development-review]$ git push
+...output omitted...
+To http://git.lab.example.com:8081/git/development-review.git
+   6db348e..a888c73  master -> master
+The webapp role contains two variables, message and version.
+
+Edit the variable names so that each variable is prefixed with webapp_. Update any reference to either of these variables in project files with the appropriate new variable name. When you have made all of the necessary updates, the deploy_webapp.yml playbook will execute without errors.
+
+Commit these changes to your local repository.
+
+Edit the roles/webapp/tasks/main.yml file. Add the webapp_ prefix to all role variable references. After you save your changes, the file displays as follows:
+
+---
+# tasks file for webapp
+
+- name: Ensure placeholder content is deployed
+  copy:
+    content: "{{ webapp_message }} (version {{ webapp_version }})\n"
+    dest: /var/www/html/index.html
+Change the variable names in the roles/webapp/defaults/main.yml file. After you save your changes, the file contains:
+
+webapp_version: v1.0
+webapp_message: "This is {{ inventory_hostname }}."
+The deploy_webapp.yml playbook uses the webapp role. Update the name of the variables in this playbook. After you save your changes, the deploy_webapp.yml file displays as follows:
+
+- name: Ensure web application is deployed
+  hosts: web_servers
+  gather_facts: no
+  vars:
+    webapp_version: v1.0
+    webapp_message: "This is {{ inventory_hostname }}."
+
+  roles:
+    - role: webapp
+Ensure that the deploy_webapp.yml playbook executes without errors.
+
+[student@workstation development-review]$ ansible-playbook deploy_webapp.yml
+...output omitted...
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com    : ok=4    ...output omitted...
+serverc.lab.example.com    : ok=4    ...output omitted...
+Commit the changes:
+
+[student@workstation development-review]$ git status
+...output omitted...
+
+  modified:   deploy_webapp.yml
+  modified:   roles/webapp/defaults/main.yml
+  modified:   roles/webapp/tasks/main.yml
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[student@workstation development-review]$ git add deploy_webapp.yml
+[student@workstation development-review]$ git add roles/webapp/*
+[student@workstation development-review]$ git commit \
+> -m "Updated webapp role variable names."
+[master 3938c0d] Updated webapp role variable names.
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+[student@workstation development-review]$ git push
+...output omitted...
+To http://git.lab.example.com:8081/git/development-review.git
+   a888c73..8e71ee5  master -> master
+Verify that the site.yml playbook executes with no errors, and then push all of the committed changes to the remote repository.
+
+Execute the site.yml playbook.
+
+[student@workstation development-review]$ ansible-playbook site.yml
+If there are errors, make any necessary edits to correct the errors. Commit and push these changes back to the repository.
+
+When you have made all the required changes and the site.yml playbook executes without errors, proceed to the next step.
+
+

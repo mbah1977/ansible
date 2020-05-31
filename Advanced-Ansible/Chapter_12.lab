@@ -1,0 +1,208 @@
+
+Lab: Managing Advanced Inventories
+Performance Checklist
+
+In this lab, you will import a static inventory from a file, configure an inventory sourced from a project, create a dynamic inventory, and then create a smart inventory that selects its hosts from those inventories based on the value of a host variable.
+
+Outcomes
+
+You should be able to:
+
+Use the awx-manage utility to import an existing inventory file.
+
+Use an existing static inventory file stored in a Git repository.
+
+Add a custom inventory script and use it to populate a Dynamic Inventory in Ansible Tower.
+
+Create a smart inventory.
+
+You should have an Ansible Tower instance installed and configured from an earlier exercise running on the tower system.
+
+Log in as the student user on workstation and run lab advinventory-review start. This setup script prepares the IdM server for this exercise.
+
+[student@workstation ~]$ lab advinventory-review start
+From the CLI on tower.lab.example.com, import the existing static inventory, available in the /root/lab-example-inventory file, into the existing empty Lab Ansible Tower inventory. The lab setup script has created that Lab inventory for you.
+
+On workstation, open a terminal. To use the awx-manage command, log in to the tower server as root user using SSH.
+
+[student@workstation ~]$ ssh root@tower
+[root@tower ~]# 
+On the tower server, list the contents of the root user home directory to ensure that the static inventory file for Ansible Tower is available.
+
+[root@tower ~]# ls /root
+...output omitted...
+lab-example-inventory
+...output omitted...
+Using the awx-manage command and the inventory_import subcommand, import the lab-example-inventory static inventory file containing an inventory. Use the existing Lab name as the destination for the import. After the import has completed, log out of the tower system.
+
+[root@tower ~]# awx-manage inventory_import \
+> --source=/root/lab-example-inventory \
+> --inventory-name="Lab"
+    3.082 INFO     Updating inventory 5: Lab
+    4.972 INFO     Reading Ansible inventory source: /root/lab-example-inventory
+    4.976 INFO     Using VIRTUAL_ENV: /var/lib/awx/venv/ansible
+    4.977 INFO     Using PATH: /var/lib/awx/venv/ansible/bin:/var/lib/awx/venv/awx/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+    4.977 INFO     Using PYTHONPATH: /var/lib/awx/venv/ansible/lib/python3.6/site-packages:
+    5.776 ERROR    ansible-inventory 2.8.0
+...output omitted...
+    5.778 ERROR    Parsed /root/lab-example-inventory inventory source with ini plugin
+    5.779 INFO     Processing JSON output...
+    5.779 INFO     Loaded 1 groups, 2 hosts
+    5.973 INFO     Inventory import completed for  (Lab - 11) in 3.0s
+[root@tower ~]# exit
+Ignore the error messages as long as the last message indicates that the inventory import has completed.
+
+Log into the Ansible Tower web UI as admin. Use redhat as the password.
+
+In the Ansible Tower web UI, click Inventories in the left navigation bar to display the list of inventories. You should see an inventory named Lab, which was imported in a previous step.
+
+Click the Lab link to view the details of the imported static Inventory. Look at the available GROUPS and HOSTS sections. You should see that the inventory has the host group virtualization, as well as serverc.lab.example.com and serverd.lab.example.com as hosts. This confirms that the static inventory has been successfully imported and is accessible.
+
+Create a new project, named LabProjectGit that uses the Git repository located at http://git@git.lab.example.com:8081/git/inventory.git. Use the existing student-git SCM credentials. Make sure the revision is updated on project launch.
+
+Click Projects in the left navigation bar.
+
+Click + to add a new Project.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	LabProjectGit
+DESCRIPTION	Project Based on Git
+ORGANIZATION	Default
+SCM TYPE	Git
+SCM URL	http://git@git.lab.example.com:8081/git/inventory.git
+SCM CREDENTIAL	student-git
+Select the UPDATE REVISION ON LAUNCH checkbox.
+
+Click SAVE to add the project.
+
+Create a new inventory named LabGit with the git-inventory-lab inventory file available through the LabProjectGit project.
+
+Click Inventories in the left navigation bar.
+
+Click +, and then select Inventory to add a new inventory.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	LabGit
+DESCRIPTION	Static Inventory from Git
+ORGANIZATION	Default
+Click SAVE to add the inventory.
+
+Go to the SOURCES section, and then click + to add a new source.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	git-inventory-lab
+DESCRIPTION	Static Inventory from Git
+SOURCE	Sourced from a Project
+PROJECT	LabProjectGit
+INVENTORY FILE	git-inventory-lab
+NOTE
+Make sure that you manually enter git-inventory-lab in the INVENTORY FILE combo box. The file may not display in the combo box drop-down list because of a known product issue.
+
+Select the UPDATE ON PROJECT CHANGE checkbox.
+
+Click SAVE to add the inventory.
+
+Scroll down to verify that the cloud icon next to git-inventory-lab is static and green.
+
+Verify that the storage host group is available in the GROUPS section, and that the servere.lab.example.com and serverf.lab.example.com hosts are available under the HOSTS section.
+
+Add the inventory script, named ldap-idm.py, located at http://materials.example.com/classroom/ansible/ipa-setup/ldap-idm.py.
+
+Click Inventory Scripts in the left navigation bar.
+
+Click the + button to add a new custom inventory script.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	ldap-idm.py
+DESCRIPTION	Dynamic Inventory for IdM
+ORGANIZATION	Default
+Copy the contents of the ldap-idm.py script located at http://materials.example.com/classroom/ansible/ipa-setup/ldap-idm.py into the CUSTOM SCRIPT field.
+
+Click SAVE to add the custom inventory script.
+
+Create a new Inventory called Lab Dynamic Inventory.
+
+Click Inventories in the left navigation bar.
+
+Click the + button to add a new inventory, and select Inventory in the drop-down menu.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Lab Dynamic Inventory
+DESCRIPTION	Dynamic Inventory from IdM server
+ORGANIZATION	Default
+Click SAVE to create the Inventory.
+
+Add the ldap-idm.py inventory script as a new source for the Lab Dynamic Inventory inventory.
+
+Click SOURCES in the top bar for the Inventory details pane.
+
+Click the + button to add a new source.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	Custom Script
+DESCRIPTION	Custom Script for Lab Dynamic Inventory
+SOURCE	Custom Script
+CUSTOM INVENTORY SCRIPT	ldap-idm.py
+Under the UPDATE OPTIONS section, check the checkbox next to the OVERWRITE option.
+
+Click SAVE to create the source.
+
+Scroll down to the lower pane, and click the double-arrow button in the row for Custom Script. Wait until the cloud becomes green and static.
+
+Use the top breadcrumb menu to navigate back to the Lab Dynamic Inventory inventory details pane, and then click the GROUPS button. Observe that it now contains four groups: development, ipaservers, testing, and production. Each of these groups contains hosts.
+
+Modify the Demo Job Template job template to use the LabGit inventory, and then launch a job with it to trigger the caching of its associated managed hosts facts in the fact cache.
+
+Click Templates in the left navigation bar.
+
+Click on the link for the Demo Job Template job template.
+
+Select the LabGit inventory on INVENTORY.
+
+On CREDENTIAL, select Operations credential under the Machine credential type.
+
+Select the USE FACT CACHE checkbox, and then click SAVE to update the job template. See that this job template uses the LabGit inventory, which contains both servere.lab.example.com, and serverf.lab.example.com.
+
+Scroll down, and click the rocket icon for the Demo Job Template job template to launch a job with that job template. During its execution, this job retrieves the facts for both servere.lab.example.com and serverf.lab.example.com.
+
+Wait until the job status is Successful, and then click Inventories in the left navigation bar.
+
+Click on the link for the LabGit inventory, and go to HOSTS.
+
+Click on the link for servere.lab.example.com, then go to FACTS and verify that the facts for that host are available. You can also verify in the fact lists that the value for the ansible_distribution fact is RedHat.
+
+Repeat the previous step to verify that the facts for serverf.lab.example.com are available, and then check that the value for the ansible_distribution fact is RedHat.
+
+Create a smart inventory named LabSmart, which includes the Red Hat-based systems available in the LabGit host group.
+
+Click Inventories in the left navigation bar.
+
+Click +, and then select Smart Inventory to create a new smart inventory.
+
+On the next screen, fill in the details as follows:
+
+Field	Value
+NAME	LabSmart
+DESCRIPTION	Lab Smart Inventory
+ORGANIZATION	Default
+SMART HOST FILTER	ansible_facts.​ansible_distribution:​RedHat
+NOTE
+To enter the host filter, click the magnifying glass icon in SMART HOST FILTER. A new window opens. Enter the host filter's value in the combo box at the top of the window, and click the magnifying glass icon. If you have entered it correctly, then the filter should display both servere.lab.example.com and serverf.lab.example.com systems in the LabGit host group at the bottom of the window. Click SAVE to create the smart host filter.
+
+Click SAVE to create the smart inventory.
+
+Click HOSTS, and verify that both servere.lab.example.com and serverf.lab.example.com are available.
+
+

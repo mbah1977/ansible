@@ -1,0 +1,204 @@
+Lab: Transforming Data with Filters and Plug-ins
+Performance Checklist
+
+In this lab, you will implement filters and lookup plug-ins to create a better structured playbook project.
+
+Outcomes
+
+You should be able to use filters and lookup plug-ins to manipulate variables in playbook and role tasks.
+
+Log in as the student user on workstation and run lab data-review start.
+
+[student@workstation ~]$ lab data-review start
+This script initializes the remote Git repository you need for this lab, http://git.lab.example.com:8081/git/data-review.git. The Git repository contains playbooks that configures a front end load balancer and a pool of backend web servers.
+
+In the /home/student/git-repos directory, clone the project repository http://git.lab.example.com:8081/git/data-review.git.
+
+[student@workstation ~]$ mkdir -p /home/student/git-repos
+[student@workstation ~]$ cd /home/student/git-repos
+[student@workstation git-repos]$ git clone \
+> http://git.lab.example.com:8081/git/data-review.git
+...output omitted...
+[student@workstation git-repos]$ cd data-review
+[student@workstation data-review]$ 
+Refactor the tasks in the firewall role to allow for the flexible specification of firewall rules. The role processes the firewall_rules variable, which defines a list of firewall rule specifications.
+
+Ensure that the firewall role tasks use the following logic for firewall rules:
+
+If a rule's state attribute is not defined, then any firewall task uses a default value of enabled for the state keyword.
+
+If a rule's zone attribute is not defined, then omit the zone keyword for firewall tasks.
+
+If a rule attempts to enable or disable a port, and the protocol attribute is not defined, then the protocol defaults to a value of tcp. Additionally, ensure that the protocol value is always lowercase.
+
+Use the test_firewall_role.yml playbook to test your changes but do not alter the playbook. Only make changes to the tasks of the firewall role. After you correctly refactor the role, the test_firewall_role.yml playbook executes without errors.
+
+Add | default('enabled') at the end of each Jinja2 expression for the state keyword of all three firewall tasks. After you make these changes, the content of the roles/firewall/tasks/main.yml file is:
+
+- name: Ensure Firewall Sources Configuration
+  firewalld:
+    source: "{{ item.source }}"
+    zone: "{{ item.zone }}"
+    permanent: yes
+    state: "{{ item.state | default('enabled') }}"
+  loop: "{{ firewall_rules }}"
+  when: item.source is defined
+  notify: reload firewalld
+
+- name: Ensure Firewall Service Configuration
+  firewalld:
+    service: "{{ item.service }}"
+    zone: "{{ item.zone }}"
+    permanent: yes
+    state: "{{ item.state | default('enabled') }}"
+  loop: "{{ firewall_rules }}"
+  when: item.service is defined
+  notify: reload firewalld
+
+- name: Ensure Firewall Port Configuration
+  firewalld:
+    port: "{{ item.port }}/{{ item.protocol }}"
+    zone: "{{ item.zone }}"
+    permanent: yes
+    state: "{{ item.state | default('enabled') }}"
+  loop: "{{ firewall_rules }}"
+  when: item.port is defined
+  notify: reload firewalld
+Add | default(omit) at the end of each Jinja2 expression for the zone keyword of all three firewall tasks. After you make these changes, the content of the roles/firewall/tasks/main.yml file is:
+
+- name: Ensure Firewall Sources Configuration
+  firewalld:
+    source: "{{ item.source }}"
+    zone: "{{ item.zone | default(omit) }}"
+    permanent: yes
+    state: "{{ item.state | default('enabled') }}"
+  loop: "{{ firewall_rules }}"
+  when: item.source is defined
+  notify: reload firewalld
+
+- name: Ensure Firewall Service Configuration
+  firewalld:
+    service: "{{ item.service }}"
+    zone: "{{ item.zone | default(omit) }}"
+    permanent: yes
+    state: "{{ item.state | default('enabled') }}"
+  loop: "{{ firewall_rules }}"
+  when: item.service is defined
+  notify: reload firewalld
+
+- name: Ensure Firewall Port Configuration
+  firewalld:
+    port: "{{ item.port }}/{{ item.protocol }}"
+    zone: "{{ item.zone | default(omit) }}"
+    permanent: yes
+    state: "{{ item.state | default('enabled') }}"
+  loop: "{{ firewall_rules }}"
+  when: item.port is defined
+  notify: reload firewalld
+Replace {{ item.protocol }} in the third firewall task with {{ item.protocol | default('tcp') | lower }}. After you make these changes, the content of the third task is:
+
+- name: Ensure Firewall Port Configuration
+  firewalld:
+    port: "{{ item.port }}/{{ item.protocol | default('tcp') | lower }}"
+    zone: "{{ item.zone | default(omit) }}"
+    permanent: yes
+    state: "{{ item.state | default('enabled') }}"
+  loop: "{{ firewall_rules }}"
+  when: item.port is defined
+  notify: reload firewalld
+Use the test_firewall_role.yml playbook to test your changes:
+
+[student@workstation data-review]$ ansible-playbook test_firewall_role.yml
+
+PLAY [Test Firewall Role] ****************************************************
+...output omitted...
+
+PLAY RECAP *******************************************************************
+serverb.lab.example.com  : ok=5  changed=2  unreachable=0  failed=0  ...
+serverc.lab.example.com  : ok=5  changed=2  unreachable=0  failed=0  ...
+Replace load_balancer_ip_addr in the templates/apache_firewall_rules.yml.j2 template with a lookup plug-in that retrieves the IP address of the load_balancer variable.
+
+Enter the password for the student user, student, when you are prompted. Review the packages that will install, if any, and enter a y character when prompted to begin package installation.
+
+Use the dig plug-in in the templates/apache_firewall_rules.yml.j2 template to retrieve the IP address of each load balancer:
+
+- port: {{ apache_port }}
+  protocol: TCP
+  zone: internal
+{% for load_balancer in groups['lb_servers'] %}
+- zone: internal
+  source: "{{ lookup('dig', load_balancer) }}"
+{% endfor %}
+Save the template. Recall that to use the dig lookup plug-in, you must also install the python3-dns on the host where you execute the playbook:
+
+[student@workstation data-review]$ sudo yum install python3-dns
+Use the templates/apache_firewall_rules.yml.j2 template to define the firewall_rules variable in the deploy_apache.yml playbook.
+
+You need a Jinja2 expression that uses a lookup plug-in to render the template as a string, followed by a filter that converts from a YAML string to a data structure.
+
+NOTE
+The firewall_rules variable is defined on a single line. To improve readability, use ad hoc variables to keep line length under 80 characters. The below variation is also valid:
+
+The correct firewall_rules variable definition is:
+
+- name: Ensure Apache is deployed
+  hosts: web_servers
+  force_handlers: True
+  gather_facts: no
+
+  roles:
+    # Use the apache_firewall_rules.yml.j2 template to
+    # generate the firewall rules.
+    - role: apache
+      firewall_rules: "{{ lookup('template', 'apache_firewall_rules.yml.j2') | from_yaml }}"
+- name: Ensure Apache is deployed
+  hosts: web_servers
+  force_handlers: True
+  gather_facts: no
+
+  roles:
+    # Use the apache_firewall_rules.yml.j2 template to
+    # generate the firewall rules.
+    - role: apache
+      firewall_rules: "{{ lookup('template', tfile) | from_yaml }}"
+      tfile: apache_firewall_rules.yml.j2
+Execute the site.yml playbook to test your changes. If you make all of the necessary changes, then the playbook executes without any errors.
+
+Verify that requests to the load balancer on servera from workstation succeed, while direct requests to the backend web servers, serverb and serverc, from workstation are denied.
+
+When testing requests to backend servers, recall that the apache_port variable configures the port of the backend Apache servers, and it is set to a value of 8008.
+
+[student@workstation data-review]$ ansible-playbook site.yml
+...output omitted...
+[student@workstation data-review]$ echo $?
+0
+[student@workstation data-review]$ curl servera
+This is serverb. (version v1.0)
+[student@workstation data-review]$ curl servera
+This is serverc. (version v1.0)
+[student@workstation data-review]$ curl serverb
+curl: (7) Failed to connect to serverb port 80: No route to host
+[student@workstation data-review]$ curl serverc:8008
+curl: (7) Failed to connect to serverc port 8008: No route to host
+Save, commit, and push your changes to the remote repository.
+
+[student@workstation data-review]$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+  modified:   deploy_apache.yml
+  modified:   roles/firewall/tasks/main.yml
+  modified:   templates/apache_firewall_rules.yml.j2
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[student@workstation data-review]$ git add deploy_apache.yml \
+> roles/firewall/tasks/main.yml templates/apache_firewall_rules.yml.j2
+[student@workstation data-review]$ git commit \
+> -m "Added Filters and Plugins"
+...output omitted...
+[student@workstation data-review]$ git push
+

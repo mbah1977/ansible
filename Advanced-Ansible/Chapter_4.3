@@ -1,0 +1,543 @@
+Implementing Advanced Loops
+Objectives
+After completing this section, you should be able to use filters and lookup plug-ins to implement iteration over complex data structures.
+
+Loops and Lookup Plug-ins
+Using loops to iterate over tasks can help simplify your Ansible Playbooks. The loop keyword loops over a flat list of items. When used in conjunction with lookup plug-ins, you can construct more complex data in your lists for your loops.
+
+The loop keyword was introduced in Ansible 2.5. Before that, task iteration was implemented by using keywords that started with with_ and ended with the name of a lookup plug-in. The equivalent to loop in this syntax is with_list, and is designed for iteration over a simple flat list. For simple lists, loop is the best syntax to use.
+
+As an example, the following three syntaxes have the same results. The first of these is preferred:
+
+  - name: using loop
+    debug:
+      msg: "{{ item }}"
+    loop: "{{ mylist }}"
+
+  - name: using with_list
+    debug:
+      msg: "{{ item }}"
+    with_list: "{{ mylist }}"
+
+  - name: using lookup plugin
+    debug:
+      msg: "{{ item }}"
+    loop: "{{ lookup('list', mylist) }}"
+You can refactor a with_* style iteration task to use the loop keyword, by using an appropriate combination of lookup plug-ins and filters to match the functionality.
+
+Using the loop keyword in place of with_* style loops has the following benefits:
+
+No need to memorize or find a with_* style keyword to suit your iteration scenario. Instead, use plug-ins and filters to adapt a loop keyword task to your use case.
+
+Focus on learning the plug-ins and filters that are available in Ansible, which have broader applicability beyond just iteration.
+
+You have command-line access to the lookup plug-in documentation, with the ansible-doc -t lookup command. This helps you discover lookup plug-ins and design custom iteration scenarios using them.
+
+IMPORTANT
+The message from Ansible upstream has been evolving since Ansible 2.5. Using the loop keyword instead of the with_* loops is recommended, but there are some use cases where the old syntax might be better. According to the documentation, the with_* syntax is not deprecated and it should be valid for the foreseeable future. The syntax of loop might continue to evolve in future releases of Ansible.
+
+Some key tips, based on the upstream guidance for Ansible 2.8:
+
+The loop keyword requires a list, and will not accept a string. If you are having problems, then remember the difference between lookup and query.
+
+Any use of with_* that is discussed in "Migrating from with_X to loop" can be safely converted. These mostly use filters.
+
+If you need to use a lookup plug-in to convert a with_* construct to use loop, then it might be clearer to keep using the with_* syntax.
+
+Example Iteration Scenarios
+The following examples show some ways to construct more complex loops using Jinja2 expressions, filters, lookup plug-ins, and the with_* syntax.
+
+Iterating over a List of Lists
+
+The with_items keyword provides a way to iterate over complex lists. As an example, consider a hypothetical play with the following task:
+
+    - name: Remove build files
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ app_a_tmp_files }}"
+        - "{{ app_b_tmp_files }}"
+        - "{{ app_c_tmp_files }}"
+The app_a_tmp_files variable contains a list of temporary files, as do both the app_b_tmp_files and app_c_tmp_files. The with_items keyword combines these three lists into a single list containing the entries from all three lists. It automatically performs one level flattening of its list.
+
+To refactor a with_items task to use the loop keyword, use the flatten filter. The flatten filter recursively searches for embedded lists, and creates a single list from discovered values.
+
+The flatten filter accepts a levels argument, that specifies an integer number of levels to search for embedded lists. A levels=1 argument specifies that values are obtained by only descending into one additional list for each item in the initial list. This is the same one level flattening that with_items does implicitly.
+
+To refactor a with_items task to use the loop keyword, you must also use the flatten(levels=1) filter:
+
+    - name: Remove build files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ list_of_lists | flatten(levels=1) }}"
+      vars:
+        list_of_lists:
+          - "{{ app_a_tmp_files }}"
+          - "{{ app_b_tmp_files }}"
+          - "{{ app_c_tmp_files }}"
+IMPORTANT
+Because loop does not perform this implicit one level flattening, it is not exactly equivalent to with_items. However, as long as the list passed to the loop is a simple list, both methods will behave identically. The distinction only matters if you have a list of lists.
+
+Iterating Over Nested Lists
+
+Data from variable files, Ansible facts, and external services are often a composition of simpler data structures, like lists and dictionaries. Consider the users variable defined below:
+
+users:
+  - name: paul
+    password: "{{ paul_pass }}""
+    authorized:
+      - keys/paul_key1.pub
+      - keys/paul_key2.pub
+    mysql:
+      hosts:
+        - "%"
+        - "127.0.0.1"
+        - "::1"
+        - "localhost"
+   groups:
+      - wheel
+
+  - name: john
+    password: "{{ john_pass }}"
+    authorized:
+      - keys/john_key.pub
+    mysql:
+      password: other-mysql-password
+      hosts:
+         - "utility"
+    groups:
+      - wheel
+      - devops
+The users variable is a list. Each entry in the list is a dictionary with the keys: name, password, authorized, mysql, and groups. The keys name and password define simple strings, while the authorized and groups keys define lists. The mysql key references another dictionary that contains MySQL related metadata for each user.
+
+Similar to the flatten filter, the subelements filter creates a single list from a list with nested lists. The filter processes a list of dictionaries, and each dictionary contains a key that refers to a list. To use the subelements filter, you must provide the name of a key on each dictionary that corresponds to a list.
+
+To illustrate, consider again the previous users variable definition. The subelements filter enables iteration through all users and their authorized key files defined in the variable:
+
+  - name: Set authorized ssh key
+    authorized_key:
+      user: "{{ item.0.name }}"
+      key: "{{ lookup('file', item.1) }}"
+    loop: "{{ users | subelements('authorized') }}"
+The subelements filter creates a new list from the users variable data. Each item in the list is itself a two element list. The first element contains a reference to each user. The second element contains a reference to a single entry from the authorized list for that user.
+
+Iterating Over a Dictionary
+
+You often encounter data that is organized as a set of key/value pairs, commonly referred to in the Ansible community as a dictionary, instead of being organized as a list. As an example, consider the following definition of a users variable:
+
+users:
+  demo1:
+    name: Demo User 1
+    mail: demo1@example.com
+  demo2:
+    name: Demo User 2
+    mail: demo2@example.com
+...output omitted...
+  demo200:
+    name: Demo User 200
+    mail: demo200@example.com
+Before Ansible 2.5, you would have to use the with_dict keyword to iterate through the key/value pairs of this dictionary. Each iteration, the item variable has available two attributes: key and value. The key attribute contains the value of one of the dictionary keys, while the value attribute contains the data associated with the dictionary key:
+
+- name: Iterate over Users
+  user:
+    name: "{{ item.key }}"
+    comment: "{{ item.value.name }}"
+    state: present
+  with_dict: "{{ users }}"
+Alternatively, you can use the dict2items filter to transform a dictionary into a list, and this is probably easier to understand. The items in this list are structured the same as items produced by the with_dict keyword:
+
+- name: Iterate over Users
+  user:
+    name: "{{ item.key }}"
+    comment: "{{ item.value.name }}"
+    state: present
+  loop: "{{ users | dict2items }}"
+Iterating Over a File Globbing Pattern
+
+You can construct a loop that iterates over a list of files that match a provided file globbing pattern with the fileglob lookup plug-in.
+
+To illustrate, consider the following play:
+
+- name: Test
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Test fileglob lookup plugin
+      debug:
+        msg: "{{ lookup('fileglob', '~/.bash*') }}"
+Output from the fileglob lookup plug-in is a string of comma-separated files, indicated by the use of the double-quotes character (") around the msg variable's data:
+
+PLAY [Test] ******************************************************************
+
+TASK [Test fileglob lookup plugin] *******************************************
+ok: [localhost] => {
+    "msg": "/home/student/.bash_logout,/home/student/.bash_profile,/home/student/.bashrc,/home/student/.bash_history"
+}
+
+PLAY RECAP *******************************************************************
+localhost  : ok=1    changed=0    unreachable=0    failed=0    ...   
+To force a lookup plug-in to return a list of values, instead of a string of comma-separated values, use the query keyword in place of the lookup keyword. Consider the following modification of the previous playbook example:
+
+- name: Test
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Test fileglob lookup plugin
+      debug:
+        msg: "{{ query('fileglob', '~/.bash*') }}"
+The output of this modified playbook indicates that the msg keyword references a list of files, because the data is encapsulated by brackets ([...]):
+
+PLAY [Test] ******************************************************************
+
+TASK [Test fileglob lookup plugin] *******************************************
+ok: [localhost] => {
+    "msg": [
+        "/home/student/.bash_logout",
+        "/home/student/.bash_profile",
+        "/home/student/.bashrc",
+        "/home/student/.bash_history"
+    ]
+}
+
+PLAY RECAP *******************************************************************
+localhost  : ok=1    changed=0    unreachable=0    failed=0    ...   
+To use the data from this lookup plug-in in a loop, ensure that the processed data is returned as a list. Both tasks in the following play iterate over the files matching the ~/.bash* globbing pattern:
+
+- name: Both tasks have the same result
+  hosts: localhost
+  gather_facts: no
+  tasks:
+
+    - name: Iteration Option One
+      debug:
+        msg: "{{ item }}"
+      loop: "{{ query('fileglob', '~/.bash*') }}"
+
+    - name: Iteration Option Two
+      debug:
+        msg: "{{ item }}"
+      with_fileglob:
+        - "~/.bash*"
+REFERENCES
+Loops — Ansible Documentation
+
+
+
+
+
+Guided Exercise: Implementing Advanced Loops
+In this exercise, you will implement advanced iteration techniques to process complex data structures in three different scenarios.
+
+Outcomes
+
+You should be able to use filters and lookup plugins to iterate over complex data structures.
+
+Open a terminal on workstation as the student user and run the following command:
+
+[student@workstation ~]$ lab data-loops start
+After the command completes, change to the ~/DO447/labs/data-loops directory.
+
+[student@workstation ~]$ cd ~/DO447/labs/data-loops
+[student@workstation data-loops]$ 
+NOTE
+Scenario 1
+
+The scenario_1.yml playbook contains a single play with a single task to create users on the Identity Management server. The task uses the with_dict keyword to iterate over entries in the users variable. The users variable is defined in the group_vars/all/users.yml file.
+
+In this step, you will refactor the task in the scenario_1.yml playbook to use the loop keyword and remove the with_dict keyword. Use an appropriate filter to transform the users variable into a list that you can use with the loop keyword.
+
+Review the scenario_1.yml playbook to familiarize yourself with it.
+
+The ipa_* variables are defined in the group_vars/all/ipa_vars.yml file, except for the ipa_admin_pass variable. Because this value is sensitive, it is defined in the group_vars/all/vault.yml Ansible Vault file. Use a password of redhat321 to decrypt the file.
+
+The users variable is defined in the group_vars/all/users.yml file.
+
+[student@workstation data-loops]$ cat scenario_1.yml
+---
+- name: Add Users To IDM
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create Users
+      ipa_user:
+        name: "{{ item.key }}"
+        givenname: "{{ item.value.firstname }}"
+        sn: "{{ item.value.surname }}"
+        displayname: "{{ item.value.firstname + ' ' + item.value.surname }}"
+        sshpubkey: "{{ lookup('file', item.value.pub_key_file) }}"
+        state: present
+        ipa_host: "{{ ipa_server }}"
+        ipa_user: "{{ ipa_admin_user }}"
+        ipa_pass: "{{ ipa_admin_pass }}"
+        validate_certs: "{{ ipa_validate_certs }}"
+      with_dict: "{{ users }}"
+Review the structure of the users group variable defined in group_vars/all/users.yml to familiarize yourself with it.
+
+The users variable is a dictionary. Each key in the dictionary represents a username, and the value for each key is another dictionary containing metadata for that user. Each user metadata dictionary contains three keys: firstname, surname, and pub_key_file.
+
+[student@workstation data-loops]$ cat group_vars/all/users.yml
+users:
+  johnd:
+    firstname: John
+    surname: Doe
+    pub_key_file: pubkeys/johnd/id_rsa.pub
+  janed:
+    firstname: Jane
+    surname: Doe
+    pub_key_file: pubkeys/janed/id_rsa.pub
+Instead of using the with_dict keyword, you can use the loop keyword with the dict2items filter for your loop. Change the with_dict keyword to the loop keyword, and add the dict2items filter to the end of the Jinja2 expression. Save the file.
+
+The expected content of the scenario_1.yml playbook is:
+
+[student@workstation data-loops]$ cat scenario_1.yml
+---
+- name: Add Users To IDM
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create Users
+      ipa_user:
+        name: "{{ item.key }}"
+        givenname: "{{ item.value.firstname }}"
+        sn: "{{ item.value.surname }}"
+        displayname: "{{ item.value.firstname + ' ' + item.value.surname }}"
+        sshpubkey: "{{ lookup('file', item.value.pub_key_file) }}"
+        state: present
+        ipa_host: "{{ ipa_server }}"
+        ipa_user: "{{ ipa_admin_user }}"
+        ipa_pass: "{{ ipa_admin_pass }}"
+        validate_certs: "{{ ipa_validate_certs }}"
+      loop: "{{ users | dict2items }}"
+Execute the scenario_1.yml playbook. Because the playbook uses Ansible Vault variables, use the --vault-id @prompt option with the ansible-playbook command. Enter a value of redhat321 for the password:
+
+[student@workstation data-loops]$ ansible-playbook --vault-id @prompt \
+> scenario_1.yml
+Vault password (default): redhat321
+PLAY [Add Users To IDM] ******************************************************
+
+TASK [Create Users] **********************************************************
+changed: [localhost] => (item={'key': 'johnd', 'value': {'firstname': 'John', 'surname': 'Doe', 'pub_key_file': 'pubkeys/johnd/id_rsa.pub'}})
+changed: [localhost] => (item={'key': 'janed', 'value': {'firstname': 'Jane', 'surname': 'Doe', 'pub_key_file': 'pubkeys/janed/id_rsa.pub'}})
+
+PLAY RECAP *******************************************************************
+localhost   : ok=1    changed=1    unreachable=0    failed=0    ...
+NOTE
+Scenario 2.
+
+The scenario_2.yml playbook configures a database server and enables appropriate user access to databases hosted on the server. A playbook task uses the with_subelements keyword to iterate over a list of databases for each user in the db_user_access variable. The db_user_access variable is defined in the group_vars/all/db_vars.yml file.
+
+In this step, you will refactor the scenario_2.yml playbook to use the loop keyword and remove the with_subelements keyword. Use an appropriate filter to transform the db_user_access variable into a list that you can use with the loop keyword.
+
+Review the scenario_2.yml playbook to familiarize yourself with it.
+
+The user_passwords variable is a simple dictionary. Each key represents a username, and each key's value is the associated username's password. Because this variable contains sensitive information, it is protected in the group_vars/all/vault.yml Ansible Vault file.
+
+The db_user_access variable is defined in the group_vars/all/db_vars.yml file.
+
+[student@workstation data-loops]$ cat scenario_2.yml
+---
+- name: Enable Database Access
+  hosts: db_server
+  gather_facts: no
+  tasks:
+    - import_tasks: database_setup.yml
+
+    - name: Enable user access to database
+      mysql_user:
+        name: "{{ item.0.username }}"
+        priv: "{{ item.1 }}.*:ALL"
+        host: workstation.lab.example.com
+        append_privs: yes
+        password: "{{ user_passwords[item.0.username] }}"
+        state: present
+      with_subelements:
+        - "{{ db_user_access }}"
+        - db_list
+...output omitted...
+Review the structure of the db_user_access group variable defined in the file group_vars/all/db_vars.yml to familiarize yourself with it.
+
+The db_user_access variable is a list. Each entry in the list is itself a dictionary, with keys of: username, dept, role, and db_list. The db_list key references a list of databases to which the given user is granted access. As an example, the johnd user is granted access to both the employees and invoices databases.
+
+Each user requires access to each database in their db_list list.
+
+[student@workstation data-loops]$ cat group_vars/all/db_vars.yml
+...output omitted...
+db_user_access:
+  - username: johnd
+    dept: sales
+    role: manager
+    db_list:
+      - employees
+      - invoices
+
+  - username: janed
+    dept: sales
+    role: associate
+    db_list:
+      - invoices
+      - inventory
+...output omitted...
+Change the with_subelements keyword to the loop keyword, and add the subelements filter to the end of the Jinja2 expression. Configure the subelements filter to process the db_list key of each entry in the db_user_access list. Save the file.
+
+The content of the scenario_2.yml playbook is:
+
+[student@workstation data-loops]$ cat scenario_2.yml
+---
+- name: Enable Database Access
+  hosts: db_server
+  gather_facts: no
+  tasks:
+    - import_tasks: database_setup.yml
+
+    - name: Enable user access to database
+      mysql_user:
+        name: "{{ item.0.username }}"
+        priv: "{{ item.1 }}.*:ALL"
+        host: workstation.lab.example.com
+        append_privs: yes
+        password: "{{ user_passwords[item.0.username] }}"
+        state: present
+      loop: "{{ db_user_access | subelements('db_list') }}"
+
+    - name: Smoke Test - database connectivity
+      shell: "{{ lookup('template', 'db_test_command.j2') }}"
+      loop: []
+      delegate_to: workstation
+      changed_when: no
+Replace the empty list in the loop keyword of the smoke test task with the same Jinja2 expression from the Enable user access to database task. Save the file. The content of smoke test task follows:
+
+    - name: Smoke Test - database connectivity
+      shell: "{{ lookup('template', 'db_test_command.j2') }}"
+      loop: "{{ db_user_access | subelements('db_list') }}"
+      delegate_to: workstation
+      changed_when: no
+Some of the variable references in the templates/db_test_command.j2 file are not correct. Change the username and database variables to reference the correct attributes of each iteration item. Use the preceding task as a guide for the variable references. Save the file.
+
+The content of the templates/db_test_command.j2 template is:
+
+echo "use {{ item.1 }}" | \
+mysql -u {{ item.0.username }} \
+      -p{{ user_passwords[item.0.username] }} \
+      -h {{ inventory_hostname }}
+This single command tests that a user can connect to the database server and use a particular database.
+
+NOTE
+The is no space between the -p option and the password value, unlike the -u and -h options. Do not modify anything other than variable references inside a Jinja2 expression.
+
+Execute the scenario_2.yml playbook and verify that each user can access each database specified in the corresponding db_list list.
+
+[student@workstation data-loops]$ ansible-playbook --ask-vault-pass scenario_2.yml
+Vault password: redhat321
+
+PLAY [Enable Database Access] ************************************************
+...output omitted...
+
+TASK [Enable user access to database] ****************************************
+changed: [servere] => (item=[{'username': 'johnd', ...}, 'employees'])
+changed: [servere] => (item=[{'username': 'johnd', ...}, 'invoices'])
+changed: [servere] => (item=[{'username': 'janed', ...}, 'invoices'])
+changed: [servere] => (item=[{'username': 'janed', ...}, 'inventory'])
+
+TASK [Smoke Test - database connectivity] ************************************
+ok: [servere] => (item=[{'username': 'johnd', ...}, 'employees'])
+ok: [servere] => (item=[{'username': 'johnd', ...}, 'invoices'])
+ok: [servere] => (item=[{'username': 'janed', ...}, 'invoices'])
+ok: [servere] => (item=[{'username': 'janed', ...}, 'inventory'])
+
+PLAY RECAP *******************************************************************
+servere   : ok=6    changed=4    unreachable=0    failed=0    ...
+NOTE
+Scenario 3
+
+The scenario_3.yml playbook creates a developer user account on the development web servers. The playbook also adds the SSH public key of any developer to the authorized_keys file for the developer user on the development servers.
+
+In this step, you will refactor the second task to loop over the public_keys_lists variable defined in the group_vars/all/public_keys.yml file. Use the map filter, followed by the flatten filter, to generate a list of a simple list of SSH public key files for all developers. Update the task's key keyword to contain the file content of each iteration item.
+
+Review the scenario_3.yml playbook to familiarize yourself with it.
+
+The with_file keyword loops through each file in the list. The key keyword contains the content of the file in the given iteration.
+
+The scenario_3.yml playbook is tightly coupled with the list of public key files, which reduces the ability to reuse the playbook in other environments.
+
+In a later step, you extract this same list of files from the public_key_lists variable.
+
+[student@workstation data-loops]$ cat scenario_3.yml
+---
+- name: Allow Developer Access To Dev Servers
+  hosts: dev_web_servers
+  gather_facts: no
+  tasks:
+    - name: Create shared account
+      user:
+        name: developer
+        state: present
+
+    - name: Set up multiple authorized keys
+      authorized_key:
+        user: developer
+        state: present
+        key: "{{ item }}"
+      with_file:
+        - pubkeys/johnd/id_rsa.pub
+        - pubkeys/johnd/laptop_rsa.pub
+        - pubkeys/janed/id_rsa.pub
+Review the structure of the public_key_lists variable:
+
+[student@workstation data-loops]$ cat group_vars/all/public_keys.yml
+---
+public_key_lists:
+  - username: johnd
+    public_keys:
+      - pubkeys/johnd/id_rsa.pub
+      - pubkeys/johnd/laptop_rsa.pub
+  - username: janed
+    public_keys:
+      - pubkeys/janed/id_rsa.pub
+The public_key_lists variable is a list. Each entry in the list is itself a dictionary, with keys of: username and public_keys. The public_keys key references a list of public key files for the given user.
+
+As an example, the johnd user has two public key files: pubkeys/johnd/id_rsa.pub and pubkeys/johnd/laptop_rsa.pub. The filenames are relative to the root directory of the playbook project.
+
+Change the with_file keyword to the loop keyword, and start a Jinja2 expression that references the public_key_lists variable. Add a map filter to the end of the expression to extract the public_keys attribute. This creates a list of lists - each entry in the list is a list of SSH public key file for a particular user.
+
+To create a single list of files, add a flatten filter after the map filter.
+
+Use the file lookup plugin to configure the key keyword with the file content of each iteration item. Save the file.
+
+The content of the scenario_3.yml playbook is:
+
+[student@workstation data-loops]$ cat scenario_3.yml
+---
+- name: Allow Developer Access To Dev Servers
+  hosts: dev_web_servers
+  gather_facts: no
+  tasks:
+    - name: Create shared account
+      user:
+        name: developer
+        state: present
+
+    - name: Set up multiple authorized keys
+      authorized_key:
+        user: developer
+        state: present
+        key: "{{ lookup('file', item) }}"
+      loop: "{{ public_key_lists | map(attribute='public_keys') | flatten }}"
+Execute the scenario_3.yml playbook. Verify that the playbook process the same three public key files.
+
+[student@workstation data-loops]$ ansible-playbook --ask-vault-pass scenario_3.yml
+Vault password: redhat321
+
+PLAY [Allow Developer Access To Dev Servers] *********************************
+
+TASK [Create shared account] *************************************************
+changed: [servera]
+
+TASK [Set up multiple authorized keys] ***************************************
+changed: [servera] => (item=pubkeys/johnd/id_rsa.pub)
+changed: [servera] => (item=pubkeys/johnd/laptop_rsa.pub)
+changed: [servera] => (item=pubkeys/janed/id_rsa.pub)
+
+PLAY RECAP *******************************************************************
+servera  : ok=2    changed=2    unreachable=0    failed=0    ...

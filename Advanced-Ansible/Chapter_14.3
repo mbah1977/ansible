@@ -1,0 +1,295 @@
+Backing Up and Restoring Ansible Tower
+Objectives
+After completing this section, students should be able to:
+
+Back up and restore the Ansible Tower database and configuration files.
+
+Backing up Ansible Tower
+The ability to manually back up and restore a Red Hat Ansible Tower installation is integrated into Ansible Tower's installation software. You can then use other tools to automate the backup process and make sure that the backup files are stored in a safe and secure location separate from the Ansible Tower server.
+
+The procedure uses the same setup.sh script and the inventory file that you used to install Ansible Tower.
+
+IMPORTANT
+If you have deleted the original installation directory, you can still set up backups by unpacking the tar archive containing the installer for the same version of Ansible Tower that you using.
+
+You also need to edit the installer's inventory file to contain the current passwords for your Ansible Tower services (admin_password, pg_password, and rabbitmq_password). If you made any other edits to the inventory file before installing Ansible Tower, you must make those edits now as well.
+
+The actual backup is started by running ./setup.sh -b in the installation directory on the Ansible Tower server as root. This creates the backup as a tar archive in the installer's directory named tower-backup-DATE.tar.gz, where DATE is in date +%F-+%T format. It also creates a symlink, tower-backup-latest.tar.gz, pointing to the most recent backup archive in the directory.
+
+The backup archive consists of the following files and directories:
+
+tower.db: PostgreSQL database dump file.
+
+./conf: The configuration directory, containing files from the /etc/tower/ directory.
+
+./job_status: The directory for job output files.
+
+./projects: The directory for manual projects.
+
+./static: The directory for web UI customization, such as custom logos.
+
+As with every backup procedure, you should review the amount of disk space available to ensure that there is enough free space to store the backup. Note that this procedure backs up the Ansible Tower configuration, but not its logs or the programs installed by the Ansible Tower installer.
+
+WARNING
+The manual backup procedure using setup.sh -b only creates the backup archive file. You are responsible for setting up a system that periodically runs the command to create the backups and store the backup archives in a safe place.
+
+Backup Procedure
+
+The following procedure creates a new backup of the running Ansible Tower configuration.
+
+As the root user, locate the Ansible Tower installation directory and change into that directory.
+
+[root@tower ~]# find / -name ansible*
+/root/ansible-tower-setup-bundle-3.3.1-1.el7
+[root@tower ~]# cd /root/ansible-tower-setup-bundle-3.3.1-1.el7
+[root@tower ansible-tower-setup-bundle-3.3.1-1.el7]# 
+As the root user, run the setup.sh script with the -b option to initiate the Ansible Tower configuration and database backup process.
+
+[root@tower ansible-tower-setup-bundle-3.3.1-1.el7]# ./setup.sh -b
+...output omitted...
+
+RUNNING HANDLER [backup : Remove the backup tarball.] **************************
+changed: [localhost] => {"changed": true, "path": "/var/backups/tower/tower-backup-2017-03-29-08:34:43.tar.gz", "state": "absent"}
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=24   changed=16   unreachable=0    failed=0
+
+The setup process completed successfully.
+Setup log saved to /var/log/tower/setup-2017-03-29-08:34:34.log
+List the current directory to ensure that the backup archive has been created and is accessible.
+
+[root@tower ansible-tower-setup-bundle-3.3.1-1.el7]# ls -l tower-*
+-rw-r--r--.  1 root root 164317 03-29 08:34 tower-backup-2017-03-29-08:34:43.tar.gz
+lrwxrwxrwx.  1 root root     84 03-29 08:35 tower-backup-latest.tar.gz -> /root/ansible-tower-setup-bundle-3.3.1-1.el7/tower-backup-2017-03-29-08:34:43.tar.gz
+NOTE
+Notice the symbolic link tower-backup-latest.tar.gz pointing to the latest created backup archive. This link is by default used to recover the Ansible Tower infrastructure from backup.
+
+Restoring Ansible Tower from Backup
+The setup.sh script is used with the -r option to restore Ansible Tower from a backup archive. You need the backup, the installer for the same version of Ansible Tower that was used to create the backup, and an inventory file for the installer.
+
+Should you have multiple backup archives available, be sure that the tower-backup-latest.tar.gz symbolic link points to the exact backup file from which you want to restore. If you need to use an older backup file, delete the existing tower-backup.latest.tar.gz symbolic link and create a new link pointing to the correct backup archive.
+
+WARNING
+When restoring a backup, be sure to use the same version of Ansible Tower that was used to create the backup.
+
+Restore Procedure
+
+The following procedure demonstrates how to restore the Ansible Tower infrastructure from an existing backup archive.
+
+As the root user, locate the Ansible Tower installation directory and change into that directory.
+
+[root@tower ~]# find / -name ansible*
+/root/ansible-tower-setup-bundle-3.3.1-1.el7
+[root@tower ~]# cd /root/ansible-tower-setup-bundle-3.3.1-1.el7
+[root@tower ansible-tower-setup-bundle-3.3.1-1.el7]# 
+Ensure that the backup archive is in that directory.
+
+[root@tower ansible-tower-setup-bundle-3.3.1-1.el7]# ls -l tower-*
+-rw-r--r--.  1 root root 164317 03-29 08:34 tower-backup-2017-03-29-08:34:43.tar.gz
+lrwxrwxrwx.  1 root root     84 03-29 08:35 tower-backup-latest.tar.gz -> /root/ansible-tower-setup-bundle-3.3.1-1.el7/tower-backup-2017-03-29-08:34:43.tar.gz
+IMPORTANT
+Remember that the symbolic link tower-backup-latest.tar.gz points to the latest backup archive. This link is used to recover the Ansible Tower infrastructure from backup. If you need to restore from an older archive, you have to recreate that link by pointing to the correct archive.
+
+As the root user, run setup.sh -r to start restoring the Ansible Tower configuration and database.
+
+IMPORTANT
+Do not forget the -r option to the setup.sh command. Without this option, the Ansible Tower installer will start a new installation process from the beginning.
+
+If that happens, wait until the installation process finishes, and then restore the backup.
+
+[root@tower ansible-tower-setup-bundle-3.3.1-1.el7]# ./setup.sh -r
+...output omitted...
+00ms", "Result": "success", "RootDirectoryStartOnly": "no", "RuntimeDirectoryMode": "0755", "SameProcessGroup": "no", "SecureBits": "0", "SendSIGHUP": "no", "SendSIGKILL": "yes", "Slice": "system.slice", "StandardError": "inherit", "StandardInput": "null", "StandardOutput": "journal", "StartLimitAction": "none", "StartLimitBurst": "5", "StartLimitInterval": "10000000", "StartupBlockIOWeight": "18446744073709551615", "StartupCPUShares": "18446744073709551615", "StatusErrno": "0", "StopWhenUnneeded": "no", "SubState": "dead", "SyslogLevelPrefix": "yes", "SyslogPriority": "30", "SystemCallErrorNumber": "0", "TTYReset": "no", "TTYVHangup": "no", "TTYVTDisallocate": "no", "TimeoutStartUSec": "1min 30s", "TimeoutStopUSec": "1min 30s", "TimerSlackNSec": "50000", "Transient": "no", "Type": "forking", "UMask": "0022", "UnitFilePreset": "disabled", "UnitFileState": "enabled", "WantedBy": "multi-user.target", "Wants": "system.slice", "WatchdogTimestampMonotonic": "0", "WatchdogUSec": "0"}, "warnings": []}
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=26   changed=18   unreachable=0    failed=0
+
+The setup process completed successfully.
+Setup log saved to /var/log/tower/setup-2017-03-30-04:19:05.log
+Log in to the Ansible Tower web UI and verify that the server has been restored from backup correctly.
+
+REFERENCES
+Ansible Tower Administration Guide
+
+
+
+Guided Exercise: Backing Up and Restoring Ansible Tower
+In this exercise, you will back up the Red Hat Ansible Tower database and configuration files.
+
+Outcomes
+
+You will be able to:
+
+Back up the existing Red Hat Ansible Tower installation.
+
+Restore the Red Hat Ansible Tower configuration and database from an existing backup.
+
+Ensure that the workstation and tower virtual machines are started.
+
+Log in to workstation as student using student as the password.
+
+On workstation, run lab admin-recovery start, which verifies that the Ansible Tower services are running and all the required resources are available.
+
+[student@workstation ~]$ lab admin-recovery start
+Open a terminal on workstation and use ssh to log in to the tower server as root. In the following steps you will create a backup of Ansible Tower from the CLI.
+
+[student@workstation ~]$ ssh root@tower
+List the contents of the root user home directory, to ensure that the installation directory of Ansible Tower is available.
+
+[root@tower ~]# ls /root
+anaconda-ks.cfg  ansible-tower-setup-bundle-3.5.0-1.el8  original-ks.cfg
+Use the ansible-tower-service status command to ensure that the Ansible Tower services are running.
+
+[root@tower ~]# ansible-tower-service status
+(...output omitted...)
+Redirecting to /bin/systemctl status  supervisord.service
+● supervisord.service - Process Monitoring and Control Daemon
+   Loaded: loaded (/usr/lib/systemd/system/supervisord.service; enabled; vendor preset: disabled)
+   Active: active (running) since wto 2018-11-23 04:25:50 EDT; 2h 33min ago
+  Process: 4145 ExecStart=/usr/bin/supervisord -c /etc/supervisord.conf (code=exited, status=0/SUCCESS)
+(...output omitted...)
+Change to the /root/ansible-tower-setup-bundle-3.5.0-1.el8 directory.
+
+[root@tower ~]# cd /root/ansible-tower-setup-bundle-3.5.0-1.el8
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# 
+Use the setup.sh -b command to back up the Ansible Tower configuration and database.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# ./setup.sh -b
+...output omitted...
+RUNNING HANDLER [backup : Remove the backup directory.] ***********************
+changed: [localhost] => {"changed": true, "path": "/var/backups/tower/2019-05-14-11:09:04/", "state": "absent"}
+
+RUNNING HANDLER [backup : Remove common directory.] ***************************
+changed: [localhost] => {"changed": true, "path": "/var/backups/tower/common/", "state": "absent"}
+
+RUNNING HANDLER [backup : Remove the backup tarball.] *************************
+changed: [localhost] => {"changed": true, "path": "/var/backups/tower/localhost.tar.gz", "state": "absent"}
+
+RUNNING HANDLER [backup : Remove the common tarball.] *************************
+changed: [localhost] => {"changed": true, "path": "/var/backups/tower/common.tar.gz", "state": "absent"}
+
+RUNNING HANDLER [backup : Remove backup dest stage directory.] ****************
+changed: [localhost] => {"changed": true, "path": "/root/ansible-tower-setup-bundle-3.5.0-1.el8/2019-05-14-11:09:04", "state": "absent"}
+
+PLAY RECAP ********************************************************************
+localhost  : ok=37   changed=29   unreachable=0    failed=0    skipped=10 ...
+
+The setup process completed successfully.
+Setup log saved to /var/log/tower/setup-2019-05-14-11:08:58.log
+Verify that the backup was created in the current working directory by issuing the ls command.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# ls -1
+backup.yml
+bundle
+group_vars
+install.yml
+inventory
+inventory.1588.2019-06-18@04:56:26~
+licenses
+README.md
+restore.yml
+roles
+setup.sh
+tower-backup-2019-06-20-07:04:57.tar.gz
+tower-backup-latest.tar.gz
+Change the Ansible Tower admin superuser password to redhat2 using the awx-manage command.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# awx-manage changepassword \
+> admin
+Changing password for user 'admin'
+Password: redhat2
+Password (again): redhat2
+Password changed successfully for user 'admin'
+On workstation, open a browser and log in to Ansible Tower as the admin user using the new redhat2 password. Then click the Log Out icon to log out of the Ansible Tower web UI.
+
+Go back to tower server and restore the backup from the file created in previous steps. Use the setup.sh command with the -r option. When the restore operation completes, exit the console session on the tower system.
+
+IMPORTANT
+Do not forget the -r, otherwise Ansible Tower will start the installation process from the beginning. If that happens, wait until the installation process finishes and then restore the backup.
+
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# ./setup.sh -r
+...output omitted...
+PLAY RECAP *****************************************************************
+localhost                  : ok=43   changed=24   unreachable=0    failed=0
+
+The setup process completed successfully.
+Setup log saved to /var/log/tower/setup-2019-05-14-11:11:28.log
+[root@tower ansible-tower-setup-bundle-3.5.0-1.el8]# exit
+Verify that the backup has been restored by logging in to the Ansible Tower web UI as admin with the old redhat password. Then click the Log Out icon to log out of the Ansible Tower web UI.
+
+Finish
+
+On workstation, run the lab admin-recovery finish script to clean up this exercise.
+
+[student@workstation ~]$ lab admin-recovery finish
+This concludes the guided exercise.
+
+
+
+
+
+
+Quiz: Performing Maintenance and Routine Administration of Ansible Tower
+Choose the correct answers to the following questions:
+
+1.		
+Which of the following commands can be used to determine the status of Ansible Tower services?
+
+A		
+firewall-cmd --list-services
+
+B		
+systemctl status ansible-tower
+
+C		
+ansible-tower-service status
+
+D		
+service tower status
+
+2.		
+Which of the following commands can be used to change the Red Hat Ansible Tower admin password?
+
+A		
+tower-manage changepassword admin
+
+B		
+awx-manage createsuperuser
+
+C		
+awx-manage changepassword admin
+
+D		
+awx-manage update_password admin
+
+3.		
+Where is the default location of Ansible Tower TLS/SSL certificate defined?
+
+A		
+/etc/tower/tower.cert
+
+B		
+/etc/httpd/conf/ssl.conf
+
+C		
+/etc/nginx/nginx.conf
+
+D		
+/etc/nginx/conf.d/nginx.conf
+
+4.		
+What is the default Ansible Tower log directory location?
+
+A		
+/etc/tower/logs/
+
+B		
+/var/log/ansible/
+
+C		
+/var/log/tower/
+
+D		
+/var/awx/log/tower/
+
+
