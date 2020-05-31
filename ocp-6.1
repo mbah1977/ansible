@@ -1,0 +1,426 @@
+Chapter 6. Controlling Pod Scheduling
+Controlling Pod Scheduling Behavior
+Guided Exercise: Controlling Pod Scheduling Behavior
+Limiting Resource Usage
+Guided Exercise: Limiting Resource Usage
+Scaling an Application
+Guided Exercise: Scaling an Application
+Lab: Controlling Pod Scheduling
+Summary
+Abstract
+
+Goal	Control the nodes on which a pod runs.
+Objectives	
+Describe pod scheduling algorithms, the methods used to influence scheduling, and apply these methods.
+
+Limit the resources consumed by an application.
+
+Control the number of replicas of a pod.
+
+Sections	
+Controlling Pod Scheduling Behavior (and Guided Exercise)
+
+Limiting Resource Usage (and Guided Exercise)
+
+Scaling an Application (and Guided Exercise)
+
+Lab	
+Controlling Pod Scheduling
+
+Controlling Pod Scheduling Behavior
+Objectives
+After completing this section, you should be able to:
+
+Describe pod scheduling algorithms.
+
+Describe the methods used to influence scheduling.
+
+Introducing the OpenShift Scheduler Algorithm
+The pod scheduler determines placement of new pods onto nodes in the OpenShift cluster. It is designed to be highly configurable and adaptable to different clusters. The default configuration shipped with Red Hat OpenShift Container Platform 4.2 supports the common data center concepts of zones and regions by using node labels, affinity rules, and anti-affinity rules.
+
+The OpenShift pod scheduler algorithm follows a three step process:
+
+Filtering nodes.
+
+The scheduler filters the list of running nodes by evaluating each node against a set of predicates, such as the availability of host ports, or whether a pod can be scheduled to a node experiencing either disk or memory pressure.
+
+Additionally, a pod can define a node selector that matches the labels in the cluster nodes. Nodes whose labels do not match are not eligible.
+
+A pod can also define resource requests for compute resources such as CPU, memory, and storage. Nodes that have insufficient free computer resources are not eligible.
+
+Another filtering check evaluates if the list of nodes have any taints, and if so whether the pod has an associated toleration that can accept the taint. If a pod cannot accept the taint of a node, then the node is not eligible. By default, master nodes include the taint node-role.kubernetes.io/master:NoSchedule. A pod that does not have a matching toleration for this taint will not be scheduled to a master node.
+
+The end result of the filtering step is typically a shorter list of node candidates that are eligible to run the pod. In some cases, none of the nodes are filtered out, which means the pod could run on any of the nodes. In other cases, all of the nodes are filtered out, which means the pod cannot be scheduled until a node with the desired prerequisites becomes available.
+
+A full list of predicates and their descriptions can be found in the references section.
+
+Prioritizing the filtered list of nodes.
+
+The list of candidate nodes is evaluated using multiple priority criteria that add up to a weighted score. Nodes with higher values are better candidates to run the pod.
+
+Among the criteria are affinity and anti-affinity rules. Nodes with higher affinity for the pod have a higher score, and nodes with higher anti-affinity have a lower score.
+
+A common use for affinity rules is to schedule related pods to be close to each other, for performance reasons. An example is to use the same network backbone for pods that synchronize with each other.
+
+A common use for anti-affinity rules is to schedule related pods that are not too close to each other, for high availability. An example is to avoid scheduling all pods from the same application to the same node.
+
+Selecting the best fit node.
+
+The candidate list is sorted based on these scores, and the node with the highest score is selected to host the pod. If multiple nodes have the same high score, then one is selected in a round-robin fashion.
+
+The scheduler is flexible and can be customized for advanced scheduling situations. Additionally, although this course will focus on pod placement using node labels and node selectors, pods can also be placed using pod affinity and anti-affinity rules, as well as node affinity and anti-affinity rules. Customizing the scheduler and covering these alternative pod placement scenarios is outside the scope of this course.
+
+Scheduling and Topology
+A common topology for large data centers, such as cloud providers, is to organize hosts into regions and zones:
+
+A region is a set of hosts in a close geographic area, which guarantees high-speed connectivity between them.
+
+A zone, also called an availability zone, is a set of hosts that might fail together because they share common critical infrastructure components, such as a network switch, a storage array, or a uninterruptible power supply (UPS).
+
+As an example of regions and zones, Amazon Web Services (AWS) has a region in northern Virginia (us-east-1) with 6 availability zones, and another region in Ohio (us-east-2) with 3 availability zones. Each of the AWS availability zones can contain multiple data centers potentially consisting of hundreds of thousands of servers.
+
+The standard configuration of the OpenShift pod scheduler supports this kind of cluster topology by defining predicates based on the region and zone labels. The predicates are defined in such a way that:
+
+Replica pods, created from the same deployment (or deployment configuration), are scheduled to run on nodes that have the same value for the region label.
+
+Replica pods are scheduled to run on nodes that have different values for the zone label.
+
+The figure below shows a sample topology that consists of multiple regions, each with multiple zones, and each zone with multiple nodes.
+
+
+Figure 6.1: Sample cluster topology using regions and zones
+Labeling Nodes
+As an OpenShift cluster administrator, you can add additional labels to your nodes. For example, you might label nodes with the env label using the values of dev, qa, or prod with the intent that development, quality assurance, and production workloads will be deployed to a specific subset of nodes. The labels you choose are arbitrary, but you must publish the labels and their associated values to your developers so that they can configure their applications appropriately.
+
+Use the oc label command as a cluster administrator to immediately add, update, or remove a node label. For example, use the following command to label a node with env=dev:
+
+[user@demo ~]$ oc label node node1.us-west-1.compute.internal env=dev
+Use the --overwrite option to change an existing label.
+
+[user@demo ~]$ oc label node node1.us-west-1.compute.internal env=prod --overwrite
+Remove a label by specifying the label name followed by a hyphen, such as env-.
+
+[user@demo ~]$ oc label node node1.us-west-1.compute.internal env-
+IMPORTANT
+Both labels and their values are case-sensitive. An application node selector must match the case of the actual label and the value applied to the node.
+
+Use the --show-labels option with the oc get nodes command to see the case-sensitive labels assigned to a node.
+
+[user@demo ~]$ oc get node node2.us-west-1.compute.internal --show-labels
+NAME                              ...  ROLES   ...  LABELS
+node2.us-west-1.compute.internal  ...  worker  ...  beta.kubernetes.io/arch=amd64,beta.kubernetes.io/instance-type=m4.xlarge,beta.kubernetes.io/os=linux,tier=gold,failure-domain.beta.kubernetes.io/region=us-west-1,failure-domain.beta.kubernetes.io/zone=us-west-1c,kubernetes.io/arch=amd64,kubernetes.io/hostname=node2,kubernetes.io/os=linux,node-role.kubernetes.io/worker=,node.openshift.io/os_id=rhcos
+Notice that a node might have several default labels assigned by OpenShift. Labels whose keys include the kubernetes.io suffix should not be changed by a cluster administrator because they are used internally by the scheduler.
+
+Cluster administrators can also use the -L option to determine the value of a single label. For example:
+
+[user@demo ~]$ oc get node -L failure-domain.beta.kubernetes.io/region
+NAME                                         ...   ROLES    ...   REGION
+ip-10-0-131-214.us-west-1.compute.internal   ...   master   ...   us-west-1
+ip-10-0-139-250.us-west-1.compute.internal   ...   worker   ...   us-west-1
+ip-10-0-141-144.us-west-1.compute.internal   ...   master   ...   us-west-1
+ip-10-0-152-57.us-west-1.compute.internal    ...   master   ...   us-west-1
+ip-10-0-154-226.us-west-1.compute.internal   ...   worker   ...   us-west-1
+Multiple -L options in the same oc get command are supported. For example:
+
+[user@demo ~]$ oc get node -L failure-domain.beta.kubernetes.io/region \
+>    -L failure-domain.beta.kubernetes.io/zone -L env
+NAME                                         ...   REGION      ZONE         ENV
+ip-10-0-131-214.us-west-1.compute.internal   ...   us-west-1   us-west-1b
+ip-10-0-139-250.us-west-1.compute.internal   ...   us-west-1   us-west-1b   dev
+ip-10-0-141-144.us-west-1.compute.internal   ...   us-west-1   us-west-1b
+ip-10-0-152-57.us-west-1.compute.internal    ...   us-west-1   us-west-1c
+ip-10-0-154-226.us-west-1.compute.internal   ...   us-west-1   us-west-1c
+Labeling Machine Sets
+Although node labels are persistent, if your OpenShift cluster contains machine sets (created if your cluster was installed using the full stack automation method), then you should also add labels to the machine set configuration. This ensures that new machines (and the nodes generated from them) will also contain the desired labels.
+
+You can identify the relationship between machines and nodes by listing machines in the openshift-machine-api namespace and including the -o wide option.
+
+[user@demo ~]$ oc get machines -n openshift-machine-api -o wide
+NAME                              ... NODE
+...output omitted...
+ocp-qz7hf-worker-us-west-1b-rvx6w ... ip-10-0-139-250.us-west-1.compute.internal
+ocp-qz7hf-worker-us-west-1c-v4n4n ... ip-10-0-154-226.us-west-1.compute.internal
+Machines used for worker nodes should come from a machine set. The name of a machine contains the name of the machine set from which it was generated.
+
+[user@demo ~]$ oc get machineset -n openshift-machine-api
+NAME                          DESIRED   CURRENT   READY   AVAILABLE  ...
+ocp-qz7hf-worker-us-west-1b   1         1         1       1          ...
+ocp-qz7hf-worker-us-west-1c   1         1         1       1          ...
+Edit a machine set so that new machines generated from it will have the desired label or labels. Modifying a machine set will not apply changes to existing machines or nodes.
+
+[user@demo ~]$ oc edit machineset ocp-qz7hf-worker-us-west-1b \
+>    -n openshift-machine-api
+The highlighted lines below show where to add a label within a machine set.
+
+...output omitted...
+    spec:
+      metadata:
+        creationTimestamp: null
+        labels:
+          env: dev
+      providerSpec:
+...output omitted...
+Controlling Pod Placement
+Many infrastructure-related pods in an OpenShift cluster are configured to run on master nodes. Examples include pods for the DNS operator, the OAuth operator, and the OpenShift API server. In some cases, this is accomplished by using the node selector node-role.kubernetes.io/master: '' in the configuration of a daemon set or a replica set.
+
+Similarly, some user applications might require running on a specific set of nodes. For example, certain nodes provide hardware acceleration for certain types of workloads, or the cluster administrator does not want to mix production applications with development applications. Use node labels and node selectors to implement these kinds of scenarios.
+
+A node selector is part of an individual pod definition. Define a node selector in either a deployment or a deployment configuration resource, so that any new pod generated from that resource will have the desired node selector. If your deployment or deployment configuration resource is under version control, then modify the resource file and apply the changes using the oc apply -f command.
+
+Alternatively, a node selector can be added or modified using either the oc edit command or the oc patch command. For example, to configure the myapp deployment so that its pods only run on nodes that have the env=qa label, use the oc edit command:
+
+[user@demo ~]$ oc edit deployment/myapp
+...output omitted...
+spec:
+...output omitted...
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: myapp
+    spec:
+      nodeSelector:
+        env: dev
+      containers:
+      - image: quay.io/redhattraining/scaling:v1.0
+...output omitted...
+The following oc patch command accomplishes the same thing:
+
+[user@demo ~]$ oc patch deployment/myapp --patch \
+>    '{"spec":{"template":{"spec":{"nodeSelector":{"env":"dev"}}}}}'
+Whether using the oc edit command or the oc patch command, the change triggers a new deployment and the new pods are scheduled according to the node selector.
+
+Configuring a Node Selector for a Project
+If the cluster administrator does not want developers controlling the node selector for their pods, then a default node selector should be configured in the project resource. A cluster administrator can either define a node selector when a project is created, or can add or update a node selector after a project is created. Use the oc adm new-project command to add the node selector at project creation. For example, the following command creates a new project named demo, where all pods will be deployed to nodes that have the label of tier=1.
+
+[user@demo ~]$ oc adm new-project demo --node-selector "tier=1"
+To configure a default node selector for an existing project, add an annotation to the namespace resource with the openshift.io/node-selector key. The oc annotate command can add, modify, or remove a node selector annotation:
+
+[user@demo ~]$ oc annotate namespace demo \
+>    openshift.io/node-selector="tier=2" --overwrite
+Scaling the Number of Pod Replicas
+Although most deployment and deployment configuration resources start with creating a single pod, the number of replicas (or copies) of a pod is frequently increased. This is accomplished by scaling the deployment or deployment configuration. Multiple methods for scaling will be covered later, but one method uses the oc scale command. For example, the number of pods in the myapp deployment can be scaled to three using the following command:
+
+[user@demo ~]$ oc scale --replicas 3 deployment/myapp
+ 
+REFERENCES
+For more information, refer to the Controlling pod placement onto nodes (scheduling) chapter in the Red Hat OpenShift Container Platform 4.2 Nodes guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/nodes/index#controlling-pod-placement-onto-nodes-scheduling
+
+Amazon Web Services Regions and Availability Zones
+
+Guided Exercise: Controlling Pod Scheduling Behavior
+In this exercise, you will configure an application to run on a subset of the cluster worker nodes.
+
+Outcomes
+
+You should be able to use the OpenShift command-line interface to:
+
+Add a new label to a node.
+
+Deploy pods to nodes that match a specified label.
+
+Remove a label from a node.
+
+Troubleshoot when pods fail to deploy to a node.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+The command ensures that the cluster API is reachable.
+
+[student@workstation ~]$ lab schedule-pods start
+As the developer user, create a new project named schedule-pods.
+
+Source the classroom variables file.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to your OpenShift cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Create a new project named schedule-pods.
+
+[student@workstation ~]$ oc new-project schedule-pods
+Now using project "schedule-pods" on server "https://api.cluster.domain.example.com:6443".
+...output omitted...
+Deploy and scale a test application.
+
+Create a new application named hello using the container located at quay.io/redhattraining/hello-world-nginx:v1.0.
+
+[student@workstation ~]$ oc create deployment hello \
+>    --image quay.io/redhattraining/hello-world-nginx:v1.0
+deployment.apps/hello created
+Create a service for the application.
+
+[student@workstation ~]$ oc expose deployment/hello --port 80 --target-port 8080
+service/hello exposed
+Make the service accessible by creating a route to it.
+
+[student@workstation ~]$ oc expose svc/hello
+route.route.openshift.io/hello exposed
+Manually scale the application so there are four running pods.
+
+[student@workstation ~]$ oc scale --replicas 4 deployment/hello
+deployment.extensions/hello scaled
+Verify that the four running pods are distributed between the two worker nodes.
+
+[student@workstation ~]$ oc get pods -o wide
+NAME                   ...  NODE                                        ...
+hello-cb7797cdd-dqk8g  ...  ip-10-0-140-20.us-east-2.compute.internal   ...
+hello-cb7797cdd-hq4xj  ...  ip-10-0-140-20.us-east-2.compute.internal   ...
+hello-cb7797cdd-mbvdw  ...  ip-10-0-152-96.us-east-2.compute.internal   ...
+hello-cb7797cdd-zbnnn  ...  ip-10-0-152-96.us-east-2.compute.internal   ...
+NOTE
+Depending on the existing load on each worker node, your output may be different. Although the scheduler will attempt to distribute the pods, the distribution may not be even.
+
+Prepare the worker nodes so that application workloads can be distributed to either development or production nodes by assigning the env label. Assign the env=dev label to the first worker node and the env=prod label to the second worker node.
+
+Log in to your OpenShift cluster as the admin user. A regular user does not have permission to view information about nodes, machines, or machine sets, nor can a regular user apply labels.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+The following two commands in this step are for information only. To keep this exercise simple, you will only label nodes. A more realistic scenario would label machine sets so that new worker machines (and the nodes associated with them) would have the desired label.
+
+Display all of the machines in your environment. The output includes the region and zone, as well as the specific node being used by each machine. All of your machines might be deployed in the same region and zone.
+
+[student@workstation ~]$ oc get machines -n openshift-machine-api -o wide
+NAME                                          ...  REGION     ZONE        AGE  NODE
+do280-33cc33cc-ntpkj-master-0                 ...  us-east-2  us-east-2a  63d  ip-10-0-134-251.us-east-2.compute.internal
+do280-33cc33cc-ntpkj-master-1                 ...  us-east-2  us-east-2a  63d  ip-10-0-155-221.us-east-2.compute.internal
+do280-33cc33cc-ntpkj-master-2                 ...  us-east-2  us-east-2a  63d  ip-10-0-171-178.us-east-2.compute.internal
+do280-33cc33cc-ntpkj-worker-us-east-2a-p2slq  ...  us-east-2  us-east-2a  63d  ip-10-0-140-20.us-east-2.compute.internal
+do280-33cc33cc-ntpkj-worker-us-east-2a-pntdb  ...  us-east-2  us-east-2a  41d  ip-10-0-152-96.us-east-2.compute.internal
+Display the machine sets used to generate your workers. You might only have one.
+
+[student@workstation ~]$ oc get machinesets -n openshift-machine-api
+NAME                                     DESIRED  CURRENT  READY  AVAILABLE  ...
+do280-33cc33cc-ntpkj-worker-us-east-2a   2        2        2      2          ...
+Now that you have seen the correlation between machines and nodes (and the machine sets used to create the machines), verify that none of the worker nodes use the env label.
+
+[student@workstation ~]$ oc get nodes -L env -l node-role.kubernetes.io/worker
+NAME                                         STATUS   ROLES    ...   ENV
+ip-10-0-140-20.us-east-2.compute.internal    Ready    worker   ...
+ip-10-0-152-96.us-east-2.compute.internal    Ready    worker   ...
+Add the env=dev label to the first worker node to indicate that it is a development node.
+
+[student@workstation ~]$ oc label node \
+>    ip-10-0-140-20.us-east-2.compute.internal \
+>    env=dev
+node/ip-10-0-140-20.us-east-2.compute.internal labeled
+Add the env=prod label to the second worker node to indicate that it is a production node.
+
+[student@workstation ~]$ oc label node \
+>    ip-10-0-152-96.us-east-2.compute.internal \
+>    env=prod
+node/ip-10-0-152-96.us-east-2.compute.internal labeled
+Verify that the worker nodes have the correct env label set. Make note of the node that has the env=dev label, as you will check later to see if the application pods have been deployed to that node.
+
+[student@workstation ~]$ oc get nodes -L env -l node-role.kubernetes.io/worker
+NAME                                         STATUS   ROLES    ...   ENV
+ip-10-0-140-20.us-east-2.compute.internal    Ready    worker   ...   dev
+ip-10-0-152-96.us-east-2.compute.internal    Ready    worker   ...   prod
+Switch back to the developer user and modify the hello application so that it is deployed to the development node. After verifying this change, delete the schedule-pods project.
+
+Log in to your OpenShift cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Using project "schedule-pods".
+Modify the deployment resource for the hello application to select a development node. Make sure to add the node selector the spec group in the template section.
+
+[student@workstation ~]$ oc edit deployment/hello
+Add the highlighted lines below to the deployment resource, indenting as shown.
+
+...output omitted...
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        env: dev
+      restartPolicy: Always
+...output omitted...
+The following output from oc edit is displayed after you save your changes.
+
+deployment.extensions/hello edited
+Verify that the application pods are deployed to the node with the env=dev label. Although it make take a little time to redeploy, the application pods must be deployed to the same worker node that you previously identified.
+
+[student@workstation ~]$ oc get pods -o wide
+NAME                    ...  NODE                                       ...
+hello-5564c6bd8f-5b22n  ...  ip-10-0-140-20.us-east-2.compute.internal  ...
+hello-5564c6bd8f-b9b2w  ...  ip-10-0-140-20.us-east-2.compute.internal  ...
+hello-5564c6bd8f-g9sct  ...  ip-10-0-140-20.us-east-2.compute.internal  ...
+hello-5564c6bd8f-gmjls  ...  ip-10-0-140-20.us-east-2.compute.internal  ...
+Remove the schedule-pods project.
+
+[student@workstation ~]$ oc delete project schedule-pods
+project.project.openshift.io "schedule-pods" deleted
+Finish cleaning up this portion of the exercise by removing the env label from the worker nodes.
+
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Remove the env label from all worker nodes.
+
+[student@workstation ~]$ oc label node -l node-role.kubernetes.io/worker env-
+node/ip-10-0-140-20.us-east-2.compute.internal labeled
+node/ip-10-0-152-96.us-east-2.compute.internal labeled
+The schedule-pods-ts project contains an application that runs only on nodes that are labeled as client=ACME. In the following example, the application pod is pending and you must diagnose the problem using the following steps:
+
+Log in to your OpenShift cluster as the developer user and ensure that you are using the schedule-pods-ts project.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Using project "schedule-pods-ts".
+If the output above does not show that you are using the schedule-pods-ts project, switch to it.
+
+[student@workstation ~]$ oc project schedule-pods-ts
+Now using project "schedule-pods-ts" on server ...
+Verify that the application pod has a status of Pending.
+
+[student@workstation ~]$ oc get pods
+NAME                       READY   STATUS    RESTARTS   AGE
+hello-ts-5dbff9f44-w6csj   0/1     Pending   0          7s
+Because a pod with a status of pending does not have any logs, check details of the pod using the oc describe pod command to see if describing the pod provides any useful information.
+
+[student@workstation ~]$ oc describe pod hello-ts-5dbff9f44-8h7c7
+...output omitted...
+QoS Class:       BestEffort
+Node-Selectors:  client=acme
+Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                 node.kubernetes.io/unreachable:NoExecute for 300s
+Events:
+  Type     Reason            ...               Message
+  ----     ------            ...               -------
+  Warning  FailedScheduling  ...  0/5 nodes are available: 5 node(s) didn't match node selector.
+Based on this information, the pod should be scheduled to a node with the label client=acme, but none of the five nodes has this label. The information provided indicates that at least one worker node has the label client=ACME. You have found the problem. The application must be modified so that it uses the correct node selector.
+
+Edit the deployment resource for the application to use the correct node selector.
+
+[student@workstation ~]$ oc edit deployment/hello-ts
+Change acme to ACME as shown below.
+
+...output omitted...
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        client: ACME
+      restartPolicy: Always
+...output omitted...
+The following output from oc edit is displayed after you save your changes.
+
+deployment.extensions/hello-ts edited
+Verify that the a new application pod is deployed and has a status of Running.
+
+[student@workstation ~]$ oc get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+hello-ts-69769f64b4-wwhpc   1/1     Running   0          11s
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab schedule-pods finish

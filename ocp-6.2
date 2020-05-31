@@ -1,0 +1,525 @@
+Limiting Resource Usage
+Objectives
+After completing this section, you should be able to use limit ranges and resource quotas to limit the resources consumed by an application.
+
+Defining Resource Requests and Limits for Pods
+A pod definition can include both resource requests and resource limits:
+
+Resource requests
+Used for scheduling, and to indicate that a pod is not able to run with less than the specified amount of compute resources. The scheduler tries to find a node with sufficient compute resources to satisfy the pod requests.
+
+Resource limits
+Used to prevent a pod from using up all compute resources from a node. The node that runs a pod configures the Linux kernel cgroups feature to enforce the resource limits for the pod.
+
+Resource request and resource limits should be defined for each container in either a deployment or a deployment configuration resource. If requests and limits have not been defined, then you will find a resources: {} line for each container.
+
+Modify the resources: {} line to specify the desired requests and or limits. For example:
+
+...output omitted...
+    spec:
+      containers:
+      - image: quay.io/redhattraining/hello-world-nginx:v1.0
+        name: hello-world-nginx
+        resources:
+          requests:
+            cpu: "10m"
+            memory: 20Mi
+          limits:
+            cpu: "80m"
+            memory: 100Mi
+status: {}
+If you use the oc edit command to modify a deployment or a deployment configuration, ensure you use the correct indentation. Indentation mistakes can result in the editor refusing to save changes. To avoid indentation issues, you can use the oc set resources command to specify resource requests and limits. The following command sets the same requests and limits as the preceding example.
+
+[user@demo ~]$ oc set resources deployment hello-world-nginx \
+>    --requests cpu=10m,memory=20Mi --limits cpu=80m,memory=100Mi
+If a resource quota applies to a resource request, then the pod should define a resource request. If a resource quota applies to a resource limit, then the pod should also define a resource limit. Red Hat recommends defining resource requests and limits even if quotas are not being used.
+
+Viewing Requests, Limits, and Actual Usage
+Using the OpenShift command-line interface, cluster administrators can view compute usage information on individual nodes. The oc describe node command displays detailed information about a node, including information about the pods running on the node. For each pod, it shows CPU requests and limits, as well as memory requests and limits. If a request or limit has not been specified, then the pod will show a 0 for that column. A summary of all resource requests and limits is also displayed.
+
+[user@demo ~]$ oc describe node node1.us-west-1.compute.internal
+Name:               node1.us-west-1.compute.internal
+Roles:              worker
+Labels:             beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/instance-type=m4.xlarge
+                    beta.kubernetes.io/os=linux
+...output omitted...
+Non-terminated Pods:                      (20 in total)
+...  Name                CPU Requests  ...  Memory Requests  Memory Limits  AGE
+...  ----                ------------  ...  ---------------  -------------  ---
+...  tuned-vdwt4         10m (0%)      ...  50Mi (0%)        0 (0%)         8d
+...  dns-default-2rpwf   110m (3%)     ...  70Mi (0%)        512Mi (3%)     8d
+...  node-ca-6xwmn       10m (0%)      ...  10Mi (0%)        0 (0%)         8d
+...output omitted...
+  Resource                    Requests     Limits
+  --------                    --------     ------
+  cpu                         600m (17%)   0 (0%)
+  memory                      1506Mi (9%)  512Mi (3%)
+...output omitted...
+NOTE
+The summary columns for Requests and Limits display the sum totals of defined requests and limits. In the case of the output above, only 1 of the 20 pods running on the node defined a memory limit, and that limit was 512Mi.
+
+The oc describe node command displays requests and limits, and the oc adm top command shows actual usage. For example, if a pod requests 10m of CPU, then the scheduler will ensure that it places the pod on a node with available capacity. Although the pod requested 10m of CPU, it might use more or less than this value, unless it is also constrained by a CPU limit. Similarly, a pod that does not specify resource requests will still use some amount of resources. The oc adm top nodes command shows actual usage for one or more nodes in the cluster, and the oc adm top pods command shows actual usage for each pod in a project.
+
+[user@demo ~]$ oc adm top nodes -l node-role.kubernetes.io/worker
+NAME                               CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+node1.us-west-1.compute.internal   519m         14%    3126Mi          20%
+node2.us-west-1.compute.internal   167m         4%     1178Mi          7%
+Applying Quotas
+OpenShift Container Platform can enforce quotas that track and limit the use of two kinds of resources:
+
+Object counts
+The number of Kubernetes resources, such as pods, services, and routes.
+
+Compute resources
+The number of physical or virtual hardware resources, such as CPU, memory, and storage capacity.
+
+Imposing a quota on the number of Kubernetes resources improves the stability of the OpenShift control plane, by avoiding unbounded growth of the Etcd database. Quotas on Kubernetes resources also avoids exhausting other limited software resources, such as IP addresses for services.
+
+In a similar way, imposing a quota on the amount of compute resources avoids exhausting the compute capacity of a single node in an OpenShift cluster. It also avoids having one application starve other applications in a shared cluster by using all the cluster capacity.
+
+OpenShift manages quotas for the number of resources and the use of compute resources in a cluster by using a ResourceQuota resource, or a quota. A quota specifies hard resource usage limits for a project. All attributes of a quota are optional, meaning that any resource that is not restricted by a quota can be consumed without bounds.
+
+NOTE
+Although a single quota resource can define all of the quotas for a project, a project can contain multiple quotas. For example, one quota resource might limit compute resources, such as total CPU allowed or total memory allowed. Another quota resource might limit object counts, such as the number of pods allowed or the number of services allowed. The effect of multiple quotas is cumulative, but it is expected that two different ResourceQuota resources for the same project do not limit the use of the same type of Kubernetes or compute resource. For example, two different quotas in a project should not both attempt to limit the maximum number of pods allowed.
+
+The following table describes some resources that a quota can restrict by their count or number.
+
+Resource Name	Quota Description
+pods	Total number of pods
+replicationcontrollers	Total number of replication controllers
+services	Total number of services
+secrets	Total number of secrets
+persistentvolumeclaims	Total number of persistent volume claims
+The following table describes some compute resources that can be restricted by a quota.
+
+Compute Resource Name	Quota Description
+cpu (requests.cpu)	Total CPU use across all containers
+memory (requests.memory)	Total memory use across all containers
+storage (requests.storage)	Total storage requests by containers across all persistent volume claims
+Quota attributes can track either resource requests or resource limits for all pods in the project. By default, quota attributes track resource requests. To track resource limits instead, prefix the compute resource name with limits, for example, limits.cpu.
+
+The following listing show a ResourceQuota resource defined using YAML syntax. This example specifies quotas for both the number of resources and the use of compute resources:
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dev-quota
+spec:
+  hard:
+    services: "10"
+    cpu: "1300m"
+    memory: "1.5Gi"
+Resource units are the same for pod resource requests and resource limits, for example: Gi means GiB, and m means millicores. One millicore is the equivalent to 1/1000 of a single CPU core.
+
+Resource quotas can be created in the same way as any other OpenShift Container Platform resource; that is, by passing a YAML or JSON resource definition file to the oc create command:
+
+[user@demo ~]$ oc create --save-config -f dev-quota.yml
+Another way to create a resource quota is by using the oc create quota command, for example:
+
+[user@demo ~]$ oc create quota dev-quota --hard services=10,cpu=1300,memory=1.5Gi
+Use the oc get resourcequota command to list available quotas, and use the oc describe resourcequota command to view usage statistics related to any hard limits defined in the quota, for example:
+
+[user@demo ~]$ oc get resourcequota
+NAME            CREATED AT
+compute-quota   2019-11-26T21:51:43Z
+count-quota     2019-11-26T21:51:09Z
+Without arguments, the oc describe quota command displays the cumulative limits set for all ResourceQuota resources in the project.
+
+[user@demo ~]$ oc describe quota
+Name:       compute-quota
+Namespace:  schedule-demo
+Resource    Used    Hard
+--------    ----    ----
+cpu         500m    10
+memory      300Mi   1Gi
+
+
+Name:                   count-quota
+Namespace:              schedule-demo
+Resource                Used  Hard
+--------                ----  ----
+pods                    1     3
+replicationcontrollers  1     5
+services                1     2
+An active quota can be deleted by name using the oc delete command:
+
+[user@demo ~]$ oc delete resourcequota QUOTA
+When a quota is first created in a project, the project restricts the ability to create any new resources that might violate a quota constraint until it has calculated updated usage statistics. After a quota is created and usage statistics are up-to-date, the project accepts the creation of new content. When a new resource is created, the quota usage is incremented immediately. When a resource is deleted, the quota use is decremented during the next full recalculation of quota statistics for the project.
+
+Quotas are applied to new resources, but they do not affect existing resources. For example, if you create a quota to limit a project to 15 pods, but there are already 20 pods running, then the quota will not remove the additional 5 pods that exceed the quota.
+
+IMPORTANT
+ResourceQuota constraints are applied for the project as a whole, but many OpenShift processes, such as builds and deployments, create pods inside the project and might fail because starting them would exceed the project quota.
+
+If a modification to a project exceeds the quota for a resource count, then the action is denied by the server and an appropriate error message is returned to the user. However, if the modification exceeds the quota for a compute resource, then the operation does not fail immediately; OpenShift retries the operation several times, giving the administrator an opportunity to increase the quota or to perform another corrective action, such as bringing a new node online.
+
+IMPORTANT
+If a quota that restricts usage of compute resources for a project is set, then OpenShift refuses to create pods that do not specify resource requests or resource limits for that compute resource. To use most templates and builders with a project restricted by quotas, the project must also contain a limit range resource that specifies default values for container resource requests.
+
+Applying Limit Ranges
+A LimitRange resource, also called a limit, defines the default, minimum, and maximum values for compute resource requests, and limits for a single pod or for a single container defined inside the project. A resource request or limit for a pod is the sum of its containers.
+
+To understand the difference between a limit range and a resource quota, consider that a limit range defines valid ranges and default values for a single pod, and a resource quota defines only top values for the sum of all pods in a project. A cluster administrator concerned about resource usage in an OpenShift cluster usually defines both limits and quotas for a project.
+
+A limit range resource can also define default, minimum, and maximum values for the storage capacity requested by an image, image stream, or persistent volume claim. If a resource that is added to a project does not provide a compute resource request, then it takes the default value provided by the limit ranges for the project. If a new resource provides compute resource requests or limits that are smaller than the minimum specified by the project limit ranges, then the resource is not created. In a similar way, if a new resource provides compute resource requests or limits that are higher than the maximum specified by the project limit ranges, then the resource is not created.
+
+The following table describes some of the compute resources that can be specified by a limit range resource.
+
+Type	Resource Name	Description
+Container	cpu	Minimum and maximum CPU allowed and default CPU set per container
+memory	Minimum and maximum memory allowed and default memory set per container
+Pod	cpu	Minimum and maximum CPU allowed across all containers in a pod
+memory	Minimum and maximum memory allowed across all containers in a pod
+Image	storage	Maximum size of an image that can be pushed to the internal registry
+PVC	storage	Minimum and maximum capacity of the volume that can be requested by one claim
+The following listing shows a limit range defined using YAML syntax:
+
+apiVersion: "v1"
+kind: "LimitRange"
+metadata:
+  name: "dev-limits"
+spec:
+  limits:
+    - type: "Pod"
+      max:
+        cpu: "500m"
+        memory: "750Mi"
+      min:
+        cpu: "10m"
+        memory: "5Mi"
+    - type: "Container"
+      default:
+        cpu: "100m"
+        memory: "100Mi"
+      max:
+        cpu: "500m"
+        memory: "750Mi"
+      min:
+        cpu: "10m"
+        memory: "5Mi"
+Users can create a limit range resource the same way as any other OpenShift resource; that is, by passing a YAML or JSON resource definition file to the oc create command:
+
+[user@demo ~]$ oc create --save-config -f dev-limits.yml
+Red Hat OpenShift Container Platform 4.2 does not provide an oc create command specifically for limit ranges like it does for resource quotas. The only alternative is to use YAML or JSON files.
+
+Use the oc describe limitrange command to view the limit constraints enforced in a project.
+
+[user@demo ~]$ oc describe limitrange dev-limits
+Name:       dev-limits
+Namespace:  schedule-demo
+Type        Resource  Min  Max    Default Request  Default Limit  ...
+----        --------  ---  ---    ---------------  -------------  ...
+Pod         cpu       10m  500m   -                -              ...
+Pod         memory    5Mi  750Mi  -                -              ...
+Container   cpu       10m  500m   100m             100m           ...
+Container   memory    5Mi  750Mi  100Mi            100Mi          ...
+An active limit range can be deleted by name with the oc delete command:
+
+[user@demo ~]$ oc delete limitrange dev-limits
+After a limit range is created in a project, all requests to create new resources are evaluated against each limit range resource in the project. If the new resource violates the minimum or maximum constraint enumerated by any limit range, then the resource is rejected. If the new resource does not set an explicit value, and the constraint supports a default value, then the default value is applied to the new resource as its usage value.
+
+All resource update requests are also evaluated against each limit range resource in the project. If the updated resource violates any constraint, the update is rejected.
+
+IMPORTANT
+Avoid setting LimitRange constraints that are too high, or ResourceQuota constraints that are too low. A violation of LimitRange constraints prevents pod creation, and resulting error messages are displayed. A violation of ResourceQuota constraints prevents a pod from being scheduled to any node. The pod might be created but remain in the pending state.
+
+Applying Quotas to Multiple Projects
+The ClusterResourceQuota resource is created at cluster level, in a similar way to a persistent volume, and specifies resource constraints that apply to multiple projects.
+
+Cluster administrators can specify which projects are subject to cluster resource quotas in two ways:
+
+Using the openshift.io/requester annotation to specify the project owner. All projects with the specified owner are subject to the quota.
+
+Using a selector. All projects whose labels match the selector are subject to the quota.
+
+The following is an example of creating a cluster resource quota for all projects owned by the qa user:
+
+[user@demo ~]$ oc create clusterquota user-qa \
+>    --project-annotation-selector openshift.io/requester=qa \
+>    --hard pods=12,secrets=20
+The following is an example of creating a cluster resource quota for all projects that have been assigned the environment=qa label:
+
+[user@demo ~]$ oc create clusterquota env-qa \
+>    --project-label-selector environment=qa \
+>    --hard pods=10,services=5
+Project users can use the oc describe QUOTA command to view cluster resource quotas that apply to the current project, if any.
+
+Use the oc delete command to delete a cluster resource quota:
+
+[user@demo ~]$ oc delete clusterquota QUOTA
+NOTE
+It is not recommended to have a single cluster resource quota that matches over a hundred projects. This is to avoid large locking overheads. When resources in a project are created or updated, the project is locked while searching for all applicable resource quotas.
+
+ 
+REFERENCES
+For more information, refer to the Quotas chapter in the Red Hat OpenShift Container Platform 4.2 Applications guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/applications/index#quotas
+
+
+
+Guided Exercise: Limiting Resource Usage
+In this exercise, you will configure an application so that it does not consume all computing resources from the cluster and its worker nodes.
+
+Outcomes
+
+You should be able to use the OpenShift command-line interface to:
+
+Configure an application to specify resource requests for CPU and memory usage.
+
+Modify an application to work within existing cluster restrictions.
+
+Create a quota to limit the total amount of CPU, memory, and configuration maps available to a project.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+The command ensures that the cluster API is reachable and creates the resource files that you will be using in the activity.
+
+[student@workstation ~]$ lab schedule-limit start
+As the developer user, create a new project named schedule-limit.
+
+Source the classroom variables file.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to your OpenShift cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Create a new project for this guided exercise named schedule-limit.
+
+[student@workstation ~]$ oc new-project schedule-limit
+Now using project "schedule-limit" on server
+   "https://api.cluster.domain.example.com:6443".
+...output omitted...
+Deploy a test application for this exercise that explicitly requests container resources for CPU and memory.
+
+Create a deployment resource file and save it to ~/DO280/labs/schedule-limit/hello-limit.yaml. Name the application hello-limit and use the container image located at quay.io/redhattraining/hello-world-nginx:v1.0.
+
+[student@workstation ~]$ oc create deployment hello-limit \
+>    --image quay.io/redhattraining/hello-world-nginx:v1.0 \
+>    --dry-run -o yaml > ~/DO280/labs/schedule-limit/hello-limit.yaml
+Edit ~/DO280/labs/schedule-limit/hello-limit.yaml to replace the resources: {} line with the highlighted lines below. Ensure that you have proper indentation before saving the file.
+
+[student@workstation ~]$ vim ~/DO280/labs/schedule-limit/hello-limit.yaml
+
+...output omitted...
+    spec:
+      containers:
+      - image: quay.io/redhattraining/hello-world-nginx:v1.0
+        name: hello-world-nginx
+        resources:
+          requests:
+            cpu: "3"
+            memory: 20Mi
+status: {}
+Create the new application using your resource file.
+
+[student@workstation ~]$ oc create --save-config \
+>    -f ~/DO280/labs/schedule-limit/hello-limit.yaml
+deployment.apps/hello-limit created
+Although a new deployment was created for the application, the application pod should have a status of Pending.
+
+[student@workstation ~]$ oc get pods
+NAME                            READY   STATUS      RESTARTS   AGE
+hello-limit-d86874d86b-fpmrt    0/1     Pending     0          10s
+The pod cannot be scheduled because none of the worker nodes have sufficient CPU resources. This can be verified by viewing warning events.
+
+[student@workstation ~]$ oc get events --field-selector type=Warning
+LAST SEEN   TYPE      REASON             OBJECT                            MESSAGE
+88s         Warning   FailedScheduling   pod/hello-limit-d86874d86b-fpmrt  0/5 nodes are available: 5 Insufficient cpu.
+Redeploy your application so that it requests fewer CPU resources.
+
+Edit ~/DO280/labs/schedule-limit/hello-limit.yaml to request two CPUs for the container. Change the cpu: "3" line to match the highlighted line below.
+
+[student@workstation ~]$ vim ~/DO280/labs/schedule-limit/hello-limit.yaml
+
+...output omitted...
+        resources:
+          requests:
+            cpu: "2"
+            memory: 20Mi
+Apply the changes to your application.
+
+[student@workstation ~]$ oc apply -f ~/DO280/labs/schedule-limit/hello-limit.yaml
+deployment.apps/hello-limit configured
+Verify that your application deploys successfully. You might need to run oc get pods multiple times until you see a running pod. The previous pod with a pending status will terminate and eventually disappear.
+
+[student@workstation ~]$ oc get pods
+NAME                           READY   STATUS        RESTARTS   AGE
+hello-limit-d86874d86b-fpmrt   0/1     Terminating   0          2m19s
+hello-limit-7c7998ff6b-ctsjp   1/1     Running       0          6s
+Attempt to scale your application from one pod to three pods. After verifying that this change would exceed the capacity of your cluster, delete the resources associated with the hello-limit application.
+
+Manually scale the hello-limit application up to three pods.
+
+[student@workstation ~]$ oc scale --replicas 3 deployment/hello-limit
+deployment.extensions/hello-limit scaled
+Check to see if all three pods are running. You might need to run oc get pods multiple times until you see that two pods are running and one pod is pending. Depending on the current cluster load, both additional pods might also be in a pending state.
+
+NOTE
+If your application pod still does not deploy, scale the number of application pods to zero and then modify ~/DO280/labs/schedule-limit/hello-limit.yaml to reduce the cpu request to 1400m. Run oc apply -f ~/DO280/labs/schedule-limit/hello-limit.yaml to apply the changes then rerun the oc scale command to scale out to three pods.
+
+[student@workstation ~]$ oc get pods
+NAME                           READY   STATUS    RESTARTS   AGE
+hello-limit-7c7998ff6b-ctsjp   1/1     Running   0          76s
+hello-limit-7c7998ff6b-j7mqx   1/1     Running   0          23s
+hello-limit-7c7998ff6b-sz6kl   0/1     Pending   0          23s
+Warning events indicate that one or more pods cannot be scheduled because none of the nodes has sufficient CPU resources. Your warning messages might be slightly different.
+
+[student@workstation ~]$ oc get events --field-selector type=Warning
+LAST SEEN   TYPE      REASON             OBJECT                            MESSAGE
+38s         Warning   FailedScheduling   pod/hello-limit-7c7998ff6b-sz6kl  0/5 nodes are available: 2 node(s) had taints that the pod didn't tolerate, 3 Insufficient cpu.
+...output omitted...
+Delete all of the resources associated with the hello-limit application.
+
+[student@workstation ~]$ oc delete all -l app=hello-limit
+pod "hello-limit-7c7998ff6b-ctsjp" deleted
+pod "hello-limit-7c7998ff6b-j7mqx" deleted
+pod "hello-limit-7c7998ff6b-sz6kl" deleted
+deployment.apps "hello-limit" deleted
+Deploy a second application to test memory usage. This second application sets a memory limit of 200MB per container.
+
+Use the resource file located at /home/student/DO280/labs/schedule-limit/loadtest.yml to create the loadtest application. In addition to creating a deployment, this resource file also creates a service and a route.
+
+[student@workstation ~]$ oc create --save-config \
+>    -f ~/DO280/labs/schedule-limit/loadtest.yaml
+deployment.apps/loadtest created
+service/loadtest created
+route.route.openshift.io/loadtest created
+The loadtest container image is designed to increase either CPU or memory load on the container by making a request to the application API. Identify the fully-qualified domain name used in the route.
+
+[student@workstation ~]$ oc get routes
+NAME       HOST/PORT                                               ...
+loadtest   loadtest-schedule-limit.apps.cluster.domain.example.com  ...
+Generate additional memory load that can be handled by the container.
+
+Open two additional terminal windows to continuously monitor the load of your application. Access the application API from the first terminal to simulate additional memory pressure on the container.
+
+From the second terminal window, run watch oc get pods to continuously monitor the status of each pod.
+
+Finally, from the third terminal, run watch oc adm top pod to continuously monitor the CPU and memory usage of each pod.
+
+In the first terminal window, use the application API to increase the memory load by 150MB for 60 seconds. Use the fully-qualified domain name previously identified in the route. While you wait for the curl command to complete, observe the output in the other two terminal windows.
+
+[student@workstation ~]$ curl -X GET \
+>    http://loadtest-schedule-limit.apps.cluster.domain.example.com\
+> /api/loadtest/v1/mem/150/60
+curl: (52) Empty reply from server
+In the second terminal window, observe the output of watch oc get pods. Because the container can handle the additional load, you should see that the single application pod has a status of Running for the entire curl request.
+
+Every 2.0s: oc get pods             Tue Nov  5 ...
+
+NAME                      READY   STATUS    RESTARTS   AGE
+loadtest-f7495948-tlxgm   1/1     Running   0          7m34s
+In the third terminal window, observe the output of watch oc adm top pod. The starting memory usage for the pod is about 20-22Mi.
+
+Every 2.0s: oc adm top pod             Tue Nov  5 ...
+
+NAME                      CPU(cores)   MEMORY(bytes)
+loadtest-f7495948-tlxgm   0m           20Mi
+As the API request is made, you should see memory usage for the pod increase to about 170-172Mi.
+
+Every 2.0s: oc adm top pod             Tue Nov  5 ...
+
+NAME                      CPU(cores)   MEMORY(bytes)
+loadtest-f7495948-tlxgm   0m           172Mi
+A short while after the curl request completes, you should see memory usage drop back down to about 20-22Mi.
+
+Every 2.0s: oc adm top pod             Tue Nov  5 ...
+
+NAME                      CPU(cores)   MEMORY(bytes)
+loadtest-f7495948-tlxgm   0m           20Mi
+Generate additional memory load that cannot be handled by the container.
+
+Use the application API to increase the memory load by 200MB for 60 seconds. Observe the output in the other two terminal windows.
+
+[student@workstation ~]$ curl -X GET \
+>    http://loadtest-schedule-limit.apps.cluster.domain.example.com\
+> /api/loadtest/v1/mem/200/60
+<html><body><h1>502 Bad Gateway</h1>
+The server returned an invalid or incomplete response.
+</body></html>
+In the second terminal window, observe the output of watch oc get pods. Almost immediately after running the curl command, the status of the pod will transition to OOMKilled. You might even see a status of Error. The pod is out of memory and needs to be killed and restarted. The status might change to CrashLoopBackOff before returning to a Running status. The restart count will also increment.
+
+Every 2.0s: oc get pods                Tue Nov  5 ...
+
+NAME                      READY   STATUS      RESTARTS   AGE
+loadtest-f7495948-tlxgm   0/1     OOMKilled   0          9m13s
+In some cases the pod might have restarted and changed to a status of Running before you have time to switch to the second terminal window. The restart count will have incremented from 0 to 1.
+
+Every 2.0s: oc get pods                Tue Nov  5 ...
+
+NAME                      READY   STATUS    RESTARTS   AGE
+loadtest-f7495948-tlxgm   1/1     Running   1          9m33s
+In the third terminal window, observe the output of watch oc adm top pod. After the pod is killed, metrics will not be available for a brief period of time.
+
+Every 2.0s: oc adm top pod             Tue Nov  5 ...
+
+W1104 15:19:39.314609  114486 top_pod.go:259] Metrics not available for pod schedule-limit/loadtest-f7495948-tlxgm, age: 15m33.314602192s
+error: Metrics not available for pod schedule-limit/loadtest-f7495948-tlxgm, age: 15m33.314602192s
+In the first terminal window, delete all of the resources associated with the second application.
+
+[student@workstation ~]$ oc delete all -l app=loadtest
+pod "loadtest-f7495948-tlxgm" deleted
+service "loadtest" deleted
+deployment.apps "loadtest" deleted
+route.route.openshift.io "loadtest" deleted
+In the second and third terminal windows, press Ctrl+c to end the watch command. Optionally, close the second and third terminal windows.
+
+As a cluster administrator, create quotas for the schedule-limit project.
+
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Create a quota named project-quota that limits the schedule-limit project to 3 CPUs, 1GB of memory, and 3 configuration maps.
+
+[student@workstation ~]$ oc create quota project-quota \
+>    --hard cpu="3",memory="1G",configmaps="3" \
+>    -n schedule-limit
+resourcequota/project-quota created
+NOTE
+This exercise places a quota on configuration maps to demonstrate what happens when a user tries to exceed the quota.
+
+As a developer, attempt to exceed the configuration map quota for the project.
+
+Log in to your OpenShift cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Use a loop to attempt to create four configuration maps. The first three should succeed and the fourth should fail because it would exceed the quota.
+
+[student@workstation ~]$ for X in {1..4}
+>    do
+>    oc create configmap my-config${X} --from-literal key${X}=value${X}
+>    done
+configmap/my-config1 created
+configmap/my-config2 created
+configmap/my-config3 created
+Error from server (Forbidden): configmaps "my-config4" is forbidden: exceeded quota: project-quota, requested: configmaps=1, used: configmaps=3, limited: configmaps=3
+Clean up the lab environment by deleting the quota and the project.
+
+Log in to your OpenShift cluster as the admin user.
+
+[student@workstation ~]$ oc login -u admin -p ${RHT_OCP4_USER_PASSWD}
+Login successful.
+...output omitted...
+Delete the project-quota quota.
+
+[student@workstation ~]$ oc delete resourcequota project-quota
+resourcequota "project-quota" deleted
+Delete the schedule-limit project.
+
+[student@workstation ~]$ oc delete project schedule-limit
+project.project.openshift.io "schedule-limit" deleted
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab schedule-limit finish
+This concludes the lab.
+
+

@@ -1,0 +1,308 @@
+Scaling an Application
+Objectives
+After completing this section, students should be able to:
+
+Control the number of replicas of a pod.
+
+Specify the number of replicas in a deployment or deployment configuration resource.
+
+Manually scale the number of replicas.
+
+Create a horizontal pod autoscaler (HPA) resource.
+
+Specifying Pod Replicas in Configuration Workloads
+The number of pod replicas for a specific deployment or deployment configuration can be increased or decreased to meet your needs. Despite the ReplicaSet and ReplicationController resources, the number of replicas needed for an application is typically defined in a deployment or deployment configuration resource. A replica set or replication controller (managed by a deployment or a deployment configuration) guarantees that the specified number of replicas of a pod are running at all times. The replica set or replication controller can add or remove pods as necessary to conform to the desired replica count.
+
+Both deployments and deployment configurations contain:
+
+The desired number of replicas
+
+A selector for identifying managed pods
+
+A pod definition, or template, for creating a replicated pod (including labels to apply to the pod)
+
+The following deployment resource (created using the oc create deployment command) displays the following items:
+
+apiVersion: apps/v1
+kind: Deployment
+...output omitted...
+spec:
+  replicas: 1 1
+  selector:
+    matchLabels:
+      app: scale 2
+  strategy: {}
+  template: 3
+    metadata:
+      labels:
+        app: scale 4
+    spec:
+      containers:
+...output omitted...
+1
+
+Specifies the desired number of copies (or replicas) of the pod to run.
+
+2
+
+A replica set (for a deployment) or a replication controller (for a deployment configuration) uses a selector to count the number of running pods, in the same way that a service uses a selector to find the pods to load balance.
+
+3
+
+A template for pods that the replica set or replication controller creates.
+
+4
+
+Labels on pods created by the template must match those used for the selector.
+
+A deployment configuration, typically created using either the oc new-app command or the web console, defines the same information, but in a slightly different way. Notice that an additional selector for deploymentconfig exists, and the matching deploymentconfig label is also added to the pod metadata.
+
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+...output omitted...
+spec:
+  replicas: 1
+  selector:
+    app: hello
+    deploymentconfig: hello
+  strategy:
+    resources: {}
+  template:
+    metadata:
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+      labels:
+        app: hello
+        deploymentconfig: hello
+...output omitted...
+If the deployment or deployment configuration resource is under version control, then modify the replicas line in the resource file and apply the changes using the oc apply command.
+
+Whether in a deployment or a deployment configuration resource, a selector is a set of labels that all of the pods managed by the replica set or replication controller must match. The same set of labels must be included in the pod definition that the deployment or deployment configuration instantiates. This selector is used to determine how many instances of the pod are already running in order to adjust as needed.
+
+NOTE
+The replication controller does not perform autoscaling, because it does not track load or traffic. The horizontal pod autoscaler resource, presented later in this section, manages autoscaling.
+
+Manually Scaling the Number of Pod Replicas
+Developers and administrators can choose to manually scale the number of pod replicas in a project. More pods may be needed for an anticipated surge in traffic, or the pod count may be reduced to reclaim resources that can be used elsewhere by the cluster. Whether increasing or decreasing the pod replica count, the first step is to identify the appropriate deployment or deployment configuration (dc) to scale using the oc get command.
+
+[user@demo ~]$ oc get deployment
+NAME    READY   UP-TO-DATE   AVAILABLE   AGE
+scale   1/1     1            1           8h
+The number of replicas in a deployment or deployment configuration resource can be changed manually using the oc scale command.
+
+[user@demo ~]$ oc scale --replicas 5 deployment/scale
+The deployment resource propagates the change to the replica set; it reacts to the change by creating new pods (replicas) or deleting existing ones, depending on whether the new desired replica count is less than or greater than the existing count.
+
+Although it is possible to manipulate a replica set or replication controller resource directly, the recommended practice is to manipulate the deployment or deployment configuration resource instead. A new deployment creates either a new replica set or a new replication controller and changes made directly to a previous replica set or replication controller are ignored.
+
+Autoscaling Pods
+OpenShift can autoscale a deployment or a deployment configuration based on current load on the application pods, by means of a HorizontalPodAutoscaler resource type.
+
+A horizontal pod autoscaler resource uses performance metrics collected by the OpenShift Metrics subsystem. The Metrics subsystem comes pre-installed in OpenShift 4.2, rather than requiring a separate install, as in OpenShift 3.x. To autoscale a deployment or deployment configuration, you must specify resource requests for pods so that the horizontal pod autoscaler can calculate the percentage of usage.
+
+The recommended way to create a horizontal pod autoscaler resource is using the oc autoscale command, for example:
+
+[user@demo ~]$ oc autoscale dc/hello --min 1 --max 10 --cpu-percent 80
+The previous command creates a horizontal pod autoscaler resource that changes the number of replicas on the hello deployment configuration to keep its pods under 80% of their total requested CPU usage.
+
+The oc autoscale command creates a horizontal pod autoscaler resource using the name of the deployment or deployment configuration as an argument (hello in the previous example).
+
+NOTE
+Autoscaling for Memory Utilization continues to be a Technology Preview feature for Red Hat OpenShift Container Platform 4.2.
+
+The maximum and minimum values for the horizontal pod autoscaler resource serve to accommodate bursts of load and avoid overloading the OpenShift cluster. If the load on the application changes too quickly, then it might be advisable to keep a number of spare pods to cope with sudden bursts of user requests. Conversely, too many pods can use up all cluster capacity and impact other applications sharing the same OpenShift cluster.
+
+To get information about horizontal pod autoscaler resources in the current project, use the oc get command. For example:
+
+[user@demo ~]$ oc get hpa
+NAME   REFERENCE               TARGETS        MINPODS  MAXPODS  REPLICAS  ...
+hello  DeploymentConfig/hello  <unknown>/80%  1        10       1         ...
+scale  Deployment/scale        60%/80%        2        10       2         ...
+IMPORTANT
+A value of <unknown> in the TARGETS column indicates that the deployment or deployment configuration does not define resource requests for the metric. The horizontal pod autoscaler will not scale these pods. Most of the pods created using either the oc create deployment or the oc new-app command do not define resource requests. Using the OpenShift autoscaler may therefore require editing the deployment or deployment configuration resources, creating custom YAML or JSON resource files for your application, or adding limit range resources to your project that define default resource requests.
+
+ 
+REFERENCES
+For more information, refer to the Automatically scaling pods section in the Red Hat OpenShift Container Platform 4.2 Nodes guide at https://access.redhat.com/documentation/en-us/openshift_container_platform/4.2/html-single/nodes/index#nodes-pods-autoscaling
+
+Guided Exercise: Scaling an Application
+In this exercise, you will scale an application manually and automatically.
+
+Outcomes
+
+You should be able to use the OpenShift command-line interface to:
+
+Manually scale an application.
+
+Configure an application to automatically scale based on usage.
+
+As the student user on the workstation machine, use the lab command to prepare your system for this exercise.
+
+The command ensures that the cluster API is reachable and creates the resource files that you will be using in the activity.
+
+[student@workstation ~]$ lab schedule-scale start
+As the developer user, create a new project named schedule-scale.
+
+Source the classroom variables file.
+
+[student@workstation ~]$ source /usr/local/etc/ocp4.config
+Log in to your OpenShift cluster as the developer user.
+
+[student@workstation ~]$ oc login -u developer -p ${RHT_OCP4_USER_PASSWD} \
+>    ${RHT_OCP4_MASTER_API}
+Login successful.
+...output omitted...
+Create a new project for this guided exercise named schedule-scale.
+
+[student@workstation ~]$ oc new-project schedule-scale
+Now using project "schedule-scale" on server
+   "https://api.cluster.domain.example.com:6443".
+...output omitted...
+Deploy a test application for this exercise which explicitly requests container resources for CPU and memory.
+
+Modify the resource file located at ~/DO280/labs/schedule-scale/loadtest.yaml to set both requests and limits for CPU and memory usage.
+
+[student@workstation ~]$ vim ~/DO280/labs/schedule-scale/loadtest.yaml
+Replace the resources: {} line with the highlighted lines listed below. Ensure that you have proper indentation before saving the file.
+
+...output omitted...
+    spec:
+      containers:
+      - image: quay.io/redhattraining/loadtest:v1.0
+        name: loadtest
+        resources:
+          requests:
+            cpu: "25m"
+            memory: 25Mi
+          limits:
+            cpu: "100m"
+            memory: 100Mi
+status: {}
+Create the new application using your resource file.
+
+[student@workstation ~]$ oc create --save-config \
+>    -f ~/DO280/labs/schedule-scale/loadtest.yaml
+deployment.apps/loadtest created
+service/loadtest created
+route.route.openshift.io/loadtest created
+Verify that your application pod has a status of Running. You might need to run the oc get pods command multiple times.
+
+[student@workstation ~]$ oc get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+loadtest-5f9565dbfb-jm9md   1/1     Running   0          23s
+Manually scale the loadtest deployment by first increasing and then decreasing the number of running pods.
+
+Scale the loadtest deployment up to five pods.
+
+[student@workstation ~]$ oc scale --replicas 5 deployment/loadtest
+deployment.extensions/loadtest scaled
+Verify that all five application pods are running. You might need to run the oc get pods command multiple times.
+
+[student@workstation ~]$ oc get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+loadtest-5f9565dbfb-22f9s   1/1     Running   0          54s
+loadtest-5f9565dbfb-8l2rn   1/1     Running   0          54s
+loadtest-5f9565dbfb-jm9md   1/1     Running   0          3m17s
+loadtest-5f9565dbfb-lfhns   1/1     Running   0          54s
+loadtest-5f9565dbfb-prjkl   1/1     Running   0          54s
+Scale the loadtest deployment back down to one pod.
+
+[student@workstation ~]$ oc scale --replicas 1 deployment/loadtest
+deployment.extensions/loadtest scaled
+Verify that only one application pod is running. You might need to run the oc get pods command multiple times while waiting for the other pods to terminate.
+
+[student@workstation ~]$ oc get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+loadtest-5f9565dbfb-prjkl   1/1     Running   0          72s
+Configure the loadtest application to automatically scale based on load, and then test the application by applying load.
+
+Create a horizontal pod autoscaler that ensures the loadtest application always has 2 application pods running; that number can be increased to a maximum of 10 pods when CPU load exceeds 50%.
+
+[student@workstation ~]$ oc autoscale deployment/loadtest \
+>    --min 2 --max 10 --cpu-percent 50
+horizontalpodautoscaler.autoscaling/loadtest autoscaled
+The loadtest container image is designed to either increase CPU or memory load on the container by making a request to the application API. Identify the fully-qualified domain name used in the route.
+
+[student@workstation ~]$ oc get route/loadtest
+NAME       HOST/PORT                                                ...
+loadtest   loadtest-schedule-scale.apps.cluster.domain.example.com  ...
+Access the application API to simulate additional CPU pressure on the container. Move on to the next step while you wait for the curl command to complete.
+
+[student@workstation ~]$ curl -X GET \
+>    http://loadtest-schedule-scale.apps.cluster.domain.example.com\
+> /api/loadtest/v1/cpu/1
+curl: (52) Empty reply from server
+Open a second terminal window and continuously monitor the status of the horizontal pod autoscaler.
+
+NOTE
+The increased activity of the application does not immediately trigger the autoscaler. Wait a few moments if you do not see any changes to the number of replicas.
+
+[student@workstation ~]$ watch oc get hpa/loadtest
+As the load increases (visible in the TARGETS column), you should see the count under REPLICAS increase. Observe the output for a minute or two before moving on to the next step. Your output will likely be different from what is displayed below.
+
+Every 2.0s: oc get hpa/loadtest             Tue Nov  5 ...
+
+NAME      REFERENCE            TARGETS    MINPODS  MAXPODS  REPLICAS  ...
+loadtest  Deployment/loadtest  172%/50%   2        10       9         ...
+NOTE
+Although the horizontal pod autoscaler resource can be quick to scale out, it is slower to scale in. Rather than waiting for the loadtest application to scale back down to two pods, continue with the rest of the exercise.
+
+Back in the first terminal window, create a second application named scaling that uses a deployment configuration resource. Scale the application, and then verify the responses coming from the application pods.
+
+Create a new application with the oc new-app command using the container image located at quay.io/redhattraining/scaling:v1.0.
+
+[student@workstation ~]$ oc new-app \
+>    --docker-image quay.io/redhattraining/scaling:v1.0
+...output omitted...
+--> Creating resources ...
+    imagestream.image.openshift.io "scaling" created
+    deploymentconfig.apps.openshift.io "scaling" created
+    service "scaling" created
+--> Success
+    Application is not exposed. You can expose services to the outside world by executing one or more of the commands below:
+     'oc expose svc/scaling'
+    Run 'oc status' to view your app.
+Create a route to the application by exposing the service for the application.
+
+[student@workstation ~]$ oc expose svc/scaling
+route.route.openshift.io/scaling exposed
+The oc create deployment command creates a deployment resource, and the oc new-app command creates a deploymentconfig (dc) resource. Scale the application up to three pods using the deployment configuration for the application.
+
+[student@workstation ~]$ oc scale --replicas 3 dc/scaling
+deploymentconfig.apps.openshift.io/scaling scaled
+Verify that all three pods for the scaling application are running, and identify their associated IP addresses.
+
+[student@workstation ~]$ oc get pods -o wide -l app=scaling
+NAME             READY  STATUS   ...  IP           ...
+scaling-1-5n9nj  1/1    Running  ...  10.128.2.83  ...
+scaling-1-8tnnq  1/1    Running  ...  10.128.2.84  ...
+scaling-1-l9nxb  1/1    Running  ...  10.131.0.73  ...
+Display the host name used to route requests to the scaling application.
+
+[student@workstation ~]$ oc get route/scaling
+NAME      HOST/PORT                                               ...
+scaling   scaling-schedule-scale.apps.cluster.domain.example.com  ...
+When you access the host name for your application, the PHP page will output the IP address of the pod that replied to the request. Send several requests to your application, and then sort the responses to count the number of requests sent to each pod. Run the script located at ~/DO280/labs/schedule-scale/curl-route.sh.
+
+[student@workstation ~]$ ~/DO280/labs/schedule-scale/curl-route.sh
+     34 Server IP: 10.128.2.83
+     33 Server IP: 10.128.2.84
+     33 Server IP: 10.131.0.73
+Optional: Check the status of the horizontal pod autoscaler running for the loadtest application. If the watch oc get hpa/loadtest command is still running in the second terminal window, switch to it an observe the output. Provided enough time has passed, the replica count should be back down to two. When finished, press Ctrl+c to exit the watch command, and then close the second terminal window.
+
+Every 2.0s: oc get hpa/loadtest             Tue Nov  5 ...
+
+NAME      REFERENCE            TARGETS  MINPODS  MAXPODS  REPLICAS  ...
+loadtest  Deployment/loadtest  0%/50%   2        10       2         ...
+Clean up the lab environment by deleting the schedule-scale project.
+
+[student@workstation ~]$ oc delete project schedule-scale
+project.project.openshift.io "schedule-scale" deleted
+Finish
+
+On the workstation machine, use the lab command to complete this exercise. This is important to ensure that resources from previous exercises do not impact upcoming exercises.
+
+[student@workstation ~]$ lab schedule-scale finish
+This concludes the lab.
+
+
