@@ -1,0 +1,170 @@
+Lab: Lab: Managing DNS for Servers
+In this lab, you will use DNS troubleshooting techniques and knowledge of unbound configuration to resolve DNS issues with a misconfigured unbound caching nameserver.
+
+Resources:
+Files:	
+/etc/unbound/ubound.conf
+
+Machines:	
+desktopX
+
+serverX
+
+Outcomes:
+
+The resolution of issues with DNS requests performed from desktopX against the unbound caching nameserver running on serverX. Properly configured unbound caching nameserver running on serverX.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX -]$ lab dnsunboundissues setup
+To improve DNS performance and security, a fellow system administrator has recently configured a secure caching nameserver running the unbound DNS server on serverX to serve your local subnet, 172.25.X.0/24. The caching nameserver uses DNS server 172.25.254.254 for name resolution. The administrator released the caching nameserver for use just prior to leaving for a week-long vacation.
+
+Soon after, you receive reports of DNS issues from users trying to use the newly configured caching nameserver for the first time. One user provides a specific example and reports that name resolution for example.com fails.
+
+You will conduct troubleshooting to determine and correct the unbound misconfiguration that is causing this issue.
+
+On desktopX, replicate the reported issue to determine the nature and scope of the problem.
+
+From desktopX, issue a query for the address of example.com to the caching nameserver on serverX.
+
+[student@desktopX -]$ dig @serverX.example.com A example.com
+  ; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> @serverX.example.com example.com
+  ; (1 server found)
+  ;; global options: +cmd
+  ;; connection timed out; no servers could be reached
+Verify the operation of the caching nameserver on serverX by issuing queries to it locally from serverX.
+
+Issue the query to the localhost interface. The query succeeds with no errors.
+
+[student@serverX -]$ dig @localhost A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> @localhost A example.com
+; (2 servers found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 64095
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;example.com.			IN	A
+
+;; ANSWER SECTION:
+example.com.		84526	IN	A	172.25.254.254
+
+;; Query time: 0 msec
+;; SERVER: ::1#53(::1)
+;; WHEN: Wed May 21 05:12:00 EDT 2014
+;; MSG SIZE  rcvd: 56
+Issue the query to the 172.25.X.11 interface. No response is received and the query times out.
+
+[student@serverX -]$ dig @172.25.X.11 A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> @172.25.X.11 A example.com
+; (1 server found)
+;; global options: +cmd
+;; connection timed out; no servers could be reached
+Determine which interfaces unbound is listening on. You should discover that it's only listening on the localhost interface.
+
+[student@serverX -]$ sudo ss -tulpn | grep -w 53
+tcp    UNCONN     0      0              127.0.0.1:53                    *:*      users:(("unbound",2192,5))
+tcp    UNCONN     0      0                    ::1:53                   :::*      users:(("unbound",2192,3))
+tcp    LISTEN     0      5              127.0.0.1:53                    *:*      users:(("unbound",2192,6))
+tcp    LISTEN     0      5                    ::1:53                   :::*      users:(("unbound",2192,4))
+Fix the issue discovered and verify that it resolved the name resolution issue.
+
+Configure unbound to listen on all interfaces by adding the following entry in /etc/unbound/unbound.conf.
+
+interface: 0.0.0.0
+Check the configuration for syntax errors.
+
+[student@serverX -]$ sudo unbound-checkconf
+unbound-checkconf: no errors in /etc/unbound/unbound.conf
+Restart the service for the changes to take place.
+
+[student@serverX -]$ sudo systemctl restart unbound
+On serverX, rerun the query to the 172.25.X.11 interface. You should now receive a response, but with a status of REFUSED.
+
+[student@serverX -]$ dig @172.25.X.11 A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> @172.25.X.11 A example.com
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: REFUSED, id: 50719
+;; flags: qr rd ad; QUERY: 0, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+;; WARNING: recursion requested but not available
+
+;; Query time: 0 msec
+;; SERVER: 172.25.X.11#53(172.25.X.11)
+;; WHEN: Wed May 21 05:36:43 EDT 2014
+;; MSG SIZE  rcvd: 12
+While the DNS communication now works, the return code in the DNS response indicates that there may be another misconfiguration issue present. Verify the unbound configuration on serverX.
+
+Since REFUSED status indicates a policy restriction, verify that the proper access policy is in place in /etc/unbound/unbound.conf. You should see that no access control has been granted for the subnet.
+
+[student@serverX -]$ sudo grep ^[[:space:]]*access-control /etc/unbound/unbound.conf
+Fix the issue discovered and verify that it resolved the name resolution issue.
+
+Grant the 172.25.X.0/24 subnet access to the caching nameserver in /etc/unbound/unbound.conf.
+
+[student@serverX -]$ sudo grep ^[[:space:]]*access-control /etc/unbound/unbound.conf
+	access-control: 172.25.X.0/24 allow
+Check the configuration for syntax errors.
+
+[student@serverX -]$  sudo unbound-checkconf
+unbound-checkconf: no errors in /etc/unbound/unbound.conf
+Restart the service for the changes to take place.
+
+[student@serverX -]$ sudo systemctl restart unbound
+On serverX, rerun the previously failed query. It should now succeed.
+
+[student@serverX -]$ dig @172.25.X.11 A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> @172.25.X.11 A example.com
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 25229
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;example.com.			IN	A
+
+;; ANSWER SECTION:
+example.com.		86339	IN	A	172.25.254.254
+
+;; Query time: 0 msec
+;; SERVER: 172.25.X.11#53(172.25.X.11)
+;; WHEN: Wed May 21 05:56:16 EDT 2014
+;; MSG SIZE  rcvd: 56
+On desktopX, rerun the query to serverX. It should now succeed.
+
+[student@desktopX -]$ dig @serverX.example.com A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> @serverX.example.com A example.com
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 25229
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;example.com.			IN	A
+
+;; ANSWER SECTION:
+example.com.		86339	IN	A	172.25.254.254
+
+;; Query time: 0 msec
+;; SERVER: 172.25.X.11#53(172.25.X.11)
+;; WHEN: Wed May 21 05:56:16 EDT 2014
+;; MSG SIZE  rcvd: 56
+On desktopX, run lab dnsunboundissues grade to verify the unbound caching nameserver on serverX is working properly.
+
+[student@desktopX -]$ lab dnsunboundissues grade
+PASS
+

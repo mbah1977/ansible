@@ -1,0 +1,412 @@
+Chapter 17. Managing IPv6 Networking
+Review of IPv4 Networking Configuration
+Guided Exercise: Practice: Configuring IPv4 Networking
+IPv6 Networking Concepts
+Quiz: Practice: Interpreting IPv6 Addresses
+IPv6 Networking Configuration
+Guided Exercise: Practice: Configuring IPv6 Networking
+Lab: Lab: Managing IPv6 Networking
+Abstract
+
+Overview
+Goal	To configure and troubleshoot basic IPv6 networking on Red Hat Enterprise Linux systems.
+Objectives	
+Review how to configure IPv4 networking in RHEL 7.
+
+Explain the basic concepts of IPv6 networking, and read and write condensed IPv6 addresses.
+
+Configure IPv6 networking using command-line tools and configuration files.
+
+Sections	
+Review of IPv4 Networking Configuration (and Practice)
+
+IPv6 Networking Concepts (and Practice)
+
+IPv6 Networking Configuration (and Practice)
+
+Lab	
+Managing IPv6 Networking
+
+Review of IPv4 Networking Configuration
+In this section, students learned how to:
+
+Configure IPv4 networking using nmcli.
+
+Configure IPv4 networking using /etc/sysconfig/network-scripts/ifcfg-* files.
+
+Objectives
+After completing this section, students should be able to configure IPv4 networking using nmcli and configuration files in the /etc/sysconfig/network-scripts directory.
+
+IPv4 networking
+Review of IPv4 Networking Configuration
+This section assumes that students have a basic understanding of IPv4 networking concepts. In particular, students should know something about IPv4 addresses, network prefixes (and netmasks), default gateways and basic routing, network interfaces, /etc/hosts, and name resolution.
+
+NetworkManager overview
+In Red Hat Enterprise Linux 7, the configuration of network interfaces is managed by a system daemon called NetworkManager. For NetworkManager:
+
+A device is a network interface.
+
+A connection is a collection of settings that can be configured for a device.
+
+Only one connection is active for any one device at a time. Multiple connections may exist, for use by different devices or to allow a configuration to be altered for the same device.
+
+Each connection has a name or ID that identifies it.
+
+The persistent configuration for a connection is stored in /etc/sysconfig/network-scripts/ifcfg-name, where name is the name of the connection (although spaces are normally replaced with underscores in the file name). This file can be edited by hand if desired.
+
+The nmcli utility can be used to create and edit connection files from the shell prompt.
+
+Viewing networking information
+The command nmcli dev status will show the status of all network devices:
+
+[student@demo ~]$ nmcli dev status
+DEVICE  TYPE      STATE         CONNECTION 
+eno1    ethernet  connected     eno1       
+eth0    ethernet  connected     static-eth0       
+eno2    ethernet  disconnected  --         
+lo      loopback  unmanaged     --         
+The command nmcli con show will show a list of all connections. To list only the active connections, add the --active option.
+
+[student@demo ~]$ nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+eno2         ff9f7d69-db83-4fed-9f32-939f8b5f81cd  802-3-ethernet  --     
+static-eth0  72ca57a2-f780-40da-b146-99f71c431e2b  802-3-ethernet  eth0   
+eno1         87b53c56-1f5d-4a29-a869-8a7bdaf56dfa  802-3-ethernet  eno1  
+[root@demo ~]# nmcli con show --active
+NAME         UUID                                  TYPE            DEVICE 
+static-eth0  72ca57a2-f780-40da-b146-99f71c431e2b  802-3-ethernet  eth0   
+eno1         87b53c56-1f5d-4a29-a869-8a7bdaf56dfa  802-3-ethernet  eno1   
+The ip addr show command displays the current configuration of network interfaces on the system. To list only a single interface, add the interface name as the last argument:
+
+[student@demo ~]$ ip addr show eth0
+2: eth0: <BROADCAST,MULTICAST,1UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    2link/ether 52:54:00:00:00:0b brd ff:ff:ff:ff:ff:ff
+    3inet 172.25.0.11/16 brd 172.25.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    4inet6 fe80::5054:ff:fe00:b/64 scope link 
+       valid_lft forever preferred_lft forever
+1
+
+An active interface is UP.
+
+2
+
+The link/ether line specifies the hardware (MAC) address of the device.
+
+3
+
+The inet line shows an IPv4 address, its network prefix length, and scope.
+
+4
+
+The inet6 line shows an IPv6 address, its network prefix length, and scope.
+
+Adding a network connection
+The nmcli con add command is used to add new network connections. The example nmcli con add commands that follow assume that the name of the network connection being added is not already in use.
+
+The following command will add a new connection for the interface eno2, which will get IPv4 networking information using DHCP and will autoconnect on startup. The configuration will be saved in /etc/sysconfig/network-scripts/ifcfg-eno2 because the con-name is eno2.
+
+[root@demo ~]# nmcli con add con-name eno2 type ethernet ifname eno2
+The next example configures the eno2 interface statically instead, using the IPv4 address and network prefix 192.168.0.5/24 and default gateway 192.168.0.254, but still autoconnects at startup and saves its configuration into the same file. The example is line-wrapped with a shell \ escape.
+
+[root@demo ~]# nmcli con add con-name eno2 type ethernet ifname eno2 \ 
+> ip4 192.168.0.5/24 gw4 192.168.0.254
+Controlling network connections
+The nmcli con up name command will activate the connection name on the network interface it is bound to. Note that the command takes the name of a connection, not the name of the network interface. Remember that nmcli con show can be used to list the names of all available connections.
+
+[root@demo ~]# nmcli con up static-eth0
+The nmcli dev disconnect device command will disconnect the network interface device and bring it down. This command can be abbreviated nmcli dev dis device:
+
+[root@demo ~]# nmcli dev dis eth0
+IMPORTANT
+Use nmcli dev dis device to deactivate a network interface.
+
+The command nmcli con down name is normally not the best way to deactivate a network interface. This command will bring down the connection. But by default, most wired system connections are configured with autoconnect enabled. This activates the connection as soon as its network interface is available. Since the connection's network interface is still available, nmcli con down name will bring the interface down, but then NetworkManager will immediately bring it up again unless the connection is entirely disconnected from the interface.
+
+Modifying network connection settings
+NetworkManager connections have two kinds of settings. There are static connection properties, which are configured by the administrator and stored in the configuration files in /etc/sysconfig/network-scripts/ifcfg-*. There may also be active connection data, which the connection gets from a DHCP server and which are not stored persistently.
+
+To list the current settings for a connection, run the nmcli con show name command, where name is the name of the connection. Settings in lowercase are static properties the administrator can change; settings in all caps are active settings in temporary use for this instance of the connection.
+
+[root@demo ~]# nmcli con show static-eth0
+connection.id:                          static-eth0
+connection.uuid:                        87b53c56-1f5d-4a29-a869-8a7bdaf56dfa
+connection.interface-name:              --
+connection.type:                        802-3-ethernet
+connection.autoconnect:                 yes
+connection.timestamp:                   1401803453
+connection.read-only:                   no
+connection.permissions:                 
+connection.zone:                        --
+connection.master:                      --
+connection.slave-type:                  --
+connection.secondaries:                 
+connection.gateway-ping-timeout:        0
+802-3-ethernet.port:                    --
+802-3-ethernet.speed:                   0
+802-3-ethernet.duplex:                  --
+802-3-ethernet.auto-negotiate:          yes
+802-3-ethernet.mac-address:             CA:9D:E9:2A:CE:F0
+802-3-ethernet.cloned-mac-address:      --
+802-3-ethernet.mac-address-blacklist:   
+802-3-ethernet.mtu:                     auto
+802-3-ethernet.s390-subchannels:        
+802-3-ethernet.s390-nettype:            --
+802-3-ethernet.s390-options:            
+ipv4.method:                            manual
+ipv4.dns:                               192.168.0.254
+ipv4.dns-search:                        example.com
+ipv4.addresses:                         { ip = 192.168.0.2/24, gw = 192.168.0.254 }
+ipv4.routes:                            
+ipv4.ignore-auto-routes:                no
+ipv4.ignore-auto-dns:                   no
+ipv4.dhcp-client-id:                    --
+ipv4.dhcp-send-hostname:                yes
+ipv4.dhcp-hostname:                     --
+ipv4.never-default:                     no
+ipv4.may-fail:                          yes
+...
+The nmcli con mod name command can be used to change the settings for a connection. These changes will also be saved in the /etc/sysconfig/network-scripts/ifcfg-name file for the connection. The different settings that are available are documented in the nm-settings(5) man page.
+
+To set the IPv4 address to 192.0.2.2/24 and default gateway to 192.0.2.254 for the connection static-eth0:
+
+[root@demo ~]# nmcli con mod static-eth0 ipv4.addresses "192.0.2.2/24 192.0.2.254"
+IMPORTANT
+If a connection that got its IPv4 information from a DHCPv4 server is being changed to get it from static configuration files only, the setting ipv4.method should also be changed from auto to manual. Otherwise, the connection may hang or not complete successfully when it is activated, or it may get an IPv4 address from DHCP in addition to the static address.
+
+A number of settings may have multiple values. A specific value can be added to the list or deleted from the list for a setting by adding a + or - symbol to the start of the setting name.
+
+To add the DNS server 192.0.2.1 to the list of nameservers to use with the connection static-eth0:
+
+[root@demo ~]# nmcli con mod static-eth0 +ipv4.dns 192.0.2.1
+By default, changes made with nmcli con mod name are automatically saved to /etc/sysconfig/network-scripts/ifcfg-name. That file can also be manually edited with a text editor. After doing so, run nmcli con reload so that NetworkManager reads the configuration changes.
+
+For backward-compatibility reasons, the directives saved in that file have different names and syntax than the nm-settings(5) names. The following table maps some of the key setting names to ifcfg-* directives.
+
+Table 17.1. Comparison of nm-settings and ifcfg-* Directives
+
+nmcli con mod	ifcfg-* file	Effect
+ipv4.method manual	BOOTPROTO=none	IPv4 addresses configured statically.
+ipv4.method auto	BOOTPROTO=dhcp	Will look for configuration settings from a DHCPv4 server. If static addresses are also set, will not bring those up until we have information from DHCPv4.
+ipv4.addresses "192.0.2.1/24 192.0.2.254"	
+IPADDR0=192.0.2.1
+PREFIX0=24
+GATEWAY0=192.0.2.254
+
+Sets static IPv4 address, network prefix, and default gateway. If more than one is set for the connection, then instead of 0, the ifcfg-* directives end with 1, 2, 3 and so on.
+ipv4.dns 8.8.8.8	DNS0=8.8.8.8	Modify /etc/resolv.conf to use this nameserver.
+ipv4.dns-search example.com	DOMAIN=example.com	Modify /etc/resolv.conf to use this domain in the search directive.
+ipv4.ignore-auto-dns true	PEERDNS=no	Ignore DNS server information from the DHCP server.
+connection.autoconnect yes	ONBOOT=yes	Automatically activate this connection at boot.
+connection.id eth0	NAME=eth0	The name of this connection.
+connection.interface-name eth0	DEVICE=eth0	The connection is bound to the network interface with this name.
+802-3-ethernet.mac-address . . .	HWADDR= . . .	The connection is bound to the network interface with this MAC address.
+
+IMPORTANT
+Because NetworkManager tends to directly modify the /etc/resolv.conf file, direct edits to that file may be overwritten.
+
+To change settings in that file, it is better to set DNSn and DOMAIN directives in the relevant /etc/sysconfig/network-scripts/ifcfg-* files.
+
+Deleting a network connection
+The nmcli con del name command will delete the connection named name from the system, disconnecting it from the device and removing the file /etc/sysconfig/network-scripts/ifcfg-name.
+
+Modifying the system host name
+The hostname command displays or temporarily modifies the system's fully qualified host name.
+
+[root@demo ~]# hostname
+demo.example.com
+A static host name may be specified in the /etc/hostname file. The hostnamectl command is used to modify this file and may be used to view the status of the system's fully qualified host name. If this file does not exist, the host name is set by a reverse DNS query once the interface has an IP address assigned.
+
+[root@demo ~]# hostnamectl set-hostname demo.example.com
+[root@demo ~]# hostnamectl status
+   Static hostname: demo.example.com
+         Icon name: computer
+           Chassis: n/a
+        Machine ID: 9f6fb63045a845d79e5e870b914c61c9
+           Boot ID: aa6c3259825e4b8c92bd0f601089ddf7
+    Virtualization: kvm
+  Operating System: Red Hat Enterprise Linux Server 7.0 (Maipo)
+       CPE OS Name: cpe:/o:redhat:enterprise_linux:7.0:GA:server
+            Kernel: Linux 3.10.0-121.el7.x86_64
+      Architecture: x86_64
+[root@demo ~]# cat /etc/hostname
+demo.example.com
+IMPORTANT
+The static host name is stored in /etc/hostname. Previous versions of Red Hat Enterprise Linux stored the host name as a variable in the /etc/sysconfig/network file.
+
+Summary of commands
+The following table is a list of key commands discussed in this section.
+
+Command	Purpose
+nmcli dev status	Show the NetworkManager status of all network interfaces.
+nmcli con show	List all connections.
+nmcli con show name	List the current settings for the connection name.
+nmcli con add con-name name ...	Add a new connection named name.
+nmcli con mod name ...	Modify the connection name.
+nmcli con reload	Tell NetworkManager to reread the configuration files (useful after they have been edited by hand).
+nmcli con up name	Activate the connection name.
+nmcli dev dis dev	Deactivate and disconnect the current connection on the network interface dev.
+nmcli con del name	Delete the connection name and its configuration file.
+ip addr show	Show the current network interface address configuration.
+hostnamectl set-hostname ...	Persistently set the host name on this system.
+REFERENCES
+NetworkManager(8), nmcli(1), nmcli-examples(5), nm-settings(5), hostnamectl(1), resolv.conf(5), hostname(5), ip(8), and ip-address(8) man pages
+
+
+
+
+Guided Exercise: Practice: Configuring IPv4 Networking
+In this lab, you will configure a network interface with a static IPv4 address. Once the interface is configured, you will confirm that it works and identify other IPv4 nodes on the local network. You will also explore the contents of the configuration file created by NetworkManager.
+
+Resources:
+Files:	/etc/sysconfig/network-scripts/ifcfg-eno1
+Machines:	serverX
+Outcomes:
+
+The eno1 network interface on your serverX machine will be managed by NetworkManager with a connection named eno1. It will statically configure an IPv4 address of 192.168.0.1/24 without a gateway. The host with address 192.168.0.254 can be referenced as "otherhost".
+
+Reset the serverX system.
+
+Log into and set up your serverX system. The following command makes the unconfigured eno1 network interface available after the serverX system has been reset. It is used for all of the hands-on practice exercises and labs in the IPv6 chapter.
+
+[student@serverX ~]$ lab ipv6 setup
+Become the root user.
+
+[student@serverX ~]$ sudo -i
+Before making any changes, display the list of existing network interfaces to determine the system's starting configuration. Also determine which interfaces are managed by NetworkManager.
+
+The ip link command will display all of the network interfaces recognized by the system.
+
+[root@serverX ~]# ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 52:54:00:00:07:0b brd ff:ff:ff:ff:ff:ff
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether ca:8a:8f:84:e4:8f brd ff:ff:ff:ff:ff:ff
+Use the nmcli to list the network interfaces that NetworkManager manages.
+
+[root@serverX ~]# nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0
+Create a NetworkManager connection, called eno1, for the eno1 network interface. Redisplay the list of managed interfaces to confirm NetworkManager manages eno1.
+
+Use nmcli to create the connection for eno1.
+
+[root@serverX ~]# nmcli con add con-name eno1 type ethernet ifname eno1
+Connection 'eno1' (6e2fa636-f7db-4567-bcba-6d12d0bbcc49) successfully added.
+Display the new list of interfaces managed by NetworkManager. eno1 should be somewhere in the list.
+
+[root@serverX ~]# nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+eno1         6e2fa636-f7db-4567-bcba-6d12d0bbcc49  802-3-ethernet  eno1
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0
+Display the current IP address information for eno1.
+
+[root@serverX ~]# ip addr show eno1
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether ca:8a:8f:84:e4:8f brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::c88a:8fff:fe84:e48f/64 scope link 
+       valid_lft forever preferred_lft forever
+It will have an IPv6 link-local address assigned to it (the address starting with fe80::), but it will not have an automatic IPv4 address.
+
+Display the initial, default NetworkManager IPv4 configuration settings for the connection.
+
+[root@serverX ~]# nmcli con show eno1 | grep ipv4
+ipv4.method:                            auto
+ipv4.dns:                               
+ipv4.dns-search:                        
+ipv4.addresses:                         
+ipv4.routes:                            
+ipv4.ignore-auto-routes:                no
+ipv4.ignore-auto-dns:                   no
+ipv4.dhcp-client-id:                    --
+ipv4.dhcp-send-hostname:                yes
+ipv4.dhcp-hostname:                     --
+ipv4.never-default:                     no
+ipv4.may-fail:                          yes
+Configure eno1 to have a static IPv4 address of 192.168.0.1/24, without an additional gateway.
+
+[root@serverX ~]# nmcli con mod eno1 ipv4.addresses '192.168.0.1/24'
+[root@serverX ~]# nmcli con mod eno1 ipv4.method manual
+Restart the eno1 network interface and confirm its new IPv4 address configuration.
+
+Bounce the eno1 interface by taking it down, then bringing it back up.
+
+[root@serverX ~]# nmcli con down eno1
+[root@serverX ~]# nmcli con up eno1
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)
+Use the ip addr command to confirm the interface's configuration.
+
+[root@serverX ~]# ip addr show dev eno1
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether ca:8a:8f:84:e4:8f brd ff:ff:ff:ff:ff:ff
+    inet 192.168.0.1/24 brd 192.168.0.255 scope global eno1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::c88a:8fff:fe84:e48f/64 scope link 
+       valid_lft forever preferred_lft forever
+Notice the new inet address entry.
+
+Ping eno1's own IPv4 address.
+
+[root@serverX ~]# ping 192.168.0.1
+PING 192.168.0.1 (192.168.0.1) 56(84) bytes of data.
+64 bytes from 192.168.0.1: icmp_seq=1 ttl=64 time=0.091 ms
+64 bytes from 192.168.0.1: icmp_seq=2 ttl=64 time=0.043 ms
+^C
+--- 192.168.0.1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1006ms
+rtt min/avg/max/mdev = 0.043/0.067/0.091/0.024 ms
+Ping another IPv4 host, with address 192.168.0.254, to make sure it is reachable by eno1.
+
+[root@serverX ~]# ping 192.168.0.254
+PING 192.168.0.254 (192.168.0.254) 56(84) bytes of data.
+64 bytes from 192.168.0.254: icmp_seq=1 ttl=64 time=0.165 ms
+64 bytes from 192.168.0.254: icmp_seq=2 ttl=64 time=0.082 ms
+^C
+--- 192.168.0.254 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1010ms
+rtt min/avg/max/mdev = 0.082/0.123/0.165/0.042 ms
+Use the ip command to display the IPv4 routing table.
+
+[root@serverX ~]# ip route
+default via 172.25.0.1 dev eth0 proto static metric 1024
+172.25.0.0/16 dev eth0 proto kernel scope link src 172.25.11.11
+192.168.0.0/24 dev eno1 proto kernel scope link src 192.168.0.1 
+Identify the interface configuration file for the eno1 network interface in /etc/sysconfig/network-scripts. View the file contents and note which variable assignments relate to the IPv4 configuration that was performed earlier.
+
+[root@serverX ~]# ls /etc/sysconfig/network-scripts/ifcfg-*
+/etc/sysconfig/network-scripts/ifcfg-eno1
+/etc/sysconfig/network-scripts/ifcfg-eth0
+/etc/sysconfig/network-scripts/ifcfg-lo
+[root@serverX ~]# cat /etc/sysconfig/network-scripts/ifcfg-eno1
+TYPE=Ethernet
+BOOTPROTO=none
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+NAME=eno1
+UUID=6e2fa636-f7db-4567-bcba-6d12d0bbcc49
+DEVICE=eno1
+ONBOOT=yes
+IPADDR0=192.168.0.1
+PREFIX0=24
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+Configure the hosts file so that 192.168.0.254 can be referenced as "otherhost".
+
+[root@serverX ~]# echo '192.168.0.254 otherhost' >> /etc/hosts
+Ping "otherhost" by name to make sure the alias works.
+
+[root@serverX ~]# ping otherhost
+PING otherhost (192.168.0.254) 56(84) bytes of data.
+64 bytes from otherhost (192.168.0.254): icmp_seq=1 ttl=64 time=0.099 ms
+64 bytes from otherhost (192.168.0.254): icmp_seq=2 ttl=64 time=0.070 ms
+^C
+--- otherhost ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1009ms
+rtt min/avg/max/mdev = 0.070/0.084/0.099/0.017 ms
+

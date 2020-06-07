@@ -1,0 +1,262 @@
+Automounting Network Storage with NFS
+Install the necessary package: autofs.
+
+Create a master map file in /etc/auto.master.d/file.autofs.
+
+Create a map file for accessing the NFS share: /etc/auto.name.
+
+Direct maps.
+
+Indirect maps.
+
+Indirect maps using wildcards.
+
+Start and enable the autofs service using systemctl.
+
+Objectives
+After completing this section, students should be able to:
+
+Describe the benefits of using the automounter.
+
+Automount NFS shares using direct and indirect maps, including wildcards.
+
+Mounting NFS shares with the automounter
+The automounter is a service (autofs) that can automatically mount NFS shares "on demand," and will automatically unmount NFS shares when they are no longer being used.
+
+Automounter benefits
+
+Users do not need to have root privileges to run the mount/umount commands.
+
+NFS shares configured in the automounter are available to all users on the machine, subject to access permissions.
+
+NFS shares are not permanently connected like entries in /etc/fstab, freeing network and system resources.
+
+The automounter is configured entirely on the client side; no server-side configuration required.
+
+The automounter uses the same mount options used by the mount command, including security options.
+
+Support for both direct and indirect mount point mapping, providing flexibility in mount point locations.
+
+Indirect mount points are created and removed by autofs, alleviating the need to manually manage them.
+
+NFS is the default file system for the automounter, but it can be used to automount a range of different file systems.
+
+autofs is a service that is managed like other system services.
+
+Create an automount
+
+Configuring an automount is a multistep process:
+
+Install the autofs package.
+
+[student@desktopX ~]$ sudo yum -y install autofs
+This package contains everything needed to use the automounter for NFS shares.
+
+Add a master-map file to /etc/auto.master.d—this file identifies the base directory used for mount points and identifies the mapping file used for creating the automounts.
+
+Use vim to create and edit the master-map file:
+
+[student@desktopX ~]$ sudo vim /etc/auto.master.d/demo.autofs
+The name of the master-map file is not important, but it is normally something meaningful. The only requirement is it must have an extension of .autofs. The master-map file can hold multiple mapping entries, or use multiple files to separate configuration data.
+
+Add the master-map entry, in this case, for indirectly mapped mounts:
+
+/shares  /etc/auto.demo
+This entry would use the /shares directory as the base of future indirect automounts. The /etc/auto.demo file contains the mount details; use an absolute filename. The auto.demo file needs to be created before starting the autofs service.
+
+To use directly mapped mount points, add an entry to the same file (or in a separate file):
+
+/-  /etc/auto.direct
+All direct map entries use "/-" as the base directory. In this case, the mapping file that contains the mount details is /etc/auto.direct.
+
+Create the mapping file(s). The mapping file identifies the mount point, mount options, and source location to mount.
+
+Use vim to create and edit the mapping file:
+
+[student@desktopX ~]$ sudo vim /etc/auto.demo
+The file name is not important, but by convention is located in /etc and called auto.name, where name is something meaningful to the included contents.
+
+work  -rw,sync  serverX:/shares/work
+The format of an entry is mount point, mount options, and source location. This example is showing a basic indirect mapping entry. Direct maps and indirect maps using wildcards will be covered later in this section.
+
+Known as the "key" in the man pages, the mount point will be created and removed automatically by the autofs service. In this case, the fully qualified mount point will be /shares/work—see the master-map file. The /shares directory and the work directory will be created and removed as needed by the autofs service.
+
+In this example, the local mount point mirrors the server's directory structure. The local mount point can be named anything. There is no requirement to align the names of the local mount point and the server directory structure.
+
+Mount options start with a "-" (dash) and are comma-separated with no white space. The mount options available are the same as those available to the equivalent manual mount command. In this example, the automounter will try and mount the share using read/write access, security will be based on standard Linux file permissions (the default: sec=sys), and the server will be synchronized immediately during write operations.
+
+There are a couple of useful automounter specific options: -fstype= and -strict. Use fstype to specify the file system if it is not NFS and use strict to treat errors, when mounting file systems, as fatal.
+
+The source location for NFS shares follows the host:/pathname pattern; in this example, serverX:/shares/work. This directory will need to have been exported on serverX with support for read/write access and standard Linux file permissions for the mount to be successful.
+
+If the file system to be mounted begins with a "/" (slash), such as local device entries or SMB shares, then a ":" (colon) needs to be prefixed; for example, an SMB share would be ://serverX/share.
+
+Start and enable the automount service.
+
+Use systemctl to both start and enable the autofs service.
+
+[student@desktopX ~]$ sudo systemctl enable autofs
+ln -s '/usr/lib/systemd/system/autofs.service'  ...
+[student@desktopX ~]$ sudo systemctl start autofs
+The mapping file—direct maps
+
+As the name implies, direct maps are used to map an NFS share to an existing mount point. The automounter will not attempt to create the mount point automatically; it must exist prior to the autofs service being started.
+
+Continuing from the previous example, the content for the /etc/auto.direct file might look like this:
+
+/mnt/docs  -rw,sync  serverX:/shares/docs
+The mount point (or key) is always an absolute path, starting with "/" (slash). The rest of the mapping file uses the same structure.
+
+Only the right-most directory is put under automounter control. Thus, the directory structure above the mount point (/mnt in this example) is not obscured by autofs.
+
+The mapping file—indirect wildcard maps
+
+When an NFS server is exporting multiple subdirectories within a directory, then the automounter can be configured to access any one of those subdirectories using a single mapping entry. As an example, this can be really useful for automounting user home directories from an NFS server.
+
+Continuing the previous example, if serverX:/shares is exporting two or more subdirectories and they are able to be accessed using the same mount options, then the content for the /etc/auto.demo file might look like this:
+
+*  -rw,sync  serverX:/shares/&
+The mount point (or key) is an "*" (asterisk), and the subdirectory on the source location is an "&" (ampersand). Everything else in the entry is the same.
+
+When a user attempts to access /shares/work, the key * (which is work in this example) will replace the ampersand in the source location and serverX:/shares/work will be mounted. As with the indirect example, the work directory will be created and removed automatically by the autofs service.
+
+REFERENCES
+autofs(5), automount(8), auto.master(5), and mount.nfs(8) man page
+
+
+Guided Exercise: Practice: Automounting NFS
+In this lab, you will install a package to support automount. Create a direct-map automount and an indirect-map automount using wildcards. serverX is the NFSv4 host.
+
+Resources:
+Files:	nfs_ldapuserX.txt
+Machines:	desktopX and serverX
+Outcomes:
+
+User ldapuserX will be able to successfully log in and use the three automounted directories.
+
+Reset the desktopX system.
+
+Log into and set up your desktop system.
+
+[student@desktopX ~]$ lab nfsmount setup
+Open a terminal.
+
+IMPORTANT
+The serverX setup performed at the beginning of "Mounting and Unmounting NFS" is used for this practice exercise as well. If you have not yet performed the server setup, then run it now. It only needs to be run once for both practice exercises.
+
+S.H.I.E.L.D. (Storage Hardware Incorporating Every Last Document) uses a central server, serverX, to host a number of document share directories. Access to these directories is via LDAP-based users, authenticating using Kerberos with encryption. Users need to be able to log in and have the share directories automount with read and write access, ready for use.
+
+Here are the key details you will need:
+
+Username: ldapuserX
+
+Password: kerberos
+
+serverX is sharing three directories under /shares: docs, work, and public.
+
+File access is secured using Kerberos with encryption: krb5p.
+
+desktopX mount point: /shares for docs and work and a direct map of public to /mnt/public.
+
+The krb5.keytab is available from http://classroom.example.com/pub/keytabs/desktopX.keytab.
+
+Each share should have read and write access.
+
+When done with the work, reboot the desktopX machine, then run the command lab nfsmount grade from the desktopX machine to verify the work.
+
+Download and install the krb5.keytab file to enable Kerberos access and security.
+
+[student@desktopX ~]$ sudo wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/desktopX.keytab
+Enable and start the nfs-secure service.
+
+[student@desktopX ~]$ sudo systemctl enable nfs-secure
+ln -s '/usr/lib/systemd/system/nfs-secure.service'  ...
+[student@desktopX ~]$ sudo systemctl start nfs-secure
+Use yum to install autofs, needed for automounting directories.
+
+[student@desktopX ~]$ sudo yum -y install autofs
+Loaded plugins: langpacks
+Resolving Dependencies
+...
+Complete!
+Create the automount configuration files for the direct-map automount.
+
+Use vim to create and edit the /etc/auto.master.d/direct.autofs file.
+
+[student@desktopX ~]$ sudo vim /etc/auto.master.d/direct.autofs
+Note: The file extension must be .autofs.
+
+Add the line as follows:
+
+/-  /etc/auto.direct
+Use vim to create and edit the auto.direct map file.
+
+[student@desktopX ~]$ sudo vim /etc/auto.direct
+Add the line as follows:
+
+/mnt/public  -rw,sync,sec=krb5p  serverX:/shares/public
+Note: The file names above are not important; they were chosen to be meaningful.
+
+Create the automount configuration files for the indirect-map automounts.
+
+Use vim to create and edit the /etc/auto.master.d/shares.autofs file.
+
+[student@desktopX ~]$ sudo vim /etc/auto.master.d/shares.autofs
+Note: The file extension must be .autofs.
+
+Add the line as follows:
+
+/shares  /etc/auto.shares
+Use vim to create and edit the auto.shares map file.
+
+[student@desktopX ~]$ sudo vim /etc/auto.shares
+Add the line as follows:
+
+*  -rw,sync,sec=krb5p  serverX:/shares/&
+Note: The file names above are not important; they were chosen to be meaningful.
+
+Use mkdir to create the /mnt/public mount point for the direct-map automount.
+
+[student@desktopX ~]$ sudo mkdir -p /mnt/public
+Enable and start the automount service.
+
+[student@desktopX ~]$ sudo systemctl enable autofs
+ln -s '/usr/lib/systemd/system/autofs.service'  ...
+[student@desktopX ~]$ sudo systemctl start autofs
+Use ssh to switch to ldapuserX on localhost and confirm the mounts, and read/write access.
+
+Use ssh to log in as ldapuserX.
+
+[student@desktopX ~]$ ssh ldapuserX@localhost
+If you see something similar to the following, type yes to accept and continue.
+
+The authenticity of host 'localhost (::1)' can't be established.
+ECDSA key fingerprint is d9:cc:73:82:3b:8a:74:e4:11:2f:f3:2b:03:a4:46:4d.
+Are you sure you want to continue connecting (yes/no)? yes
+Enter the password: kerberos.
+
+ldapuserX@localhost's password: kerberos
+Verify you can switch to the automounted share directories and confirm you have read/write access.
+
+Use cd to switch directories.
+
+[ldapuserX@desktopX ~]$ cd /shares/docs
+Use echo and cat to verify read and write access.
+
+[ldapuserX@desktopX docs]$ echo hello > test.txt
+[ldapuserX@desktopX docs]$ cat test.txt
+hello
+Repeat this step to test /shares/work and /mnt/public.
+
+Use exit or Ctrl+D to log out of ldapuserX.
+
+Reboot the desktopX machine, then run the command lab nfsmount grade from the desktopX machine to verify the work.
+
+[student@desktopX ~]$ sudo systemctl reboot
+[student@desktopX ~]$ lab nfsmount grade
+
+
+
+
+
+

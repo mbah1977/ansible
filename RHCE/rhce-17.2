@@ -1,0 +1,182 @@
+IPv6 Networking Concepts
+In this section, students learned how to:
+
+Explain the basic details of IPv6 networking.
+
+Interpret text representations of IPv6 addresses.
+
+Objectives
+After completing this section, students should be able to explain the basic concepts of IPv6 addresses and networking.
+
+IPv6 overview
+IPv6 is intended as the replacement for the IPv4 network protocol. The major problem it solves is the exhaustion of IPv4 addresses by using a much larger network address space. It also provides a number of enhancements and new features for network configuration management and support for future protocol changes.
+
+The key reason IPv6 is not yet in wide deployment is that the core protocol does not have a simple way for systems that only have IPv6 addresses to communicate with systems that only have IPv4 addresses.
+
+The best transition plan at present is to provide all hosts with both IPv4 and IPv6 addresses, so that Internet resources only using one of the protocols can be reached from the host. This is called a dual-stack configuration, and is the approach on which this course will focus.
+
+NOTE
+There are a number of promising transition methods in development to allow IPv6-only hosts to use the IPv4 Internet or support other forms of IPv4/IPv6 translation, such as NAT64 (RFC 6145) and 464XLAT (RFC 6877), but they are beyond the scope of this course.
+
+The basic position of the Internet Engineering Task Force (IETF) is that network operators using IPv4 should “obtain an IPv6 prefix, turn on IPv6 routing within their networks and between themselves and any peer, upstream, or downstream neighbors, enable it on their computers, and use it in normal processing. This should be done while leaving IPv4 stable, until a point is reached that any communication that can be carried out could use either protocol equally well. At that point, the economic justification for running both becomes debatable, and network operators can justifiably turn IPv4 off.” (RFC 6144, Introduction)
+
+Interpreting IPv6 addresses
+IPv6 addresses
+
+An IPv6 address is a 128-bit number, normally expressed as eight colon-separated groups of four hexadecimal nibbles (half-bytes). Each nibble represents four bits of the IPv6 address, so each group represents 16 bits of the IPv6 address.
+
+2001:0db8:0000:0010:0000:0000:0000:0001
+To make it easier to write IPv6 addresses, leading zeros in a colon-separated group do not need to be written. However, at least one nibble must be written in each field. Zeros which follow a nonzero nibble in the group do need to be written.
+
+2001:db8:0:10:0:0:0:1
+Since addresses with long strings of zeros are common, one or more groups of consecutive zeros may be combined with exactly one :: block.
+
+2001:db8:0:10::1
+Notice that under these rules, 2001:db8::0010:0:0:0:1 would be another less convenient way to write the example address. But it is a valid representation of the same address, and this can confuse administrators new to IPv6. Some tips for writing consistently readable addresses:
+
+Leading zeros in a group must always be suppressed.
+
+Use :: to shorten as much as possible. If two runs of zeros are equal in length, shorten the leftmost run of zeros by preference.
+
+Although it is allowed, do not use :: to shorten one group of zeros. Use :0: instead, and save :: for runs of zeros longer than a single group.
+
+Always use lowercase letters for hexadecimal numbers a through f.
+
+IMPORTANT
+When including a TCP or UDP network port after an IPv6 address, always enclose the IPv6 address in square brackets so that the port does not look like it is part of the address.
+
+[2001:db8:0:10::1]:80
+IPv6 subnets
+
+A normal unicast address is divided into two parts: the network prefix and interface ID. The network prefix identifies the subnet. No two network interfaces on the same subnet can have the same interface ID; the interface ID identifies a particular interface on the subnet.
+
+Unlike IPv4, IPv6 has a standard subnet mask, which is used for almost all normal addresses, /64. In this case, half of the address is the network prefix and half of it is the interface ID. This means that a single subnet can hold as many hosts as necessary.
+
+Typically, the network provider will allocate a shorter prefix to an organization, such as a /48. This leaves the rest of the network part for assigning subnets from that allocated prefix. For a /48 allocation, that leaves 16 bits for subnets (up to 65536 subnets).
+
+
+Figure 17.1: IPv6 address parts and subnetting
+IPv6 address allocation
+Table 17.2. Common IPv6 Addresses and Networks
+
+IPv6 address or network	Purpose	Description
+::1/128	localhost	
+The IPv6 equivalent to 127.0.0.1/8, set on the loopback interface.
+
+::	The unspecified address	
+The IPv6 equivalent to 0.0.0.0. For a network service, this could indicate that it is listening on all configured IP addresses.
+
+::/0	The default route (the IPv6 Internet)	
+The IPv6 equivalent to 0.0.0.0/0. The default route in the routing table matches this network; the router for this network is where all traffic is sent for which there is not a better route.
+
+2000::/3	Global unicast addresses	
+"Normal" IPv6 addresses are currently being allocated from this space by IANA. This is equivalent to all the networks ranging from 2000::/16 through 3fff::/16.
+
+fd00::/8	Unique local addresses (RFC 4193)	
+IPv6 has no direct equivalent of RFC 1918 private address space, although this is close. A site can use these to self-allocate a private routable IP address space inside the organization, but these networks cannot be used on the global Internet. The site must randomly select a /48 from this space, but it can subnet the allocation into /64 networks normally.
+
+fe80::/64	Link-local addresses	
+Every IPv6 interface automatically configures a link-local address that only works on the local link on this network. This will be discussed in more detail later.
+
+ff00::/8	Multicast	
+The IPv6 equivalent to 224.0.0.0/4. Multicast is used to transmit to multiple hosts at the same time, and is particularly important in IPv6 because it has no broadcast addresses.
+
+
+Link-local addresses
+
+A link-local address in IPv6 is an unroutable address which is used only to talk to hosts on a specific network link. Every network interface on the system is automatically configured with a link-local address on the fe80:: network. To ensure that it is unique, the interface ID of the link-local address is constructed from the network interface's Ethernet hardware address. The usual procedure to convert the 48-bit MAC address to a 64-bit interface ID is to invert bit 7 of the MAC address and insert ff:fe between its two middle bytes.
+
+Network prefix: fe80::/64
+
+MAC address: 00:11:22:aa:bb:cc
+
+Link-local address: fe80::211:22ff:feaa:bbcc/64
+
+The link-local addresses of other machines can be used like normal addresses by other hosts on the same link. Since every link has a fe80::/64 network on it, the routing table cannot be used to select the outbound interface correctly. The link to use when talking to a link-local address must be specified with a scope identifier at the end of the address. The scope identifier consists of % followed by the name of the network interface.
+
+For example, to use ping6 to ping the link-local address fe80::211:22ff:feaa:bbcc using the link connected to the eth0 network interface, the correct command would be:
+
+[student@demo ~]$ ping6 fe80::211:22ff:feaa:bbcc%eth0
+NOTE
+Scope identifiers are only needed when contacting addresses that have "link" scope. Normal global addresses are used just like they are in IPv4, and select their outbound interfaces from the routing table.
+
+Multicast
+
+Multicast plays a larger role in IPv6 than in IPv4 because there is no broadcast address in IPv6. One key multicast address in IPv6 is ff02::1, the all-nodes link-local address. Pinging this address will send traffic to all nodes on the link. Link-scope multicast addresses (starting ff02::/8) need to be specified with a scope identifier, just like a link-local address.
+
+[student@demo ~]$ ping6 ff02::1%eth0
+PING ff02::1%eth0(ff02::1) 56 data bytes
+64 bytes from fe80::211:22ff:feaa:bbcc: icmp_seq=1 ttl=64 time=0.072 ms
+64 bytes from fe80::200:aaff:fe33:2211: icmp_seq=1 ttl=64 time=102 ms (DUP!)
+64 bytes from fe80::bcd:efff:fea1:b2c3: icmp_seq=1 ttl=64 time=103 ms (DUP!)
+64 bytes from fe80::211:22ff:feaa:bbcc: icmp_seq=2 ttl=64 time=0.079 ms
+...
+IPv6 address configuration
+IPv4 has two ways in which addresses get configured on network interfaces. Network addresses may be configured on interfaces manually by the administrator, or dynamically from the network using DHCP. IPv6 also supports manual configuration, and two methods of dynamic configuration, one of which is DHCPv6.
+
+Static addressing
+
+Interface IDs for static IPv6 addresses can be selected at will, just like IPv4. In IPv4, there were two addresses on a network that could not be used, the lowest address in the subnet and the highest address in the subnet. In IPv6, the following interface IDs are reserved and cannot be used for a normal network address on a host.
+
+The all-zeros identifier 0000:0000:0000:0000 ("subnet router anycast") used by all routers on the link. (For the 2001:db8::/64 network, this would be the address 2001:db8::.)
+
+The identifiers fdff:ffff:ffff:ff80 through fdff:ffff:ffff:ffff.
+
+DHCPv6 configuration
+
+DHCPv6 works a little differently than DHCP for IPv4, because there is no broadcast address. Essentially, a host sends a DHCPv6 request from its link-local address to port 547/UDP on ff02::1:2, the all-dhcp-servers link-local multicast group. The DHCPv6 server then usually sends a reply with appropriate information to port 546/UDP on the client's link-local address.
+
+The dhcp package in RHEL 7 provides support for a DHCPv6 server.
+
+SLAAC configuration
+
+In addition to DHCPv6, IPv6 also supports a second dynamic configuration method, called Stateless Address Autoconfiguration (SLAAC). Using SLAAC, the host brings up its interface with a link-local fe80::/64 address normally. It then sends a "router solicitation" to ff02::2, the all-routers link-local multicast group. An IPv6 router on the local link responds to the host's link-local address with a network prefix and possibly other information. The host then uses that network prefix with an interface ID that it normally constructs in the same way that link-local addresses are constructed. The router periodically sends multicast updates ("router advertisements") to confirm or update the information it provided.
+
+The radvd package in RHEL 7 allows a RHEL-based IPv6 router to provide SLAAC through router advertisements.
+
+IMPORTANT
+A typical RHEL 7 machine configured to get IPv4 addresses through DHCP is usually also configured to use SLAAC to get IPv6 addresses. This can result in machines unexpectedly obtaining IPv6 addresses when an IPv6 router is added to the network.
+
+Some IPv6 deployments combine SLAAC and DHCPv6, using SLAAC to only provide network address information and DHCPv6 to provide other information, such as which DNS servers and search domains to configure.
+
+REFERENCES
+ping(8), radvd(8), and dhcpd(8) man pages
+
+Selected IETF RFC references:
+
+RFC 2460: Internet Protocol, Version 6 (IPv6) Specification
+
+RFC 4291: IP Version 6 Addressing Architecture
+
+RFC 5952: A Recommendation For IPv6 Address Text Representation
+
+RFC 4862: IPv6 Stateless Address Autoconfiguration
+
+RFC 3315: Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
+
+RFC 3736: Stateless Dynamic Host Configuration Protocol (DHCP) Service for IPv6
+
+RFC 4193: Unique Local IPv6 Unicast Addresses
+
+
+
+
+
+
+Quiz: Practice: Interpreting IPv6 Addresses
+Match the following compressed IPv6 addresses to their counterparts in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+IPv6 address	Compressed IPv6 address
+2000:0000:0000:0000:0000:0000:0000:0001	
+0002:0000:0000:0000:0000:0000:0000:0001	
+2001:0db8:0000:0007:0000:0000:0000:0002	
+2001:0003:0000:0000:0000:0007:0000:0002	
+2001:0003:0700:0000:0000:0000:0000:0002	
+ff02:0000:0000:0000:0000:0001:0000:0000	
+0000:0000:0000:0000:0000:0000:0000:0000	
+Not a valid IPv6 address	
+

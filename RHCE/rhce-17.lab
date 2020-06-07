@@ -1,0 +1,80 @@
+Lab: Lab: Managing IPv6 Networking
+In this lab, you will assign static IPv4 and IPv6 addresses to a network interface.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+serverX will have a NetworkManager connection, called eno1, that manages the eno1 network interface. It will be configured statically with an IPv4 address of 192.168.0.100/24 and an IPv6 address of fddb:fe2a:ab1e::c0a8:64/64.
+
+Reset the serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab ipv6 setup
+Become the root user.
+
+[student@serverX ~]$ sudo -i
+Create a NetworkManager connection, called eno1, that corresponds to the eno1 network interface.
+
+[root@serverX ~]# nmcli con add con-name eno1 type ethernet ifname eno1
+Connection 'eno1' (0d687259-c64b-4e5b-bece-cabbe952e46f) successfully added.
+[root@serverX ~]# nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+eno1         0d687259-c64b-4e5b-bece-cabbe952e46f  802-3-ethernet  eno1   
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0   
+Configure eno1 with a static IPv4 address of 192.168.0.100/24.
+
+[root@serverX ~]# nmcli con mod eno1 ipv4.addresses 192.168.0.100/24
+[root@serverX ~]# nmcli con mod eno1 ipv4.method manual
+Configure eno1 with a static IPv6 address of fddb:fe2a:ab1e::c0a8:64/64.
+
+[root@serverX ~]# nmcli con mod eno1 ipv6.addresses fddb:fe2a:ab1e::c0a8:64/64
+[root@serverX ~]# nmcli con mod eno1 ipv6.method manual
+Restart the eno1 network interface and confirm its new IPv4 and IPv6 address configuration.
+
+Bounce the eno1 interface by taking it down, then bringing it back up.
+
+[root@serverX ~]# nmcli con down eno1
+[root@serverX ~]# nmcli con up eno1
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)
+Use the ip addr command to confirm the interface's configuration.
+
+[root@serverX ~]# ip addr show dev eno1
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether ca:8a:8f:84:e4:8f brd ff:ff:ff:ff:ff:ff
+    inet 192.168.0.100/24 brd 192.168.0.255 scope global eno1
+       valid_lft forever preferred_lft forever
+    inet6 fddb:fe2a:ab1e::c0a8:64/64 scope global 
+       valid_lft forever preferred_lft forever
+    inet6 fe80::c88a:8fff:fe84:e48f/64 scope link 
+       valid_lft forever preferred_lft forever
+Notice the new inet address entry.
+
+Ping the local IPv4 gateway, 192.168.0.254, and the local IPv6 gateway, fddb:fe2a:ab1e::c0a8:fe, to confirm they can both be reached through the eno1 interface.
+
+[student@serverX ~]$ ping -I eno1 192.168.0.254
+PING 192.168.0.254 (192.168.0.254) from 192.168.0.100 eno1: 56(84) bytes of data.
+64 bytes from 192.168.0.254: icmp_seq=1 ttl=64 time=0.099 ms
+64 bytes from 192.168.0.254: icmp_seq=2 ttl=64 time=0.056 ms
+64 bytes from 192.168.0.254: icmp_seq=3 ttl=64 time=0.036 ms
+64 bytes from 192.168.0.254: icmp_seq=4 ttl=64 time=0.047 ms
+^C
+--- 192.168.0.254 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 2999ms
+rtt min/avg/max/mdev = 0.036/0.059/0.099/0.025 ms
+[student@serverX ~]$ ping6 -I eno1 fddb:fe2a:ab1e::c0a8:fe
+PING fddb:fe2a:ab1e::c0a8:fe(fddb:fe2a:ab1e::c0a8:fe) from fddb:fe2a:ab1e::c0a8:64 eno1: 56 data bytes
+64 bytes from fddb:fe2a:ab1e::c0a8:fe: icmp_seq=1 ttl=64 time=0.150 ms
+64 bytes from fddb:fe2a:ab1e::c0a8:fe: icmp_seq=2 ttl=64 time=0.103 ms
+64 bytes from fddb:fe2a:ab1e::c0a8:fe: icmp_seq=3 ttl=64 time=0.049 ms
+^C
+--- fddb:fe2a:ab1e::c0a8:fe ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.049/0.100/0.150/0.042 ms
+Run the grading script to verify your work.
+
+[student@serverX ~]$ lab ipv6 grade
+IPv4 address is correct ....... PASS
+... Output omitted ...
+

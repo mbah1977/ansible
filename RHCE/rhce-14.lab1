@@ -1,0 +1,92 @@
+Lab: Lab: Accessing Network Storage with Network File System (NFS)
+In this lab, you will install a package to support automount. Create an automount for ldapuserX's "home" directory from classroom.example.com, an NFSv4 host.
+
+Resources:
+Machines:	desktopX and classroom.example.com
+Outcomes:
+
+User ldapuserX will be able to successfully log in and use the home directory mounted at /home/guests/ldapuserX.
+
+Reset the desktopX system.
+
+Log into and set up your desktop system.
+
+[student@desktopX ~]$ lab nfs setup
+Open a terminal.
+
+Umbrella Corp uses a central server, classroom, to host the home directories of their LDAP-based users. Users need to be able to log in and have their home directories automount with read and write access, ready for use.
+
+Here are the key details you will need:
+
+Username: ldapuserX
+
+Password: kerberos
+
+classroom.example.com is sharing /home/guests.
+
+desktopX mount point: /home/guests/ldapuserX
+
+The home directory should have read and write access.
+
+When done with the work, reboot the desktopX machine, then run the command lab nfs grade from the desktopX machine to verify the work.
+
+Install any packages needed to automount the home directory.
+
+[student@desktopX ~]$ sudo yum -y install autofs
+Loaded plugins: langpacks
+Resolving Dependencies
+...
+Complete!
+Use yum to install autofs.
+
+Add an auto.master.d configuration file that identifies the base directory and associated map file (use any name desired for the configuration file, but it must end with .autofs), and create the associated map file (use any name desired for the map file).
+
+Use vim to create and edit the /etc/auto.master.d/home.autofs file.
+
+[student@desktopX ~]$ sudo vim /etc/auto.master.d/home.autofs
+Add the line as follows:
+
+/home/guests  /etc/auto.home
+NOTE
+This solution is using home.autofs as the master map file and auto.home as the map file, but the file names are not important.
+
+Use vim to create and edit the auto.home map file.
+
+[student@desktopX ~]$ sudo vim /etc/auto.home
+Add the line as follows:
+
+*  -rw,sync  classroom.example.com:/home/guests/&
+Enable and start the automount service.
+
+[student@desktopX ~]$ sudo systemctl enable autofs
+ln -s '/usr/lib/systemd/system/autofs.service'  ...
+[student@desktopX ~]$ sudo systemctl start autofs
+Use ssh to switch to ldapuserX on localhost and confirm the mount, and read/write access.
+
+Use ssh to log in as ldapuserX.
+
+[student@desktopX ~]$ ssh ldapuserX@localhost
+If you see something similar to the following, type yes to accept and continue.
+
+The authenticity of host 'localhost (::1)' can't be established.
+ECDSA key fingerprint is d9:cc:73:82:3b:8a:74:e4:11:2f:f3:2b:03:a4:46:4d.
+Are you sure you want to continue connecting (yes/no)? yes
+Enter the password: kerberos.
+
+ldapuserX@localhost's password: kerberos
+Verify the current directory and read/write access.
+
+Use pwd to verify the current directory.
+
+[ldapuserX@desktopX ~]$ pwd
+/home/guests/ldapuserX
+Use echo and cat to verify read and write access.
+
+[ldapuserX@desktopX ~]$ echo hello > test.txt
+[ldapuserX@desktopX ~]$ cat test.txt
+hello
+Use exit or Ctrl+D to log out of ldapuserX.
+
+Reboot the desktopX machine, then run the command lab nfs grade from the desktopX machine to verify the work.
+
+

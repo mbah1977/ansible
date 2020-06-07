@@ -1,0 +1,250 @@
+Chapter 15. Firewall Configuration
+Limiting Network Communication
+Guided Exercise: Practice: Limiting Network Communication
+Lab: Lab: Limiting Network Communication
+Abstract
+
+Overview
+Goal	To configure a basic firewall.
+Objectives	
+Configure a basic firewall using firewalld, firewall-config, and firewall-cmd.
+
+Sections	
+Limiting Network Communication (and Practice)
+
+Lab	
+Limiting Network Communication with firewalld
+
+Limiting Network Communication
+The Linux kernel has a subsystem called netfilter to filter network traffic.
+
+firewalld is the user-space component that manages firewall rules.
+
+firewalld splits traffic into zones based on source address and the network interface it arrives on, with each zone having its own firewall rules.
+
+firewall-config and firewall-cmd can be used to control the firewall rules.
+
+Objectives
+After completing this section, students should be able to configure a basic firewall.
+
+Netfilter and firewalld concepts
+The Linux kernel includes a powerful network filtering subsystem, netfilter. The netfilter subsystem allows kernel modules to inspect every packet traversing the system. This means any incoming, outgoing, or forwarded network packet can be inspected, modified, dropped, or rejected in a programmatic way, before reaching components in user space. This is the main building block for building a firewall on a Red Hat Enterprise Linux 7 machine.
+
+Interacting with netfilter
+
+Although it is theoretically possible for system administrators to write their own kernel modules to interact with netfilter, this is typically not done. Instead, other programs are used to interact with netfilter. One of the most common and well-known of these programs is iptables. In previous Red Hat Enterprise Linux releases, iptables was the main method of interacting with the kernel netfilter subsystem.
+
+The iptables command is a low-level tool, and it can be challenging to correctly manage firewalls with that tool. In addition, it only adjusts IPv4 firewall rules. Other utilities, such as ip6tables for IPv6 and ebtables for software bridges, need to be used for more complete firewall coverage.
+
+Introducing firewalld
+
+In Red Hat Enterprise Linux 7 a new method of interacting with netfilter has been introduced: firewalld. firewalld is a system daemon that can configure and monitor the system firewall rules. Applications can talk to firewalld to request ports to be opened using the DBus messaging system, a feature which can be disabled or locked down). It both covers IPv4, IPv6, and potentially ebtables settings. The firewalld daemon is installed from the firewalld package. This package is part of a base install, but not part of a minimal install.
+
+firewalld simplifies firewall management by classifying all network traffic into zones. Based on criteria such as the source IP address of a packet or the incoming network interface, traffic is then diverted into the firewall rules for the appropriate zone. Each zone can have its own list of ports and services to be opened or closed.
+
+NOTE
+For laptops or other machines that regularly change networks, NetworkManager can be used to automatically set the firewall zone for a connection. The zones can be customized with rules appropriate for particular connections.
+
+This is especially useful when traveling between home, work, and public wireless networks. A user might want their system's sshd service to be reachable when connected to their home and corporate networks, but not when connected to the public wireless network in the local coffee shop.
+
+Every packet that comes into the system will first be checked for its source address. If that source address is tied to a specific zone, the rules for that zone will be parsed. If the source address is not tied to a zone, the zone for the incoming network interface will be used.
+
+If the network interface is not associated with a zone for some reason, the default zone will be used. The default zone is not a separate zone itself; it is one of the other zones. The public zone is used by default, but this can be changed by a system administrator.
+
+Most zones will allow traffic through the firewall which matches a list of particular ports and protocols ("631/udp") or pre-defined services ("ssh"). If the traffic does not match a permitted port/protocol or service, it will generally be rejected. (The trusted zone, which permits all traffic by default, is one exception to this.)
+
+Pre-defined zones
+
+firewalld ships with a number of pre-defined zones, suitable for various purposes. The default zone is set to public and interfaces are assigned to public if no changes are made. The lo interface is treated as if it were in the trusted zone. The following table details the configuration of these zones on installation, but the system administrator may then customize these zones to have different settings. By default, all zones permit any incoming traffic which is part of a communication initiated by the system, and all outgoing traffic.
+
+Table 15.1. Default configuration of firewalld zones
+
+Zone name	Default configuration
+trusted	Allow all incoming traffic.
+home	Reject incoming traffic unless related to outgoing traffic or matching the ssh, mdns, ipp-client, samba-client, or dhcpv6-client pre-defined services.
+internal	Reject incoming traffic unless related to outgoing traffic or matching the ssh, mdns, ipp-client, samba-client, or dhcpv6-client pre-defined services (same as the home zone to start with).
+work	Reject incoming traffic unless related to outgoing traffic or matching the ssh, ipp-client, or dhcpv6-client pre-defined services.
+public	Reject incoming traffic unless related to outgoing traffic or matching the ssh or dhcpv6-client pre-defined services. The default zone for newly-added network interfaces.
+external	Reject incoming traffic unless related to outgoing traffic or matching the ssh pre-defined service. Outgoing IPv4 traffic forwarded through this zone is masqueraded to look like it originated from the IPv4 address of the outgoing network interface.
+dmz	Reject incoming traffic unless related to outgoing traffic or matching the ssh pre-defined service.
+block	Reject all incoming traffic unless related to outgoing traffic.
+drop	Drop all incoming traffic unless related to outgoing traffic (do not even respond with ICMP errors).
+
+For a list of all available pre-defined zones and their intended uses, consult the firewalld.zones(5) manual page.
+
+Pre-defined services
+
+firewalld also ships with a number of pre-defined services. These service definitions can be used to easily permit traffic for particular network services to pass through the firewall. The following table details the configuration of the pre-defined services used in the default configuration of the firewall zones.
+
+Table 15.2. Selected pre-defined firewalld services
+
+Service name	Configuration
+ssh	Local SSH server. Traffic to 22/tcp
+dhcpv6-client	Local DHCPv6 client. Traffic to 546/udp on the fe80::/64 IPv6 network
+ipp-client	Local IPP printing. Traffic to 631/udp.
+samba-client	Local Windows file and print sharing client. Traffic to 137/udp and 138/udp.
+mdns	Multicast DNS (mDNS) local-link name resolution. Traffic to 5353/udp to the 224.0.0.251 (IPv4) or ff02::fb (IPv6) multicast addresses.
+
+NOTE
+Many other pre-defined services exist. The firewall-cmd --get-services command will list them. The configuration files that define the ones included in the firewalld package can be found in the /usr/lib/firewalld/services directory, in a format defined by firewalld.zone(5). We will not discuss these files further in this chapter.
+
+For the purposes of this chapter, the easiest options for a system administrator new to firewalld is to either use pre-defined services or to explicitly specify the port/protocol they wish to permit. The firewall-config graphical tool can also be used to review pre-defined services and to define additional services.
+
+Configure firewall settings
+There are three main ways for system administrators to interact with firewalld:
+
+By directly editing configuration files in /etc/firewalld/ (not discussed in this chapter)
+
+By using the graphical firewall-config tool
+
+By using firewall-cmd from the command line
+
+Configure firewall settings with firewall-config
+
+firewall-config is a graphical tool that can be used to alter and inspect both the running, in-memory configuration for firewalld, as well as the persistent, on-disk configuration. The firewall-config tool can be installed from the firewall-config package.
+
+Once installed, firewall-config can be launched from the command line as firewall-config, or from the Applications menu under Applications → Sundry → Firewall. If firewall-config is started by an unprivileged user, it will prompt for the root password to continue.
+
+
+Figure 15.1: The main firewall configuration screen
+On the main screen of firewall-config, a system administrator can select between modifying the current, in-memory configuration, or the persistent, on-disk configuration that will be used after a restart/reload of firewalld. This is achieved with the Configuration dropdown menu. In most cases, system administrators will want to adjust the persistent (Permanent) configuration, and then use the Options → Reload Firewalld menu entry to activate their changes.
+
+To modify a zone, select the zone in the Zone menu on the left. Network interfaces and source IP addresses/ranges can be assigned in the Interfaces and Sources tabs on the right, respectively.
+
+Ports can be opened by either putting a checkmark in front of them in the Services tab, or by adding a new port in the Ports tab for that zone.
+
+If a specific set of ports has to be opened in multiple zones, a system administrator can also define a service for those ports. This can be done in the Services tab at the top of the window.
+
+The default zone for otherwise unspecified connections can be changed under Options → Change Default Zone.
+
+IMPORTANT
+Any changes made in the Permanent configuration will not become active until the next time that the firewalld service unit is restarted or reloaded. Likewise, any changes made in the Runtime configuration will not survive a reload or restart of the firewalld service.
+
+Configure firewall settings with firewall-cmd
+
+For those system administrators who prefer to work on the command line or who can not use a graphical environment for any reason, there is also a command-line client to interact with firewalld, firewall-cmd.
+
+firewall-cmd is installed as part of the main firewalld package. firewall-cmd can perform the same actions that firewall-config can.
+
+The following table lists a number of frequently used firewall-cmd commands, along with an explanation. Note that unless otherwise specified, almost all commands will work on the runtime configuration, unless the --permanent option is specified. Many of the commands listed take the --zone=<ZONE> option to determine which zone they affect.
+
+firewall-cmd commands	Explanation
+--get-default-zone	
+Query the current default zone.
+
+--set-default-zone=<ZONE>	
+Set the default zone. This changes both the runtime and the permanent configuration.
+
+--get-zones	
+List all available zones.
+
+--get-active-zones	
+List all zones currently in use (have an interface or source tied to them), along with their interface and source information.
+
+--add-source=<CIDR> [--zone=<ZONE>]	
+Route all traffic coming from the IP address or network/netmask <CIDR> to the specified zone. If no --zone= option is provided, the default zone will be used.
+
+--remove-source=<CIDR> [--zone=<ZONE>]	
+Remove the rule routing all traffic coming from the IP address or network/netmask <CIDR> from the specified zone. If no --zone= option is provided, the default zone will be used.
+
+--add-interface=<INTERFACE> [--zone=<ZONE>]	
+Route all traffic coming from <INTERFACE> to the specified zone. If no --zone= option is provided, the default zone will be used.
+
+--change-interface=<INTERFACE> [--zone=<ZONE>]	Associate the interface with <ZONE> instead of its current zone. If no --zone= option is provided, the default zone will be used.
+--list-all [--zone=<ZONE>]	
+List all configured interfaces, sources, services, and ports for <ZONE>. If no --zone= option is provided, the default zone will be used.
+
+--list-all-zones	
+Retrieve all information for all zones. (Interfaces, sources, ports, services, etc.)
+
+--add-service=<SERVICE> [--zone=<ZONE>]	
+Allow traffic to <SERVICE>. If no --zone= option is provided, the default zone will be used.
+
+--add-port=<PORT/PROTOCOL> [--zone=<ZONE>]	
+Allow traffic to the <PORT/PROTOCOL> port(s). If no --zone= option is provided, the default zone will be used.
+
+--remove-service=<SERVICE> [--zone=<ZONE>]	
+Remove <SERVICE> from the allowed list for the zone. If no --zone= option is provided, the default zone will be used.
+
+--remove-port=<PORT/PROTOCOL> [--zone=<ZONE>]	
+Remove the <PORT/PROTOCOL> port(s) from the allowed list for the zone. If no --zone= option is provided, the default zone will be used.
+
+--reload	
+Drop the runtime configuration and apply the persistent configuration.
+
+firewall-cmd example
+
+The following examples show the default zone being set to dmz, all traffic coming from the 192.168.0.0/24 network being assigned to the internal zone, and the network ports for mysql being opened on the internal zone.
+
+[root@serverX ~]# firewall-cmd --set-default-zone=dmz
+[root@serverX ~]# firewall-cmd --permanent --zone=internal --add-source=192.168.0.0/24
+[root@serverX ~]# firewall-cmd --permanent --zone=internal --add-service=mysql
+[root@serverX ~]# firewall-cmd --reload
+NOTE
+For situations where the basic syntax of firewalld is not enough, system administrators can also add rich-rules, a more expressive syntax, to write more complex rules. If even the rich-rules syntax is not enough, system administrators can also use Direct Configuration rules, basically raw iptables syntax that will be mixed in with the firewalld rules.
+
+These advanced modes are beyond the scope of this chapter.
+
+REFERENCES
+firewall-cmd(1), firewall-config(1), firewalld(1), firewalld.zone(5) and firewalld.zones(5) man pages
+
+
+Guided Exercise: Practice: Limiting Network Communication
+In this lab, you will configure a basic firewall.
+
+Resources
+Machines:	serverX and desktopX
+Outcomes:
+
+After completion of this exercise, your serverX machine should have a running web server, listening on both the cleartext port 80/TCP and the SSL encapsulated port 443/TCP. The firewall configuration on serverX should only allow connections to the SSL encapsulated port.
+
+The firewall should allow access to sshd and vnc from all hosts.
+
+Reset your serverX system.
+
+On your serverX system, make sure that both the httpd and mod_ssl packages are installed. These packages provide the Apache web server you will protect with a firewall, and the necessary extensions for the web server to serve content over SSL.
+
+[student@serverX ~]$ sudo yum -y
+            install httpd mod_ssl
+On your serverX system, create a new file called /var/www/html/index.html, with the following contents:
+
+I am alive
+[student@serverX ~]$ sudo bash -c "echo 'I am alive' > /var/www/html/index.html"
+Start and enable the httpd service on your serverX system.
+
+[student@serverX ~]$ sudo systemctl start httpd
+[student@serverX ~]$ sudo systemctl enable httpd
+On your serverX system, make sure that both the iptables and ip6tables services are masked, and that the firewalld service is enabled and running.
+
+[student@serverX ~]$ sudo systemctl mask iptables
+[student@serverX ~]$ sudo systemctl mask ip6tables
+[student@serverX ~]$ sudo systemctl status firewalld
+On your serverX system, start the firewall-config application. When prompted for the student password, enter student.
+
+[student@serverX ~]$ firewall-config
+or
+
+Select Applications → Sundry → Firewall from the system menu.
+
+From the Configuration dropdown menu, select Permanent to switch to editing the permanent configuration.
+
+Add the https service to the list of services allowed in the public zone.
+
+In the Zone list, select public. Since this zone is also the default zone, it is highlighted in bold.
+
+In the Services tab, add a checkmark in front of the https service.
+
+Important: Also add a checkmark in front of the vnc-server service. Failing to do so will lock out your graphical interface when you activate the firewall. If you do accidentally lock yourself out, recover by using ssh -X serverX firewall-config from your desktopX machine.
+
+Activate your firewall configuration by selecting Options → Reload Firewalld from the menu.
+
+Verify your work by attempting to view your web server contents from desktopX.
+
+This command should fail:
+
+[student@desktopX ~]$ curl -k http://serverX.example.com
+This command should succeed:
+
+[student@desktopX ~]$ curl -k https://serverX.example.com
+NOTE
+If you use firefox to connect to the web server, it will prompt for verification of the host certificate if it successfully gets past the firewall.

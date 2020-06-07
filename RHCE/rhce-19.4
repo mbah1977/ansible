@@ -1,0 +1,151 @@
+Managing SELinux Port Labeling
+In this section, students learned how to ensure network ports have the correct SELinux type so that services are able to bind to them.
+
+Objectives
+After completing this section, students should be able to ensure network ports have the correct SELinux type so that services are able to bind to them.
+
+SELinux port labeling
+Managing SELinux port security
+SELinux does more than just file and process labeling. Network traffic is also tightly enforced by the SELinux policy. One of the methods that SELinux uses for controlling network traffic is labeling network ports; for example, in the targeted policy, port 22/TCP has the label ssh_port_t associated with it.
+
+Whenever a process wants to listen on a port, SELinux will check to see if the label associated with that process (the domain) is allowed to bind that port label. This can stop a rogue service from taking over ports otherwise used by other (legitimate) network services.
+
+Managing SELinux port labeling
+Whenever an administrator decides to run a service on a nonstandard port, there is a high chance that SELinux port labels will need to be updated. In some cases, the targeted policy has already labeled the port with a type that can be used; for example, since port 8008/TCP is often used for web applications, that port is already labeled with http_port_t, the default port type for the web server.
+
+Listing port labels
+
+To get an overview of all the current port label assignments, administrators can use the port subcommand of the semanage command. The -l option will list all current assignments, in the form:
+
+port_label_t     tcp|udp    comma,separated,list,of,ports
+To only view local changes to the default policy, administrators can add the -C option to this command.
+
+Example output:
+
+[root@serverX ~]# semanage port -l
+...  
+http_cache_port_t       tcp   8080, 8118, 8123, 10001-10010
+http_cache_port_t       udp   3130
+http_port_t             tcp   80, 81, 443, 488, 8008, 8009, 8443, 9000
+...
+Note that a port label can appear twice in the output, once for TCP and once for UDP.
+
+NOTE
+A graphical tool, system-config-selinux, is also available for administrators who prefer to work with GUI tools. This tool is part of the policycoreutils-gui package.
+
+Managing port labels
+
+semanage can also be used to assign new port labels, remove port labels, or modify existing ones.
+
+IMPORTANT
+Only local modifications can be removed or modified. To allow a service to bind to a port label normally associated with another service, a small policy module must be written. Writing and generating policy modules falls outside the scope of this course. It is also not possible to remove a port label from the policy without overriding the policy module that provided that label.
+
+To add a port to an existing port label (type), use the following syntax:
+
+[root@serverX ~]# semanage port -a -t port_label -p tcp|udp PORTNUMBER
+For example, to allow a gopher service to listen on port 71/TCP:
+
+[root@serverX ~]# semanage port -a -t gopher_port_t -p tcp 71
+NOTE
+The targeted policy ships with a large number of port types. Per-service documentation on SELinux types, Booleans, and port types can be found in the service-specific SELinux man pages found in the selinux-policy-devel package.
+
+If these man pages are not yet installed on your system, follow this procedure:
+
+[root@serverX ~]# yum -y install selinux-policy-devel
+[root@serverX ~]# mandb
+[root@serverX ~]# man -k _selinux
+Removing port labels
+
+The syntax for removing a custom port label is the same as the syntax for adding a port label, but instead of using the -a option (for Add), the -d option (for Delete) is used.
+
+For example, to remove the binding of port 71/TCP to gopher_port_t:
+
+[root@serverX ~]# semanage port -d -t gopher_port_t -p tcp 71
+Modifying port bindings
+
+If an administrator has accidentally assigned the wrong type to a port, or requirements have changed, it's possible to modify the label associated with a port. This is a more efficient process than removing the old binding and adding a new one. Modifications require the -m option.
+
+For example, to modify port 71/TCP from gopher_port_t to http_port_t, an administrator can use the following command:
+
+[root@serverX ~]# semanage port -m -t http_port_t -p tcp 71
+REFERENCES
+semanage(8), semanage-port(8), *_selinux(8), and system-config-selinux(8) man pages
+
+
+
+
+
+Guided Exercise: Practice: Managing SELinux Port Labeling
+In this lab, you will configure your serverX system to allow http access on a nonstandard port.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+A web server running on serverX successfully serving content on a nonstandard port.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab selinuxport setup
+Your organization is deploying a new custom web application. Unfortunately for you, the web application is running on a nonstandard port; in this case, 82/TCP.
+
+One of your developers has already configured the application on your serverX. But, not being a rock star system administrator, he failed in getting the web server to start successfully. Your mission, if you choose to accept it, is to get the httpd.service service on serverX successfully started, and serving out content to your desktopX system over port 82/TCP.
+
+Start by restarting the httpd.service.
+
+[student@serverX ~]$ sudo systemctl restart httpd.service
+Job for httpd.service failed. See 'systemctl status httpd.service' and
+'journalctl -xn' for details
+View the output from systemctl status -l httpd.service.
+
+[student@serverX ~]$ sudo systemctl status -l httpd.service
+...
+  Permission denied: AH00072: make_sock: could not bind to address 0.0.0.0:82
+...
+Check if SELinux is blocking httpd from binding to port 82/TCP.
+
+[student@serverX ~]$ sudo sealert -a /var/log/audit/audit.log
+Configure SELinux to allow httpd to bind to port 82/TCP, then restart the httpd.service service.
+
+Use semanage to find an appropriate port type for port 82/TCP.
+
+[student@serverX ~]$ sudo semanage port -l | grep http
+http_port_t seems promising, since it is what the normal http port (80/TCP) is also assigned to.
+
+Assign port 82/TCP the http_port_t type.
+
+[student@serverX ~]$ sudo semanage port -a -t http_port_t -p tcp 82
+Restart the httpd.service service.
+
+[student@serverX ~]$ sudo systemctl restart httpd.service
+Check if you can now access the web server running on port 82/TCP.
+
+[student@serverX ~]$ curl http://serverX.example.com:82
+Hello
+Check if you can access the new web service from your desktopX system.
+
+[student@desktopX ~]$ curl http://serverX.example.com:82
+curl: (7) Failed to connect to serverX.example.com:82; No route to host
+That error means you still can't connect from desktopX. Take a minute to think up some probable causes for this failure.
+
+On your serverX system, open up port 82/TCP on your firewall.
+
+Open port 82/TCP in the permanent configuration for the default zone on the firewall on serverX.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-port=82/tcp
+Activate your firewall changes on serverX.
+
+[student@serverX ~]$ sudo firewall-cmd --reload
+Check if you can now access the new web service from your desktopX system.
+
+[student@desktopX ~]$ curl http://serverX.example.com:82
+Hello
+On your desktopX system, run the command lab selinuxport grade to verify your work.
+
+[student@desktopX ~]$ lab selinuxport grade
+Testing http access over port 82...  PASS
+

@@ -1,0 +1,141 @@
+Lab: Lab: Configuring Link Aggregation and Bridging
+In this lab, you will create a bridge that is connected to a network team interface.
+
+Resources:
+Files:	/etc/sysconfig/network-scripts/ifcfg-*
+Machines:	serverX
+Outcomes:
+
+serverX will have an activebackup team interface, called team0. The team0 interface will be built upon the port interfaces eno1 and eno2. team0 will be attached to a bridge, called brteam0. The bridge will have a static IP address of 192.168.0.100/24.
+
+Reset the serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab teambridge setup
+Become the root user.
+
+[student@serverX ~]$ sudo -i
+Confirm that eno1 and eno2 are available for use. Display the current state of the existing network interfaces. eno1 and eno2 will be the port interfaces that will be teamed into a single interface.
+
+[root@serverX ~]# ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 52:54:00:00:XX:0b brd ff:ff:ff:ff:ff:ff
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 00:10:18:2b:98:85 brd ff:ff:ff:ff:ff:ff
+6: eno2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 64:31:50:18:80:8f brd ff:ff:ff:ff:ff:ff
+Create an activebackup network team interface called team0.
+
+Create the network team interface and call it team0.
+
+[root@serverX ~]# nmcli con add type team con-name team0 ifname team0 \
+> config '{"runner": {"name": "activebackup"}}'
+Connection 'team0' (2f608473-ff8b-4a0d-b250-79567e3f4a13) successfully added.
+Assign eno1 and eno2 as network port interfaces for team0.
+
+[root@serverX ~]# nmcli con add type team-slave con-name team0-port1 ifname eno1 master team0
+Connection 'team0-port1' (3367d0ef-deb5-444b-bc01-0ed3825615a9) successfully added.
+[root@serverX ~]# nmcli con add type team-slave con-name team0-port2 ifname eno2 master team0
+Connection 'team0-port2' (4951d25b-a454-4735-8c7b-a51b983df56b) successfully added.
+Confirm the team0 interface is up and working properly.
+
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+ports:
+  eno1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+  eno2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+runner:
+  active port: eno1
+Disable the team0 device then the NetworkManager service.
+
+[root@serverX ~]# nmcli dev dis team0
+[root@serverX ~]# systemctl stop NetworkManager
+[root@serverX ~]# systemctl disable NetworkManager
+rm '/etc/systemd/system/multi-user.target.wants/NetworkManager.service'
+rm '/etc/systemd/system/dbus-org.freedesktop.NetworkManager.service'
+rm '/etc/systemd/system/dbus-org.freedesktop.nm-dispatcher.service'
+Manipulate the interface configuration files so that the team0 interface is attached to a software bridge called brteam0. The bridge should have a static IP address of 192.168.0.100/24.
+
+List the original interface configuration files that were created by NetworkManager:
+
+[root@serverX ~]# cd /etc/sysconfig/network-scripts/ 
+[root@serverX network-scripts]# ls -1 ifcfg-*
+ifcfg-eth0
+ifcfg-lo
+ifcfg-team0
+ifcfg-team0-port1
+ifcfg-team0-port2
+Edit ifcfg-team0 and define a BRIDGE variable that assigns it to the new bridge about to be created, brteam0.
+
+[root@serverX network-scripts]# vim ifcfg-team0
+[root@serverX network-scripts]# tail ifcfg-team0
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+IPV6_FAILURE_FATAL=no
+NAME=team0
+UUID=2f608473-ff8b-4a0d-b250-79567e3f4a13
+ONBOOT=yes
+BRIDGE=brteam0
+BRIDGE=brteam0
+Remove the IP configuration information from the configuration files for the team port interfaces.
+
+[root@serverX network-scripts]# vim ifcfg-team0-port1
+[root@serverX network-scripts]# cat ifcfg-team0-port1
+NAME=team0-port1
+UUID=3367d0ef-deb5-444b-bc01-0ed3825615a9
+DEVICE=eno1
+ONBOOT=yes
+TEAM_MASTER=team0
+DEVICETYPE=TeamPort
+Repeat these steps for the ifcfg-team0-port2 configuration file.
+
+Create a new interface configuration file for the bridge, ifcfg-brteam0. Define the IP configuration information in that file.
+
+[root@serverX network-scripts]# vim ifcfg-brteam0
+[root@serverX network-scripts]# cat ifcfg-brteam0
+DEVICE=brteam0
+ONBOOT=yes
+TYPE=Bridge
+IPADDR0=192.168.0.100
+PREFIX0=24
+Reset the network to start the new bridge, brteam0, and reactivate the team0 interface.
+
+[root@serverX network-scripts]# systemctl restart network
+Reboot serverX, log in as student, and test the network connectivity of the new bridge, brteam0. Verify your configuration by running lab teambridge grade.
+
+Reboot serverX.
+
+[root@serverX network-scripts]# reboot
+Use ping to see if the local gateway, 192.168.0.254, can be reached through the brteam0 interface.
+
+[student@serverX ~]$ ping -I brteam0 192.168.0.254
+PING 192.168.0.254 (192.168.0.254) from 192.168.0.100 brteam0: 56(84) bytes of data.
+64 bytes from 192.168.0.254: icmp_seq=1 ttl=64 time=0.172 ms
+64 bytes from 192.168.0.254: icmp_seq=2 ttl=64 time=0.091 ms
+64 bytes from 192.168.0.254: icmp_seq=3 ttl=64 time=0.052 ms
+... Output omitted ...
+Run the grading script to verify your work.
+
+[student@serverX ~]$ lab teambridge grade
+Confirming teamed inferface exists .... PASS
+It uses specified port interfaces ..... PASS
+Correct team runner implemented ....... PASS
+... Output omitted ...
+

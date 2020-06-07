@@ -1,0 +1,288 @@
+Chapter 18. Configuring Link Aggregation and Bridging
+Configuring Network Teaming
+Guided Exercise: Practice: Configuring Network Teaming
+Managing Network Teaming
+Guided Exercise: Practice: Managing Network Teaming
+Configuring Software Bridges
+Guided Exercise: Practice: Configuring Software Bridges
+Lab: Lab: Configuring Link Aggregation and Bridging
+Abstract
+
+Overview
+Goal	To configure and troubleshoot advanced network interface functionality, including teaming and local software bridges.
+Objectives	
+Use network teaming to provide link redundancy or higher throughput.
+
+Manage a network team interface.
+
+Manage local software bridges and associated interfaces.
+
+Sections	
+Configuring Network Teaming (and Practice)
+
+Managing Network Teaming (and Practice)
+
+Configuring Software Bridges (and Practice)
+
+Lab	
+Configuring Link Aggregation and Bridging
+
+Configuring Network Teaming
+In this section, students learned how to define network teaming interfaces.
+
+Objectives
+After completing this section, students should be able to combine two network links using network teaming to provide link redundancy or higher throughput.
+
+Network teaming
+Network teaming is method for linking NICs together logically to allow for failover or higher throughput. Teaming is a new implementation that does not affect the older bonding driver in the Linux kernel; it offers an alternate implementation. Red Hat Enterprise Linux 7 supports channel bonding for backward compatability. Network teaming provides better performance and is more extensible because of its modular design.
+
+Red Hat Enterprise Linux 7 implements network teaming with a small kernel driver and a user-space daemon, teamd. The kernel handles network packets efficiently and teamd handles logic and interface processing. Software, called runners, implement load balancing and active-backup logic, such as roundrobin. The following runners are available to teamd:
+
+broadcast: a simple runner which transmits each packet from all ports.
+
+roundrobin: a simple runner which transmits packets in a round-robin fashing from each of the ports.
+
+activebackup: this is a failover runner which watches for link changes and selects an active port for data transfers.
+
+loadbalance: this runner monitors traffic and uses a hash function to try to reach a perfect balance when selecting ports for packet transmission.
+
+lacp: implements the 802.3ad Link Aggregation Control Protocol. Can use the same transmit port selection possibilities as the loadbalance runner.
+
+All network interaction is done through a team interface, composed of multiple network port interfaces. When controlling teamed port interfaces using NetworkManager, and especially when fault finding, keep the following in mind:
+
+Starting the network team interface does not automatically start the port interfaces.
+
+Starting a port interface always starts the teamed interface.
+
+Stopping the teamed interface also stops the port interfaces.
+
+A teamed interface without ports can start static IP connections.
+
+A team without ports waits for ports when starting DHCP connections.
+
+A team with a DHCP connection waiting for ports completes when a port with a carrier is added.
+
+A team with a DHCP connection waiting for ports continues waiting when a port without a carrier is added.
+
+Configuring network teams
+Configuring Network Teaming
+The nmcli command can be used to create and manage team and port interfaces. The following four steps are used to create and activate a network team interface:
+
+Create the team interface.
+
+Determine the IPv4 and/or IPv6 attributes of the team interface.
+
+Assign the port interfaces.
+
+Bring the team and port interfaces up/down.
+
+Create the team interface
+
+Use the nmcli command to create a connection for the network team interface, with the following syntax:
+
+nmcli con add type team con-name CNAME ifname INAME [config JSON]
+where CNAME will be the name used to refer to the connection, INAME will be the interface name, and JSON specifies the runner to be used. JSON has the following syntax:
+
+'{"runner": {"name": "METHOD"}}'
+where METHOD is one of the following: broadcast, roundrobin, activebackup, loadbalance, or lacp.
+
+Example:
+
+[root@demo ~]# nmcli con add type team con-name team0 ifname team0 config '{"runner": {"name": "loadbalance"}}'
+Determine the IPv4/IPv6 attributes of the team interface
+
+Once the network team interface is created, IPv4 and/or IPv6 attributes can be assigned to it. If DHCP is available, this step is optional, because the default attributes configure the interface to get its IP settings using DHCP.
+
+The following example demonstrates how to assign a static IPv4 address to the team0 interface:
+
+[root@demo ~]# nmcli con mod team0 ipv4.addresses 1.2.3.4/24
+[root@demo ~]# nmcli con mod team0 ipv4.method manual
+Note that the ipv4.addresses have to be assigned before the ipv4.method can be set to manual.
+
+Assign the port interfaces
+
+Use the nmcli command to create each of the port interfaces with the following syntax:
+
+nmcli con add type team-slave con-name CNAME ifname INAME master TEAM
+where CNAME will be the name used to refer to the port, INAME is the name of an existing interface, and TEAM specifies the connection name of the network team interface.
+
+The connection name can be explicitly specified, or it will be team-slave-IFACE by default.
+
+Example:
+
+[root@demo ~]# nmcli con add type team-slave ifname eth1 master team0
+[root@demo ~]# nmcli con add type team-slave ifname eth2 master team0 con-name team0-eth2
+Bring the team and port interfaces up/down
+
+nmcli command can also be used to manage the connections for the team and port interfaces with the following syntax:
+
+nmcli dev dis INAME
+nmcli con up CNAME
+INAME is the device name of the team or port interface to be managed. CNAME is the connection name of that interface. where CNAME is the connection name of the team or port interface to be managed.
+
+Example:
+
+[root@demo ~]# nmcli con up team0
+[root@demo ~]# nmcli dev dis eth2
+When the team interface is up, the teamdctl command can be used to display the team's state. The output of this command includes the status of the port interfaces.
+
+[root@demo ~]# teamdctl team0 state
+setup:
+  runner: roundrobin
+ports:
+  eth1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+  eth2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+REFERENCES
+nmcli-examples(5), teamdctl(8), and teamd(8) man pages
+
+
+
+
+
+
+
+Guided Exercise: Practice: Configuring Network Teaming
+In this lab, you will create a network team interface.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+A network team interface called team0 will have a static IP address of 192.168.0.100/24 and will be built upon two port interfaces: eno1 and eno2. It will be a fault-tolerant/active-backup interface.
+
+Reset the serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab teambridge setup
+Become the root user.
+
+[student@serverX ~]$ sudo -i
+Display the current state of the existing network interfaces. eno1 and eno2 will be the interfaces that will be the ports for the teamed interface.
+
+[root@serverX ~]# ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 52:54:00:00:XX:0b brd ff:ff:ff:ff:ff:ff
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 00:10:18:2b:98:85 brd ff:ff:ff:ff:ff:ff
+6: eno2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 64:31:50:18:80:8f brd ff:ff:ff:ff:ff:ff
+Create a active-backup teaming interface called team0 and assign its IPv4 settings.
+
+Create the team0 connection.
+
+[root@serverX ~]# nmcli con add type team con-name team0 ifname team0 config '{"runner": {"name": "activebackup"}}'
+Connection 'team0' (5dc435ac-e4ac-403a-8e8f-163b163bf49b) successfully added.
+Define the IPv4 settings for team0. Assign it the IP address 192.168.0.100/24; the method for IP should be static.
+
+[root@serverX ~]# nmcli con mod team0 ipv4.addresses '192.168.0.100/24'
+[root@serverX ~]# nmcli con mod team0 ipv4.method manual
+Assign eno1 and eno2 as port interfaces for team0.
+
+[root@serverX ~]# nmcli con add type team-slave con-name team0-port1 ifname eno1 master team0
+Connection 'team0-port1' (f5664c4e-1dba-43f8-8427-35aee0594ed3) successfully added.
+[root@serverX ~]# nmcli con add type team-slave con-name team0-port2 ifname eno2 master team0
+Connection 'team0-port2' (174e4402-b169-47d1-859f-9a4b3f30000f) successfully added.
+Check the current state of the teamed interfaces on the system.
+
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+ports:
+  eno1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+  eno2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+runner:
+  active port: eno1
+Notice how the teamed interface immediately becomes active with eno1 as the active port.
+
+Open another terminal and ping the local network gateway through the team0 interface. Let this ping continue to run as you perform the following steps.
+
+[student@serverX ~]$ ping -I team0 192.168.0.254
+PING 192.168.0.254 (192.168.0.254) from 192.168.0.100 team0: 56(84) bytes of data.
+64 bytes from 192.168.0.254: icmp_seq=10 ttl=64 time=1.08 ms
+64 bytes from 192.168.0.254: icmp_seq=11 ttl=64 time=0.789 ms
+64 bytes from 192.168.0.254: icmp_seq=12 ttl=64 time=0.906 ms
+...Output omitted...
+Go back to the other root terminal. Bring the active port of the teamed interface down and see its impact upon team0.
+
+[root@serverX ~]# nmcli dev dis eno1
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+ports:
+  eno2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+runner:
+  active port: eno2
+The ping continues to work because team0 switched over to the remaining port.
+
+Bring the original port interface back up and bring the other port interface down.
+
+[root@serverX ~]# nmcli con up team0-port1
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/10)
+[root@serverX ~]# nmcli dev dis eno2
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+ports:
+  eno1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+runner:
+  active port: eno1
+Again, note how the ping continues to reach the local gateway.
+
+Bring the down port interface back up and observe how it affects the teamed interface, team0.
+
+[root@serverX ~]# nmcli con up team0-port2
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/11)
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+ports:
+  eno1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+  eno2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+runner:
+  active port: eno1
+The ping continues to contact the local network gateway, and the currently active port interface does not change when both port interfaces are available.
+
+

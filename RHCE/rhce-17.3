@@ -1,0 +1,403 @@
+IPv6 Networking Configuration
+In this section, students learned how to:
+
+Configure IPv6 networking using nmcli.
+
+Configure IPv6 networking using /etc/sysconfig/network-scripts/ifcfg-* files.
+
+Objectives
+After completing this section, students should be able to configure IPv6 networking using nmcli and configuration files in the /etc/sysconfig/network-scripts directory.
+
+NetworkManager and IPv6
+IPv6 Networking Configuration
+To work with IPv6 addresses using NetworkManager, all the commands that are used with IPv4 networking work with IPv6 networking. There are some different settings that are relevant for connections, but most commands will be similar for IPv6 configuration.
+
+Adding an IPv6 network connection
+The nmcli con add command is used to add new network connections.
+
+The following command, shown in a previous section of this chapter, will add a new connection for the interface eno2, which will autoconnect at startup, getting IPv4 networking information using DHCPv4. It will also get IPv6 networking settings by listening for router advertisements on the local link.
+
+[root@demo ~]# nmcli con add con-name eno2 type ethernet ifname eno2
+The next example configures the eno2 interface statically instead, using the IPv6 address and network prefix 2001:db8:0:1::c000:207/64 and default IPv6 gateway 2001:db8:0:1::1, and the IPv4 address and network prefix 192.0.2.7/24 and default IPv4 gateway 192.0.2.1, but still autoconnects at startup and saves its configuration into /etc/sysconfig/network-scripts/ifcfg-eno2. The example is line-wrapped with a shell \ escape.
+
+[root@demo ~]# nmcli con add con-name eno2 type ethernet ifname eno2 \ 
+> ip6 2001:db8:0:1::c000:207/64 gw6 2001:db8:0:1::1 ip4 192.0.2.7/24 gw4 192.0.2.1
+Modifying network connection settings for IPv6
+The nmcli con show name command, where name is the name of the connection, can be used to view IPv6-related settings:
+
+[root@demo ~]# nmcli con show static-eth0 | grep ipv6
+ipv6.method:                  manual
+ipv6.dns:                     2001:4860:4860::8888
+ipv6.dns-search:              example.com
+ipv6.addresses:               { ip = 2001:db8:0:1::7/64, gw = 2001:db8:0:1::1 }
+ipv6.routes:                            
+ipv6.ignore-auto-routes:      no
+ipv6.ignore-auto-dns:         no
+ipv6.never-default:           no
+ipv6.may-fail:                yes
+ipv6.ip6-privacy:             -1 (unknown)
+ipv6.dhcp-hostname:           --
+[root@demo ~]# 
+Likewise, nmcli con mod name can be used to adjust how connections set IPv6 addresses.
+
+To set the IPv6 address to 2001:db8:0:1::a00:1/64 and default gateway to 2001:db8:0:1::1 for the connection static-eth0:
+
+[root@demo ~]# nmcli con mod static-eth0 ipv6.address "2001:db8:0:1::a00:1/64 2001:db8:0:1::1"
+IMPORTANT
+If a connection that got its IPv6 information by SLAAC or a DHCPv6 server is being changed to get it from static configuration files only, the setting ipv6.method should also be changed from auto or dhcp to manual. Otherwise, the connection may hang or not complete successfully when it is activated, or it may get an IPv6 address from SLAAC or DHCPv6 in addition to the static address.
+
+A number of settings may have multiple values. A specific value can be added to the list or deleted from the list for a setting by adding a + or - symbol to the start of the setting name.
+
+To add the DNS server 2001:4860:4860::8888 to the list of nameservers to use with the connection static-eth0:
+
+[root@demo ~]# nmcli con mod static-eth0 +ipv6.dns 2001:4860:4860::8888
+NOTE
+Static IPv4 and IPv6 DNS settings all end up as nameserver directives in /etc/resolv.conf. It may be a good idea to ensure that there is, at minimum, an IPv4-reachable nameserver (assuming a dual-stack system) and preferably at least one nameserver using each protocol in case of connectivity issues with either IPv4 or IPv6 networking.
+
+Remember that the file /etc/sysconfig/network-scripts/ifcfg-name can be directly edited, and that nmcli con reload must be run after saving so that NetworkManager reads the configuration changes.
+
+The following table maps some of the key NetworkManager setting names relevant to IPv6 connections to ifcfg-* directives.
+
+Table 17.3. Comparison of nm-settings and ifcfg-* Directives
+
+nmcli con mod	ifcfg-* file	Effect
+ipv6.method manual	IPV6_AUTOCONF=no	IPv6 addresses configured statically.
+ipv6.method auto	IPV6_AUTOCONF=yes	Will configure network settings using SLAAC from router advertisements.
+ipv6.method dhcp	
+IPV6_AUTOCONF=no
+DHCPV6C=yes
+
+Will configure network settings by using DHCPv6, but not SLAAC.
+ipv6.addresses "2001:db8::a/64 2001:db8::1"	
+IPV6ADDR=2001:db8::a/64
+IPV6_DEFAULTGW=2001:db8::1
+
+Sets static IPv4 address, network prefix, and default gateway. If more than one address is set for the connection, IPV6_SECONDARIES takes a double-quoted list of space-delimited address/prefix definitions.
+ipv6.dns . . .	DNS0= . . .	Modify /etc/resolv.conf to use this nameserver. Exactly the same as IPv4.
+ipv6.dns-search example.com	DOMAIN=example.com	Modify /etc/resolv.conf to use this domain in the search directive. Exactly the same as IPv4.
+ipv6.ignore-auto-dns true	IPV6_PEERDNS=no	Ignore DNS server information from the DHCP server.
+connection.autoconnect yes	ONBOOT=yes	Automatically activate this connection at boot.
+connection.id eth0	NAME=eth0	The name of this connection.
+connection.interface-name eth0	DEVICE=eth0	The connection is bound to the network interface with this name.
+802-3-ethernet.mac-address . . .	HWADDR= . . .	The connection is bound to the network interface with this MAC address.
+
+Viewing IPv6 networking information
+Both nmcli dev status to show the NetworkManager status of all network devices and nmcli con show to show the list of available connections work exactly as they do for IPv4.
+
+The ip addr show command still displays the current configuration of network interfaces on the system. The example that follows calls out some items relevant to IPv6.
+
+[student@demo ~]$ ip addr show eth0
+2: eth0: <BROADCAST,MULTICAST,1UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    2link/ether 52:54:00:00:00:0b brd ff:ff:ff:ff:ff:ff
+    3inet 192.0.2.2/24 brd 192.0.2.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    4inet6 2001:db8:0:1:5054:ff:fe00:b/64 scope global
+       valid_lft forever preferred_lft forever
+    5inet6 fe80::5054:ff:fe00:b/64 scope link 
+       valid_lft forever preferred_lft forever
+1
+
+An active interface is UP.
+
+2
+
+The link/ether line specifies the hardware (MAC) address of the device.
+
+3
+
+The inet line shows an IPv4 address, its network prefix length, and scope.
+
+4
+
+The inet6 line shows an IPv6 address, its network prefix length, and scope. This address is of global scope and is normally used.
+
+5
+
+This inet6 line is for an address of link scope and can only be used for communication on the local Ethernet link.
+
+The ip -6 route show command displays the IPv6 routing table for the system:
+
+[root@demo ~]# ip -6 route show
+unreachable ::/96 dev lo  metric 1024  error -101
+unreachable ::ffff:0.0.0.0/96 dev lo  metric 1024  error -101
+2001:db8:0:1::/64 dev eth0  proto kernel  metric 256 
+unreachable 2002:a00::/24 dev lo  metric 1024  error -101
+unreachable 2002:7f00::/24 dev lo  metric 1024  error -101
+unreachable 2002:a9fe::/32 dev lo  metric 1024  error -101
+unreachable 2002:ac10::/28 dev lo  metric 1024  error -101
+unreachable 2002:c0a8::/32 dev lo  metric 1024  error -101
+unreachable 2002:e000::/19 dev lo  metric 1024  error -101
+unreachable 3ffe:ffff::/32 dev lo  metric 1024  error -101
+fe80::/64 dev eth0  proto kernel  metric 256 
+default via 2001:db8:0:1::ffff dev eth0  proto static  metric 1024
+In the previous example, ignore the unreachable routes, which point at networks which are never to be used. That leaves three routes:
+
+To the 2001:db8:0:1::/64 network using the eth0 interface (which presumably has an address on that network).
+
+To the fe80::/64 network using the eth0 interface, for the link-local address. On a system with multiple interfaces, there will be a route to fe80::/64 out each interface for each link-local address.
+
+A default route to all networks on the IPv6 Internet (the ::/0 network) that don't have a more specific route on the system, through the router at 2001:db8:0:1::ffff, reachable with the eth0 device.
+
+IPv6 troubleshooting tools
+Connectivity
+
+The ping6 command is the IPv6 version of ping in Red Hat Enterprise Linux. It communicates over IPv6 and can take IPv6 addresses, but otherwise works like ping.
+
+[root@demo ~]# ping6 2001:db8:0:1::1
+PING 2001:db8:0:1::1(2001:db8:0:1::1) 56 data bytes
+64 bytes from 2001:db8:0:1::1: icmp_seq=1 ttl=64 time=18.4 ms
+64 bytes from 2001:db8:0:1::1: icmp_seq=2 ttl=64 time=0.178 ms
+64 bytes from 2001:db8:0:1::1: icmp_seq=3 ttl=64 time=0.180 ms
+^C
+--- 2001:db8:0:1::1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2001ms
+rtt min/avg/max/mdev = 0.178/6.272/18.458/8.616 ms
+[root@demo ~]# 
+Link-local addresses and the link-local all-nodes multicast group (ff02::1) can be pinged, but the network interface to use must be specified explicitly with a scope zone identifier (such as ff02::1%eth0). If this is left out, the error connect: Invalid argument will be displayed.
+
+Pinging ff02::1 can be useful for finding other IPv6 nodes on the local network.
+
+[root@rhel7 ~]# ping6 ff02::1%eth1
+PING ff02::1%eth1(ff02::1) 56 data bytes
+64 bytes from fe80::78cf:7fff:fed2:f97b: icmp_seq=1 ttl=64 time=22.7 ms
+64 bytes from fe80::f482:dbff:fe25:6a9f: icmp_seq=1 ttl=64 time=30.1 ms (DUP!)
+64 bytes from fe80::78cf:7fff:fed2:f97b: icmp_seq=2 ttl=64 time=0.183 ms
+64 bytes from fe80::f482:dbff:fe25:6a9f: icmp_seq=2 ttl=64 time=0.231 ms (DUP!)
+^C
+--- ff02::1%eth1 ping statistics ---
+2 packets transmitted, 2 received, +2 duplicates, 0% packet loss, time 1001ms
+rtt min/avg/max/mdev = 0.183/13.320/30.158/13.374 ms
+[root@rhel7 ~]# ping6 -c 1 fe80::f482:dbff:fe25:6a9f%eth1
+PING fe80::f482:dbff:fe25:6a9f%eth1(fe80::f482:dbff:fe25:6a9f) 56 data bytes
+64 bytes from fe80::f482:dbff:fe25:6a9f: icmp_seq=1 ttl=64 time=22.9 ms
+
+--- fe80::f482:dbff:fe25:6a9f%eth1 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 22.903/22.903/22.903/0.000 ms
+Remember that IPv6 link-local addresses can be used by other hosts on the same link, just like normal addresses.
+
+[student@demo ~]$ ssh fe80::f482:dbff:fe25:6a9f%eth1
+student@fe80::f482:dbff:fe25:6a9f%eth1's password: 
+Last login: Thu Jun  5 15:20:10 2014 from demo.example.com
+[student@server ~]$ 
+Routing
+
+The tracepath6 and traceroute -6 commands are the equivalent to tracepath and traceroute for IPv6.
+
+[root@demo ~]# tracepath6 2001:db8:0:2::451
+ 1?: [LOCALHOST]                        0.091ms pmtu 1500
+ 1:  2001:db8:0:1::ba                   0.214ms 
+ 2:  2001:db8:0:1::1                    0.512ms
+ 3:  2001:db8:0:2::451			0.559ms reached
+     Resume: pmtu 1500 hops 3 back 3
+Ports and services
+
+Either the ss command or the netstat command can display information about network sockets, and they take almost identical options.
+
+[root@demo ~]# ss -A inet -n
+Netid State      Recv-Q Send-Q       Local Address:Port          Peer Address:Port   
+tcp   ESTAB      0      0           192.168.122.98:22           192.168.122.1:35279   
+tcp   ESTAB      0      0         2001:db8:0:1::ba:22         2001:db8:0:1::1:40810   
+[root@demo ~]# netstat -46n
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address        Foreign Address        State      
+tcp        0      0 192.168.122.98:22    192.168.122.1:35279    ESTABLISHED
+tcp6       0      0 2001:db8:0:1::ba:22  2001:db8:0:1::1:40810  ESTABLISHED
+Table 17.4. Options for ss and netstat
+
+Option	Description
+-n	Show numbers instead of names for interfaces and ports.
+-t	Show TCP sockets.
+-u	Show UDP sockets.
+-l	Show only listening sockets.
+-a	Show all (listening and established) sockets.
+-p	Show the process using the sockets.
+-A inet	
+Display active connections (but not listening sockets) for the inet address family. That is, ignore local UNIX domain sockets.
+
+For ss, both IPv4 and IPv6 connections will be displayed. For netstat, only IPv4 connections will be displayed. (netstat -A inet6 will display IPv6 connections, and netstat -46 will display IPv4 and IPv6 at the same time.)
+
+
+REFERENCES
+NetworkManager(8), nmcli(1), nmcli-examples(5), nm-settings(5), ip(8), ip-address(8), ip-route(8), ping6(8), tracepath6(8), traceroute(8), ss(8), and netstat(8) man pages
+
+
+
+
+
+Guided Exercise: Practice: Configuring IPv6 Networking
+In this lab, you will configure a network interface with a static IPv6 address. Once the interface is configured, you will confirm that it works and identify other IPv6 nodes on the local network. You will also explore the contents of the configuration file created by NetworkManager.
+
+Resources:
+Files:	/etc/sysconfig/network-scripts/ifcfg-eno1
+Machines:	serverX
+Outcomes:
+
+The eno1 network interface on your serverX machine will be managed by NetworkManager with a connection named eno1. It will statically configure an IPv6 address of fddb:fe2a:ab1e::c0a8:1/64 and use fddb:fe2a:ab1e::c0a8:fe/64 as the IPv6 gateway.
+
+Reset the serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab ipv6 setup
+Become the root user.
+
+[student@serverX ~]$ sudo -i
+Before making any changes, display the list of existing network interfaces in order to determine the system's current configuration. Also determine which interfaces are managed by NetworkManager.
+
+The ip link command will display all of the network interfaces recognized by the system.
+
+[root@serverX ~]# ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 52:54:00:00:07:0b brd ff:ff:ff:ff:ff:ff
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether ce:c4:7c:28:4c:7a brd ff:ff:ff:ff:ff:ff
+Use the nmcli to list the network interfaces that NetworkManager manages.
+
+[root@serverX ~]# nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0   
+Create a NetworkManager connection, called eno1, for the eno1 network interface. Redisplay the list of managed interfaces to confirm NetworkManager manages eno1.
+
+Use nmcli to create the connection for eno1.
+
+[root@serverX ~]# nmcli con add con-name eno1 type ethernet ifname eno1
+Connection 'eno1' (0d687259-c64b-4e5b-bece-cabbe952e46f) successfully added.
+Display the new list of interfaces managed by NetworkManager. eno1 should be somewhere in the list.
+
+[root@serverX ~]# nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+eno1         0d687259-c64b-4e5b-bece-cabbe952e46f  802-3-ethernet  eno1   
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0   
+Display the current IP address information for eno1.
+
+[root@serverX ~]# ip addr show eno1
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 06:8f:6e:13:6e:8e brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::48f:6eff:fe13:6e8e/64 scope link 
+       valid_lft forever preferred_lft forever
+It will have an IPv6 link-local address assigned to it (the address on the fe80::/64 network).
+
+Display the initial, default NetworkManager IPv6 configuration settings for the connection.
+
+[root@serverX ~]# nmcli con show eno1 | grep ipv6
+ipv6.method:                            auto
+ipv6.dns:                               
+ipv6.dns-search:                        
+ipv6.addresses:                         
+ipv6.routes:                            
+ipv6.ignore-auto-routes:                no
+ipv6.ignore-auto-dns:                   no
+ipv6.never-default:                     no
+ipv6.may-fail:                          yes
+ipv6.ip6-privacy:                       -1 (unknown)
+ipv6.dhcp-hostname:                     --
+Configure eno1 to have a static IPv6 address of fddb:fe2a:ab1e::c0a8:1 with a standard /64 subnet prefix. Use fddb:fe2a:ab1e::c0a8:fe as the IPv6 gateway.
+
+[root@serverX ~]# nmcli con mod eno1 ipv6.addresses 'fddb:fe2a:ab1e::c0a8:1/64 fddb:fe2a:ab1e::c0a8:fe'
+[root@serverX ~]# nmcli con mod eno1 ipv6.method manual
+Restart the eno1 network interface and confirm its new IPv6 address configuration.
+
+Bounce the eno1 interface by taking it down, then bringing it back up.
+
+[root@serverX ~]# nmcli con down eno1
+[root@serverX ~]# nmcli con up eno1
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)
+Use the ip addr command to confirm the interface's configuration.
+
+[root@serverX ~]# ip addr show dev eno1
+4: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 06:8f:6e:13:6e:8e brd ff:ff:ff:ff:ff:ff
+    inet6 fddb:fe2a:ab1e::c0a8:1/64 scope global 
+       valid_lft forever preferred_lft forever
+    inet6 fe80::48f:6eff:fe13:6e8e/64 scope link 
+       valid_lft forever preferred_lft forever
+Notice the global address, fddb:fe2a:ab1e::c0a8:1/64, is available for use.
+
+Ping eno1's own IPv6 address.
+
+[root@serverX ~]# ping6 fddb:fe2a:ab1e::c0a8:1
+PING fddb:fe2a:ab1e::c0a8:1(fddb:fe2a:ab1e::c0a8:1) 56 data bytes
+64 bytes from fddb:fe2a:ab1e::c0a8:1: icmp_seq=1 ttl=64 time=0.141 ms
+64 bytes from fddb:fe2a:ab1e::c0a8:1: icmp_seq=2 ttl=64 time=0.081 ms
+^C
+--- fddb:fe2a:ab1e::c0a8:1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 999ms
+rtt min/avg/max/mdev = 0.081/0.111/0.141/0.030 ms
+Ping the IPv6 gateway to make sure it is reachable by eno1.
+
+[root@serverX ~]# ping6 fddb:fe2a:ab1e::c0a8:fe
+PING fddb:fe2a:ab1e::c0a8:fe(fddb:fe2a:ab1e::c0a8:fe) 56 data bytes
+64 bytes from fddb:fe2a:ab1e::c0a8:fe: icmp_seq=1 ttl=64 time=0.254 ms
+64 bytes from fddb:fe2a:ab1e::c0a8:fe: icmp_seq=2 ttl=64 time=0.123 ms
+64 bytes from fddb:fe2a:ab1e::c0a8:fe: icmp_seq=3 ttl=64 time=0.119 ms
+64 bytes from fddb:fe2a:ab1e::c0a8:fe: icmp_seq=4 ttl=64 time=0.123 ms
+64 bytes from fddb:fe2a:ab1e::c0a8:fe: icmp_seq=5 ttl=64 time=0.090 ms
+^C
+--- fddb:fe2a:ab1e::c0a8:fe ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4000ms
+rtt min/avg/max/mdev = 0.090/0.141/0.254/0.059 ms
+Use the ip command to display the IPv6 routing table. Note the default gateway listed for IPv6.
+
+[root@serverX ~]# ip -6 route
+unreachable ::/96 dev lo  metric 1024  error -101
+unreachable ::ffff:0.0.0.0/96 dev lo  metric 1024  error -101
+unreachable 2002:a00::/24 dev lo  metric 1024  error -101
+unreachable 2002:7f00::/24 dev lo  metric 1024  error -101
+unreachable 2002:a9fe::/32 dev lo  metric 1024  error -101
+unreachable 2002:ac10::/28 dev lo  metric 1024  error -101
+unreachable 2002:c0a8::/32 dev lo  metric 1024  error -101
+unreachable 2002:e000::/19 dev lo  metric 1024  error -101
+unreachable 3ffe:ffff::/32 dev lo  metric 1024  error -101
+fddb:fe2a:ab1e::/64 dev eno1  proto kernel  metric 256 
+fe80::/64 dev eth0  proto kernel  metric 256 
+fe80::/64 dev eno1  proto kernel  metric 256 
+default via fddb:fe2a:ab1e::c0a8:fe dev eno1  proto static  metric 1024 
+Discover other local IPv6 nodes on the network. Ping the link-local all-nodes multicast group (ff02::1) through the eno1 interface to see what other hosts respond.
+
+[root@serverX ~]# ping6 ff02::1%eno1
+PING ff02::1%eno1(ff02::1) 56 data bytes
+64 bytes from fe80::fc46:acff:fefe:10b7: icmp_seq=1 ttl=64 time=0.298 ms
+64 bytes from fe80::707e:68ff:fe3e:fd23: icmp_seq=1 ttl=64 time=0.306 ms (DUP!)
+64 bytes from fe80::707e:68ff:fe3e:fd23: icmp_seq=2 ttl=64 time=0.125 ms
+64 bytes from fe80::fc46:acff:fefe:10b7: icmp_seq=2 ttl=64 time=0.161 ms (DUP!)
+64 bytes from fe80::707e:68ff:fe3e:fd23: icmp_seq=3 ttl=64 time=0.107 ms
+64 bytes from fe80::fc46:acff:fefe:10b7: icmp_seq=3 ttl=64 time=0.136 ms (DUP!)
+64 bytes from fe80::707e:68ff:fe3e:fd23: icmp_seq=4 ttl=64 time=0.111 ms
+64 bytes from fe80::fc46:acff:fefe:10b7: icmp_seq=4 ttl=64 time=0.143 ms (DUP!)
+64 bytes from fe80::707e:68ff:fe3e:fd23: icmp_seq=5 ttl=64 time=0.131 ms
+64 bytes from fe80::fc46:acff:fefe:10b7: icmp_seq=5 ttl=64 time=0.167 ms (DUP!)
+64 bytes from fe80::707e:68ff:fe3e:fd23: icmp_seq=6 ttl=64 time=0.109 ms
+64 bytes from fe80::fc46:acff:fefe:10b7: icmp_seq=6 ttl=64 time=0.141 ms (DUP!)
+64 bytes from fe80::707e:68ff:fe3e:fd23: icmp_seq=7 ttl=64 time=0.116 ms
+64 bytes from fe80::fc46:acff:fefe:10b7: icmp_seq=7 ttl=64 time=0.150 ms (DUP!)
+^C
+--- ff02::1%eno1 ping statistics ---
+7 packets transmitted, 7 received, +7 duplicates, 0% packet loss, time 5999ms
+rtt min/avg/max/mdev = 0.107/0.157/0.306/0.062 ms
+Identify the interface configuration file for the eno1 network interface in /etc/sysconfig/network-scripts. View the file contents and note which variable assignments relate to the IPv6 configuration that was performed earlier.
+
+[root@serverX ~]# ls /etc/sysconfig/network-scripts/ifcfg-*
+/etc/sysconfig/network-scripts/ifcfg-eno1
+/etc/sysconfig/network-scripts/ifcfg-eth0
+/etc/sysconfig/network-scripts/ifcfg-lo
+[root@serverX ~]# cat /etc/sysconfig/network-scripts/ifcfg-eno1
+TYPE=Ethernet
+BOOTPROTO=dhcp
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=no
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+NAME=eno1
+UUID=4214d89b-f409-4853-8e31-4e673845e1a1
+DEVICE=eno1
+ONBOOT=yes
+IPV6ADDR=fddb:fe2a:ab1e::c0a8:1/64
+IPV6_DEFAULTGW=fddb:fe2a:ab1e::c0a8:fe
+PEERDNS=yes
+PEERROUTES=yes
+

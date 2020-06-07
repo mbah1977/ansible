@@ -1,0 +1,229 @@
+
+Chapter 14. Mounting Network File Systems
+Mounting Network Storage with NFS
+Guided Exercise: Practice: Mounting and Unmounting NFS
+Automounting Network Storage with NFS
+Guided Exercise: Practice: Automounting NFS
+Accessing Network Storage with SMB
+Guided Exercise: Practice: Mounting a SMB File System
+Lab: Lab: Accessing Network Storage with Network File System (NFS)
+Lab: Lab: Accessing Network Storage with SMB
+Abstract
+
+Overview
+Goal	To use autofs and the command line to mount and unmount network storage with NFS and SMB.
+Objectives	
+Mount, access, and unmount network storage with NFS.
+
+Automount and access network storage with NFS.
+
+Mount, automount, and unmount SMB file systems.
+
+Sections	
+Mounting Network Storage with NFS (and Practice)
+
+Automounting Network Storage with NFS (and Practice)
+
+Accessing Network Storage with SMB (and Practice)
+
+Lab	
+Accessing Network Storage with Network File System (NFS)
+
+Accessing Network Storage with SMB
+
+Mounting Network Storage with NFS
+Identify the NFS share details; NFSv4 mount the NFS server root folder.
+
+Create a mount point directory.
+
+mount or update /etc/fstab to mount the NFS share.
+
+umount to unmount a NFS share.
+
+Objectives
+After completing this section, students should be able to manually mount, access, and unmount an NFS share.
+
+Manually mounting and unmounting NFS shares
+NFS, the Network File System, is an Internet standard protocol used by Linux, UNIX, and similar operating systems as their native network file system. It is an open standard under active extension which supports native Linux permissions and file system features.
+
+Red Hat Enterprise Linux 7 supports NFSv4 (version 4 of the protocol) by default, and falls back automatically to NFSv3 and NFSv2 if that is not available. NFSv4 uses the TCP protocol to communicate with the server, while older versions of NFS may use either TCP or UDP.
+
+NFS servers export shares (directories) and NFS clients mount an exported share to a local mount point (directory). The local mount point must exist. NFS shares can be mounted a number of ways:
+
+manually mounting an NFS share using the mount command.
+
+automatically mounting an NFS share at boot time using /etc/fstab.
+
+mounting an NFS share on demand through a process known as automounting.
+
+Securing file access on NFS shares
+
+NFS servers secure access to files using a number of methods: none, sys, krb5, krb5i, and krb5p. The NFS server can choose to offer a single method or multiple methods for each exported share. NFS clients must connect to the exported share using one of the methods mandated for that share, specified as a mount option sec=method.
+
+Security methods
+
+none: anonymous access to the files, writes to the server (if allowed) will be allocated UID and GID of nfsnobody.
+
+sys: file access based on standard Linux file permissions for UID and GID values. If not specified, this is the default.
+
+krb5: Clients must prove identity using Kerberos and then standard Linux file permissions apply.
+
+krb5i: adds a cryptographically strong guarantee that the data in each request has not been tampered with.
+
+krb5p: adds encryption to all requests between the client and the server, preventing data exposure on the network. This will have a performance impact.
+
+IMPORTANT
+Kerberos options will require, as a minimum, a /etc/krb5.keytab and additional authentication configuration that is not covered in this section (joining the Kerberos Realm). The /etc/krb5.keytab will normally be provided by the authentication or security administrator. Request a keytab that includes either a host principal, nfs principal, or (ideally) both.
+
+NFS uses the nfs-secure service to help negotiate and manage communication with the server when connecting to Kerberos-secured shares. It must be running to use the secured NFS shares; start and enable it to ensure it is always available.
+
+[student@desktopX ~]$ sudo systemctl enable nfs-secure
+ln -s '/usr/lib/systemd/system/nfs-secure.service'  ...
+[student@desktopX ~]$ sudo systemctl start nfs-secure
+NOTE
+The nfs-secure service is part of the nfs-utils package, which should be installed by default. If it is not installed, use:
+
+[student@desktopX ~]$ sudo yum -y install nfs-utils
+Mount an NFS share
+
+There are three basic steps to mounting an NFS share:
+
+Identify: The administrator for the NFS server can provide export details, including security requirements. Alternatively:
+
+NFSv4 shares can be identified by mounting the root folder of the NFS server and exploring the exported directories. Do this as root. Access to shares that are using Kerberos security will be denied, but the share (directory) name will be visible. Other share directories will be browsable.
+
+[student@desktopX ~]$ sudo mkdir /mountpoint
+[student@desktopX ~]$ sudo mount serverX:/ /mountpoint
+[student@desktopX ~]$ sudo ls /mountpoint
+NFSv2 and NFSv3 shares can be discovered using showmount.
+
+[student@desktopX ~]$ showmount -e serverX
+Mount point: Use mkdir to create a mount point in a suitable location.
+
+[student@desktopX ~]$ mkdir -p /mountpoint
+Mount: There are two choices here: manually or incorporated in the /etc/fstab file. Switch to root or use sudo for either operation.
+
+Manual: Use the mount command.
+
+[student@desktopX ~]$ sudo mount -t nfs -o sync serverX:/share /mountpoint
+The -t nfs option is the file system type for NFS shares (not strictly required, shown for completeness). The -o sync option tells mount to immediately synchronize write operations with the NFS server (the default is asynchronous). The default security method (sec=sys) will be used to try mounting the NFS share, using standard Linux file permissions.
+
+/etc/fstab: Use vim to edit the /etc/fstab file and add the mount entry to the bottom of the file. The NFS share will be mounted at each system boot.
+
+[student@desktopX ~]$ sudo vim /etc/fstab
+...
+serverX:/share  /mountpoint  nfs  sync  0 0
+Use umount, using root privileges, to manually unmount the share.
+
+[student@desktopX ~]$ sudo umount /mountpoint
+REFERENCES
+mount(8), umount(8), fstab(5), and mount.nfs(8) man pages
+
+
+
+
+Guided Exercise: Practice: Mounting and Unmounting NFS
+In this lab, you will manually mount a Kerberos-secured NFS share, access it, and optionally unmount it. Create a persistent share mount in /etc/fstab, mount it, and access it. serverX is the NFSv4 host.
+
+Resources:
+Files:	nfs_ldapuserX.txt and nfs_student.txt
+Machines:	desktopX and serverX
+Outcomes:
+
+User ldapuserX will be able to successfully log in and access the persistently mounted NFS share public at /mnt/public.
+
+The NFS share manual can be mounted by users on an ad hoc basis at /mnt/manual.
+
+Reset the serverX system.
+
+Log into and set up your server system.
+
+[student@serverX ~]$ lab nfsmount setup
+Reset the desktopX system.
+
+Log into and set up your desktop system.
+
+[student@desktopX ~]$ lab nfsmount setup
+Open a terminal.
+
+IMPORTANT
+The serverX setup is used for both practice exercises in this chapter. It only needs to be run once.
+
+S.H.I.E.L.D. (Storage Hardware Incorporating Every Last Document) uses a central server, serverX, to host a number of document share directories. Access to most directories is via LDAP-based users, authenticating using Kerberos; however, a number of shares are using standard Linux file access security. Users need to be able to log in and mount the manual NFS share, and should have the public NFS share available constantly.
+
+Here are the key details you will need:
+
+Username: ldapuserX
+
+Password: kerberos
+
+serverX is sharing two directories under /shares: manual and public.
+
+desktopX mount point: /mnt/public and /mnt/manual
+
+The public NFS share requires krb5p authentication to access; manual is using sys security.
+
+The krb5.keytab is available from http://classroom.example.com/pub/keytabs/desktopX.keytab.
+
+Each share should have read and write access.
+
+Download and install the krb5.keytab file to enable Kerberos access and security.
+
+[student@desktopX ~]$ sudo wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/desktopX.keytab
+Enable and start the nfs-secure service.
+
+[student@desktopX ~]$ sudo systemctl enable nfs-secure
+ln -s '/usr/lib/systemd/system/nfs-secure.service'  ...
+[student@desktopX ~]$ sudo systemctl start nfs-secure
+Use mkdir to create both mount points: /mnt/public and /mnt/manual.
+
+[student@desktopX ~]$ sudo mkdir -p /mnt/{public,manual}
+Create the persistent mount. This mount will only be accessible to authenticated users.
+
+Use vim to edit the /etc/fstab file.
+
+[student@desktopX ~]$ sudo vim /etc/fstab
+Add this line to the end of the file:
+
+serverX:/shares/public  /mnt/public  nfs  sec=krb5p,sync  0 0
+Use mount to mount the share and begin using it.
+
+[student@desktopX ~]$ sudo mount -a
+Use mount to manually mount /shares/manual on /mnt/manual. Since you already have a kerberized NFSv4 mount from the same server you will need to specify the sec=sys option.
+
+[student@desktopX ~]$ sudo mount -o sync,sec=sys serverX:/shares/manual /mnt/manual
+Use ssh to switch to ldapuserX on localhost and confirm the mounts, and read/write access.
+
+Use ssh to log in as ldapuserX.
+
+[student@desktopX ~]$ ssh ldapuserX@localhost
+If you see something similar to the following, type yes to accept and continue.
+
+The authenticity of host 'localhost (::1)' can't be established.
+ECDSA key fingerprint is d9:cc:73:82:3b:8a:74:e4:11:2f:f3:2b:03:a4:46:4d.
+Are you sure you want to continue connecting (yes/no)? yes
+Enter the password: kerberos.
+
+ldapuserX@localhost's password: kerberos
+Verify you can switch to both share directories and confirm you have read/write access.
+
+Use cd to switch directories.
+
+[ldapuserX@desktopX ~]$ cd /mnt/manual
+Use echo and cat to verify read and write access.
+
+[ldapuserX@desktopX manual]$ echo hello > test.txt
+[ldapuserX@desktopX manual]$ cat test.txt
+hello
+Repeat this step to test /mnt/public.
+
+Use exit or Ctrl+D to log out of ldapuserX.
+
+Repeat the previous step as student on both directories. You should be able to change directory and list /mnt/manual, but get Permission denied on /mnt/public because student cannot authenticate using Kerberos.
+
+Instead of test.txt, you will want to use something like test2.txt, since student is not allowed to write to files owned by ldapuserX.
+
+NOTE
+When you are finished using the network storage, you can use the umount command to manually unmount the NFS shares.
+
+[student@desktopX ~]$ sudo umount /mnt/manual

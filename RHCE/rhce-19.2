@@ -1,0 +1,182 @@
+Managing Rich Rules
+In this section, students learned how to configure more complex firewall configurations using firewalld's support for "rich language rules."
+
+Objectives
+After completing this section, students should be able to configure more complex firewall configurations using firewalld's support for "rich language rules."
+
+Rich rules concepts
+Apart from the regular zones and services syntax that firewalld offers, administrators have two other options for adding firewall rules: direct rules and rich rules.
+
+Direct rules
+
+Direct rules allow an administrator to insert hand-coded {ip,ip6,eb}tables rules into the zones managed by firewalld. While powerful, and exposing features of the kernel netfilter subsystem not exposed through other means, these rules can be hard to manage. Direct rules also offer less flexibility than standard rules and rich rules. Configuring direct rules is not covered in this course, but documentation is available in the firewall-cmd(1) and firewalld.direct(5) man pages for those administrators who are already familiar with {ip,ip6,eb}tables syntax.
+
+Unless explicitly inserted into a zone managed by firewalld, direct rules will be parsed before any firewalld rules are.
+
+A short example of adding some direct rules to blacklist an IP range:
+
+[root@serverX ~]# firewall-cmd --direct --permanent --add-chain ipv4 raw blacklist
+[root@serverX ~]# firewall-cmd --direct --permanent --add-rule ipv4 raw PREROUTING 0 -s 192.168.0.0/24 -j blacklist
+[root@serverX ~]# firewall-cmd --direct --permanent --add-rule ipv4 raw blacklist 0 -m limit --limit 1/min -j LOG --log-prefix "blacklisted "
+[root@serverX ~]# firewall-cmd --direct --permanent --add-rule ipv4 raw blacklist 1 -j DROP
+Rich rules
+
+firewalld rich rules give administrators an expressive language in which to express custom firewall rules that are not covered by the basic firewalld syntax; for example, to only allow connections to a service from a single IP address, instead of all IP addresses routed through a zone.
+
+Using rich rules
+Rich rules can be used to express basic allow/deny rules, but can also be used to configure logging, both to syslog and auditd, as well as port forwards, masquerading, and rate limiting.
+
+The basic syntax of a rich rule can be expressed by the following block:
+
+rule
+  [source]
+  [destination]
+  service|port|protocol|icmp-block|masquerade|forward-port
+  [log]
+  [audit]
+  [accept|reject|drop]
+Almost every single element of a rule can take additional arguments in the form of option=value.
+
+NOTE
+For the full available syntax for rich rules, consult the firewalld.richlanguage(5) man page.
+
+Rule ordering
+
+Once multiple rules have been added to a zone (or the firewall in general), the ordering of rules can have a big effect on how the firewall behaves.
+
+The basic ordering of rules inside a zone is the same for all zones:
+
+Any port forwarding and masquerading rules set for that zone.
+
+Any logging rules set for that zone.
+
+Any deny rules set for that zone.
+
+Any allow rules set for that zone.
+
+In all cases, the first match will win. If a packet has not been matched by any rule in a zone, it will typically be denied, but zones might have a different default; for example, the trusted zone will accept any unmatched packet. Also, after matching a logging rule, a packet will continue to be processed as normal.
+
+Direct rules are an exception. Most direct rules will be parsed before any other processing is done by firewalld, but the direct rule syntax allows an administrator to insert any rule they want anywhere in any zone.
+
+Testing and debugging
+
+To make testing and debugging easier, almost all rules can be added to the runtime configuration with a timeout. The moment the rule with a timeout is added to the firewall, the timer starts counting down for that rule. Once the timer for a rule has reached zero seconds, that rule is removed from the runtime configuration.
+
+Using timeouts can be an incredibly useful tool while working on a remote firewalls, especially when testing more complicated rule sets. If a rule works, the administrator can add it again, but with the --permanent option (or at least without a timeout). If the rule does not work as intended, maybe even locking the administrator out of the system, it will be removed automatically, allowing the administrator to continue his or her work.
+
+A timeout is added to a runtime rule by adding the option --timeout=<TIMEINSECONDS> to the end of the firewall-cmd that enables the rule.
+
+Working with rich rules
+firewall-cmd has four options for working with rich rules. All of these options can be used in combination with the regular --permanent or --zone=<ZONE> options.
+
+Option	Explanation
+--add-rich-rule='<RULE>'	
+Add <RULE> to the specified zone, or the default zone if no zone is specified.
+
+--remove-rich-rule='<RULE>'	
+Remove <RULE> to the specified zone, or the default zone if no zone is specified.
+
+--query-rich-rule='<RULE>'	
+Query if <RULE> has been added to the specified zone, or the default zone if no zone is specified. Returns 0 if the rule is present, otherwise 1.
+
+--list-rich-rules	
+Outputs all rich rules for the specified zone, or the default zone if no zone is specified.
+
+Any configured rich rules are also shown in the output from firewall-cmd --list-all and firewall-cmd --list-all-zones.
+
+Rich rules examples
+
+Some examples of rich rules:
+
+[root@serverX ~]# firewall-cmd --permanent --zone=classroom --add-rich-rule='rule family=ipv4 source address=192.168.0.11/32 reject'
+Reject all traffic from the IP address 192.168.0.11 in the classroom zone.
+
+When using source or destination with an address option, the family= option of rule must be set to either ipv4 or ipv6.
+
+[root@serverX ~]# firewall-cmd --add-rich-rule='rule service name=ftp limit value=2/m accept'
+Allow two new connections to ftp per minute in the default zone.
+
+Note that this change is only made in the runtime configuration.
+
+[root@serverX ~]# firewall-cmd --permanent --add-rich-rule='rule protocol value=esp drop'
+Drop all incoming IPsec esp protocol packets from anywhere in the default zone.
+
+NOTE
+The difference between reject and drop lies in the fact that a reject will send back an ICMP packet detailing that, and why, a connection was rejected. A drop just drops the packet and does nothing else. Normally an administrator will want to use reject for friendly and neutral networks, and drop only for hostile networks.
+
+[root@serverX ~]# firewall-cmd --permanent --zone=vnc --add-rich-rule='rule family=ipv4 source address=192.168.1.0/24 port port=7900-7905 protocol=tcp accept'
+Accept all TCP packets on ports 7900, up to and including port 7905, in the vnc zone for the 192.168.1.0/24 subnet.
+
+Logging with rich rules
+When debugging, or monitoring, a firewall, it can be useful to have a log of accepted or rejected connections. firewalld can accomplish this in two ways: by logging to syslog, or by sending messages to the kernel audit subsystem, managed by auditd.
+
+In both cases, logging can be rate limited. Rate limiting ensures that system log files do not fill up with messages at a rate such that the system cannot keep up, or fills all its disk space.
+
+The basic syntax for logging to syslog using rich rules is:
+
+log [prefix="<PREFIX TEXT>" [level=<LOGLEVEL>] [limit value="<RATE/DURATION>"]
+Where <LOGLEVEL> is one of emerg, alert, crit, error, warning, notice, info, or debug.
+
+<DURATION> can be one of s for seconds, m for minutes, h for hours, or d for days. For example, limit value=3/m will limit the log messages to a maximum of three per minute.
+
+The basic syntax for logging to the audit subsystem is:
+
+audit [limit value="<RATE/DURATION>"]
+Rate limiting is configured in the same way as for syslog logging.
+
+Logging examples
+
+Some examples of logging using rich rules:
+
+[root@serverX ~]# firewall-cmd --permanent --zone=work --add-rich-rule='rule service name="ssh" log prefix="ssh " level="notice" limit value="3/m" accept
+Accept new connections to ssh from the work zone, log new connections to syslog at the notice level, and with a maximum of three message per minute.
+
+[root@serverX ~]# firewall-cmd --add-rich-rule='rule family=ipv6 source address="2001:db8::/64" service name="dns" audit limit value="1/h" reject' --timeout=300
+New IPv6 connections from the subnet 2001:db8::/64 in the default zone to DNS are rejected for the next five minutes, and rejected connections are logged to the audit system with a maximum of one message per hour.
+
+REFERENCES
+firewalld.richlanguage(5), firewall-cmd(1), and firewalld.direct(5) man pages
+
+
+
+
+Guided Exercise: Practice: Writing Custom Rules
+In this lab, you will configure your serverX system to allow connections to a (new) http service, but only from desktopX, and with a rate-limited log message.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+Custom firewall rules that configure rate-limited logging for specific connections.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Your company is running a trial that includes starting a web server on serverX, but for the duration of the trial, only desktopX should be able to connect. Since this could potentially generate many log entries, this logging should be limited to a maximum of three messages per second, and all log messages should be prefixed with the message "NEW HTTP ".
+
+It has been decided that you, the IT Rock Star, will implement this using firewalld rich rules.
+
+First install, start, and enable httpd.
+
+[student@serverX ~]$ sudo yum install httpd
+[student@serverX ~]$ sudo systemctl start httpd.service
+[student@serverX ~]$ sudo systemctl enable httpd.service
+Configure a firewall rule in the default zone that allows traffic to http only from your desktopX system. This traffic should be logged, but with a maximum of three new connections per second.
+
+Permanently create the new firewall rule.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address=172.25.X.10/32 service name="http" log level=notice prefix="NEW HTTP " limit value="3/s" accept'
+Activate the changes to your firewall.
+
+[student@serverX ~]$ sudo firewall-cmd --reload
+On your serverX system, use tail -f to view the additions to /var/log/messages in real time.
+
+[student@serverX ~]$ sudo tail -f /var/log/messages
+From your desktopX system, use curl to connect to the httpd service running on serverX.
+
+[student@desktopX ~]$ curl http://serverX.example.com
+Inspect the output of your running tail command on serverX. You should see a message for the new connection like this:
+
+May  9 08:04:11 serverX kernel: NEW HTTP IN=eth0 OUT= MAC=... SRC=172.25.X.10 DST=172.25.X.11 LEN=60....
+

@@ -1,0 +1,252 @@
+Chapter 19. Network Port Security
+Managing Firewalld
+Guided Exercise: Practice: Configuring a Firewall
+Managing Rich Rules
+Guided Exercise: Practice: Writing Custom Rules
+Masquerading and Port Forwarding
+Guided Exercise: Practice: Forwarding a Port
+Managing SELinux Port Labeling
+Guided Exercise: Practice: Managing SELinux Port Labeling
+Lab: Lab: Network Port Security
+Abstract
+
+Overview
+Goal	To permit and reject access to network services using advanced SELinux and firewalld filtering techniques.
+Objectives	
+Review firewalld concepts and management commands covered in previous courses.
+
+Configure more complex firewall configurations using firewalld's support for "rich language rules."
+
+Describe and implement Network Address Translation (NAT).
+
+Ensure network ports have the correct SELinux type so that services are able to bind to them.
+
+Sections	
+Managing Firewalld (and Practice)
+
+Managing Rich Rules (and Practice)
+
+Masquerading and Port Forwarding (and Practice)
+
+Managing SELinux Port Labeling (and Practice)
+
+Lab	
+Network Port Security
+
+Managing Firewalld
+In this section, students reviewed firewalld concepts and management commands covered in previous courses.
+
+Objectives
+After completing this section students should be able to review firewalld concepts and management commands covered in previous courses.
+
+Firewalld overview
+firewalld is the default method in Red Hat Enterprise Linux 7 for managing host-level firewalls. Started from the firewalld.service systemd service, firewalld manages the Linux kernel netfilter subsystem using the low-level iptables, ip6tables, and ebtables commands.
+
+NOTE
+The firewalld.service and iptables.service, ip6tables.service, and ebtables.service services conflict with each other. To prevent accidentally starting one of the *tables.service services (and wiping out any running firewall config in the process), it is good practice to mask them using systemctl.
+
+[root@serverX ~]# for SERVICE in iptables ip6tables ebtables; do
+>   systemctl mask ${SERVICE}.service
+> done
+Managing firewalld
+firewalld separates all incoming traffic into zones, with each zone having its own set of rules. To check which zone to use for an incoming connection, firewalld uses this logic, where the first rule that matches wins:
+
+If the source address of an incoming packet matches a source rule setup for a zone, that packet will be routed through that zone.
+
+If the incoming interface for a packet matches a filter setup for a zone, that zone will be used.
+
+Otherwise, the default zone is used. The default zone is not a separate zone; instead, it points to one of the other zones defined on the system.
+
+Unless overridden by an administrator or a NetworkManager configuration, the default zone for any new network interface will be set to the public zone.
+
+A number of predefined zones are shipped with firewalld, each with their own intended usage:
+
+Table 19.1. Default Configuration of firewalld Zones
+
+Zone name	Default configuration
+trusted	Allow all incoming traffic.
+home	Reject incoming traffic unless related to outgoing traffic or matching the ssh, mdns, ipp-client, samba-client, or dhcpv6-client predefined services.
+internal	Reject incoming traffic unless related to outgoing traffic or matching the ssh, mdns, ipp-client, samba-client, or dhcpv6-client predefined services (same as the home zone to start with).
+work	Reject incoming traffic unless related to outgoing traffic or matching the ssh, ipp-client, or dhcpv6-client predefined services.
+public	Reject incoming traffic unless related to outgoing traffic or matching the ssh or dhcpv6-client predefined services. The default zone for newly added network interfaces.
+external	Reject incoming traffic unless related to outgoing traffic or matching the ssh predefined service. Outgoing IPv4 traffic forwarded through this zone is masqueraded to look like it originated from the IPv4 address of the outgoing network interface.
+dmz	Reject incoming traffic unless related to outgoing traffic or matching the ssh predefined service.
+block	Reject all incoming traffic unless related to outgoing traffic.
+drop	Drop all incoming traffic unless related to outgoing traffic (do not even respond with ICMP errors).
+
+Managing firewalld
+firewalld can be managed in three ways:
+
+Using the command-line tool firewall-cmd.
+
+Using the graphical tool firewall-config.
+
+Using the configuration files in /etc/firewalld/.
+
+In most cases, editing the configuration files directly is not recommended, but it can be useful to copy configurations in this way when using configuration management tools.
+
+Configure firewall settings with firewall-cmd
+
+This section will focus on managing firewalld using the command-line tool firewall-cmd.
+
+firewall-cmd is installed as part of the main firewalld package. firewall-cmd can perform the same actions as firewall-config.
+
+The following table lists a number of frequently used firewall-cmd commands, along with an explanation. Note that unless otherwise specified, almost all commands will work on the runtime configuration, unless the --permanent option is specified. Many of the commands listed take the --zone=<ZONE> option to determine which zone they affect. If --zone is omitted from those commands, the default zone is used.
+
+While configuring a firewall, an administrator will normally apply all changes to the --permanent configuration, and then activate those changes with firewall-cmd --reload. While testing out new, and possibly dangerous, rules, an administrator can choose to work on the runtime configuration by omitting the --permanent option. In those cases, an extra option can be used to automatically remove a rule after a certain amount of time, preventing an administrator from accidentally locking out a system: --timeout=<TIMEINSECONDS>.
+
+firewall-cmd commands	Explanation
+--get-default-zone	
+Query the current default zone.
+
+--set-default-zone=<ZONE>	
+Set the default zone. This changes both the runtime and the permanent configuration.
+
+--get-zones	
+List all available zones.
+
+--get-services	
+List all predefined services.
+
+--get-active-zones	
+List all zones currently in use (have an interface or source tied to them), along with their interface and source information.
+
+--add-source=<CIDR> [--zone=<ZONE>]	
+Route all traffic coming from the IP address or network/netmask <CIDR> to the specified zone. If no --zone= option is provided, the default zone will be used.
+
+--remove-source=<CIDR> [--zone=<ZONE>]	
+Remove the rule routing all traffic coming from the IP address or network/netmask <CIDR> from the specified zone. If no --zone= option is provided, the default zone will be used.
+
+--add-interface=<INTERFACE> [--zone=<ZONE>]	
+Route all traffic coming from <INTERFACE> to the specified zone. If no --zone= option is provided, the default zone will be used.
+
+--change-interface=<INTERFACE> [--zone=<ZONE>]	Associate the interface with <ZONE> instead of its current zone. If no --zone= option is provided, the default zone will be used.
+--list-all [--zone=<ZONE>]	
+List all configured interfaces, sources, services, and ports for <ZONE>. If no --zone= option is provided, the default zone will be used.
+
+--list-all-zones	
+Retrieve all information for all zones (interfaces, sources, ports, services, etc.).
+
+--add-service=<SERVICE>	
+Allow traffic to <SERVICE>. If no --zone= option is provided, the default zone will be used.
+
+--add-port=<PORT/PROTOCOL>	
+Allow traffic to the <PORT/PROTOCOL> port(s). If no --zone= option is provided, the default zone will be used.
+
+--remove-service=<SERVICE>	
+Remove <SERVICE> from the allowed list for the zone. If no --zone= option is provided, the default zone will be used.
+
+--remove-port=<PORT/PROTOCOL>	
+Remove the <PORT/PROTOCOL> port(s) from the allowed list for the zone. If no --zone= option is provided, the default zone will be used.
+
+--reload	
+Drop the runtime configuration and apply the persistent configuration.
+
+firewall-cmd example
+
+The following examples show the default zone being set to dmz, all traffic coming from the 192.168.0.0/24 network being assigned to the internal zone, and the network ports for mysql being opened on the internal zone.
+
+[root@serverX ~]# firewall-cmd --set-default-zone=dmz
+[root@serverX ~]# firewall-cmd --permanent --zone=internal --add-source=192.168.0.0/24
+[root@serverX ~]# firewall-cmd --permanent --zone=internal --add-service=mysql
+[root@serverX ~]# firewall-cmd --reload
+Firewalld configuration files
+
+firewalld configuration files are stored in two places: /etc/firewalld and /usr/lib/firewalld. If a configuration file with the same name is stored in both locations, the version from /etc/firewalld/ will be used. This allows administrators to override default zones and settings without fear of their changes being wiped out by a package update.
+
+REFERENCES
+firewall-cmd(1), firewall-config(1), firewalld(1), firewalld.zone(5), and firewalld.zones(5) man pages
+
+
+
+
+
+Guided Exercise: Practice: Configuring a Firewall
+In this lab, you will configure a basic firewalld firewall.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+A firewall configured on serverX to allow https traffic from your desktopX system.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+As part of an ongoing project to track the designated caffeinated beverage fetcher of the day, you have been tasked with configuring a basic web server and firewall on your serverX system.
+
+Your setup must meet these requirements:
+
+The httpd and mod_ssl packages must be installed on serverX.
+
+The httpd.service must be enabled and started on serverX.
+
+Until your in-house web developers complete the actual application, the web server should serve a placeholder page with the text COFFEE!.
+
+firewalld must be enabled and started on serverX.
+
+The firewalld configuration on serverX must use the dmz zone for all unspecified connections.
+
+Traffic from the 172.25.X.0/24 subnet must be routed into the work zone.
+
+The work zone should have all the necessary ports for https opened, but unencrypted http traffic should be filtered.
+
+Verify that firewalld is enabled and running on your serverX system.
+
+[student@serverX ~]$ sudo systemctl status firewalld.service
+Verify that the Loaded line ends in enabled and that the Active line specifies running. If this is not the case, enable and start the firewalld.service service using systemctl.
+
+Install the httpd and mod_ssl packages.
+
+[student@serverX ~]$ sudo yum install httpd mod_ssl
+Enable and start the httpd.service service.
+
+[student@serverX ~]$ sudo systemctl enable httpd.service
+[student@serverX ~]$ sudo systemctl start httpd.service
+Create the placeholder /var/www/html/index.html file with the contents COFFEE!.
+
+[student@serverX ~]$ sudo vim /var/www/html/index.html
+[student@serverX ~]$ cat /var/www/html/index.html
+COFFEE!
+Configure the firewalld daemon on serverX to route all traffic through the dmz zone by default.
+
+[student@serverX ~]$ sudo firewall-cmd --set-default-zone=dmz
+Configure the firewalld daemon on serverX to route all traffic from 172.25.X.0/24 through the work zone.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --zone=work --add-source=172.25.X.0/24
+Open up incoming https traffic for the work zone.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --zone=work --add-service=https
+Activate the changes to your firewall.
+
+[student@serverX ~]$ sudo firewall-cmd --reload
+Inspect the configuration of the running firewall on your serverX system.
+
+[student@serverX ~]$ sudo firewall-cmd --get-default-zone
+dmz
+[student@serverX ~]$ sudo firewall-cmd --get-active-zones
+dmz
+  interfaces: eth0
+work
+  sources: 172.25.X.0/24
+ROL
+  sources: 172.25.0.252/32
+[student@serverX ~]$ sudo firewall-cmd --zone=work --list-all
+work
+  interfaces:
+  sources: 172.25.X.0/24
+  services: dhcpv6-client https ipp-client ssh
+  ports:
+  masquerade: no
+  forward-ports:
+  icmp-blocks:
+  rich rules:
+From your desktopX system, use curl to test access to both http://serverX.example.com and https://serverX.example.com. The unencrypted connection should fail with a No route to host error message, while the encrypted connection should show your content.
+
+Since curl does not trust the placeholder self-signed certificate on serverX, you will have to use the -k option to skip certificate validation.
+
+[student@desktopX ~]$ curl http://serverX.example.com
+curl: (7) Failed connect to serverX.example.com:80; No route to host
+[student@desktopX ~]$ curl -k https://serverX.example.com
+COFFEE!

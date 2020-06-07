@@ -1,0 +1,346 @@
+Chapter 20. Managing DNS for Servers
+DNS Concepts
+Quiz: Practice: DNS Resource Record
+Configuring a Caching Nameserver
+Guided Exercise: Practice: Configuring unbound as a Caching Nameserver
+DNS Troubleshooting
+Guided Exercise: Practice: Troubleshooting DNS
+Lab: Lab: Managing DNS for Servers
+Abstract
+
+Overview
+Goal	To set and verify correct DNS records for systems and configure secure caching DNS name service.
+Objectives	
+Explain how DNS is used to resolve names and addresses and the purpose of key DNS resource records.
+
+Configure unbound to act as a secure local caching nameserver.
+
+Describe common DNS configuration problems and how to identify and resolve them.
+
+Sections	
+DNS Concepts (and Practice)
+
+Configuring a Caching Nameserver (and Practice)
+
+DNS Troubleshooting (and Practice)
+
+Lab	
+Managing DNS for Servers
+
+DNS Concepts
+In this section, students learned how to:
+
+Review the structure of the Domain Name System.
+
+Detail the anatomy of DNS lookups.
+
+Identify common DNS resource records and their uses.
+
+Objectives
+After completing this section, students should be able to:
+
+Explain the hierarchical structure of the Domain Name System (DNS).
+
+Differentiate between domains, subdomains, and zones.
+
+Identify the differences between different resource record types.
+
+The Domain Name System
+The Domain Name System (DNS) is a hierarchical naming system that serves as a directory of networked hosts and resources. Information in the directory maps network names to data and is maintained in logical entries known as resource records. The DNS hierarchy begins with the root domain "." at the top and branches downward to multiple next-level domains.
+
+Each level of the DNS hierarchy is delineated by the "." in domain names, with "." as the top level. Domains such as com, net, and org occupy the second level of the hierarchy and domains such as example.com and redhat.com occupy the third level and so on.
+
+When working with DNS, it is important to clarify some of the common terms used to refer to the structure of the DNS hierarchy, such as domain, subdomain, and zone.
+
+Domain
+
+A domain is a collection of resource records that ends in a common name and represents an entire subtree of the DNS name space, such as example.com. The largest possible domain is the root domain, ".", which includes the whole DNS namespace.
+
+A top-level domain (TLD) is a domain that has only one component. Generic TLDs (gTLDs) were originally organized by theme, and include .com, .edu, .net, etc. Country code TLDs (ccTLDs) are organized on a national basis, and include .us, .uk, .cn, .ru, etc.
+
+Subdomain
+
+A subdomain is a domain that is a subtree of another domain. This term is used when discussing the relationship of two domains to each other. For example, lab.example.com is a subdomain of example.com.
+
+Zone
+
+A zone is the portion of a domain for which a particular nameserver is directly responsible, or authoritative. This may be an entire domain, or just part of a domain with some or all of its subdomains delegated to other nameserver(s).
+
+Anatomy of DNS lookups
+When a system needs to perform name resolution using a DNS server, it begins by sending queries to the servers listed in /etc/resolv.conf in order, until it gets a response or runs out of servers. The host or dig commands can be used to manually look up DNS names.
+
+Local authoritative data
+
+When the query arrives at a DNS server, the server first determines whether the information being queried resides in a zone that it is authoritative for. If the server is an authority for the zone that the name or address being queried belongs to, then the server responds to the client with the information contained in its local zone file. This type of response is referred to as an authoritative answer (aa), since the server providing the response is authoritative for the data provided. Authoritative answers from a nameserver have the aa flag turned on in the header of the DNS response.
+
+Local cached non-authoritative data
+
+If the DNS server is not an authority for the record in question, but has recently obtained the record to answer a previous query, it may still have a copy of the record in its cache. The cache is where answers to queries are stored for a specified time, determined by a value contained in every resource record response called the Time To Live (TTL). If an answer exists in the server's cache, it is provided to the client. This answer will not have the aa flag set, since the server is not authoritative for the data being provided.
+
+Remote non-authoritative data via recursion
+
+If the DNS server is not authoritative for the name being queried, and it does not possess the record in its cache, it will then attempt to retrieve the record via an iterative process known as recursion. A DNS server with an empty cache begins the recursion process by querying one of the root nameservers by IP address retrieved from its local, pre-populated root hints file. The root nameserver will then likely respond with a referral, which indicates the nameservers that are authoritative for the TLD that contains the name being queried.
+
+Upon receiving the referral, the DNS server will then perform another iterative query to the TLD authoritative nameserver it was referred to. Depending on whether there are further remaining delegations in the name being queried, this authoritative nameserver will either send an authoritative answer or yet another referral. This continues until an authoritative server is reached and responds with an authoritative answer.
+
+The final answer, along with all the intermediate answers obtained prior to it, are cached by the DNS server to improve performance. If during a lookup for www.example.com the DNS server finds out that the example.com zone has authoritative nameservers, it will query those servers directly for any future queries for information in the example.com zone, rather than starting recursion again at the root nameservers.
+
+DNS resource records
+DNS resource records (RRs) are entries in a DNS zone that specify information about a particular name or object in the zone. A resource record contains a type, a TTL, a class, and data elements organized in the following format:
+
+owner-name           TTL      class      type     data
+www.example.com.     300      IN         A        192.168.1.10
+Table 20.1. Resource Record Fields
+
+Field name	Content
+owner-name	The name for this resource record.
+TTL	The Time To Live of the resource record in seconds. This specifies how long this resource record should be cached by DNS resolvers.
+class	The "class" of the record, almost always IN ("Internet").
+type	The type indicates the sort of information stored by this record. For example, an A record maps a host name to an IPv4 address.
+data	The data stored by this record. The exact format varies by record type.
+
+There are a number of important resource record types:
+
+A (IPv4 address) records
+
+An A resource record maps a host name to an IPv4 address.
+
+[student@serverX ~]$ host -v -t A example.com
+Trying "example.com"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 22681
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
+
+;; QUESTION SECTION:
+;example.com.			IN	A
+
+;; ANSWER SECTION:
+example.com.		86400	IN	A	172.25.254.254
+
+Recieved 96 bytes from 172.25.254.254#53 in 1 ms
+AAAA (IPv6 address) records
+
+An AAAA resource record ("quad-A" record) maps a host name to an IPv6 address.
+
+[student@serverX ~]$ host -v -t AAAA a.root-servers.net
+Trying "a.root-servers.net"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 18194
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 13, ADDITIONAL: 12
+
+;; QUESTION SECTION:
+;a.root-servers.net.		IN	AAAA
+
+;; ANSWER SECTION:
+a.root-servers.net.	604800	IN	AAAA	2001:503:ba3e::2:30
+
+Received 64 bytes from 172.25.254.254#53 in 78 ms
+CNAME (canonical name) records
+
+A CNAME resource record aliases one name to another name (the canonical name), which should have A or AAAA records.
+
+When a DNS resolver receives a CNAME record in response to a query, it will reissue the query using the canonical name instead of the original name.
+
+The data field of CNAME records can point to a name anywhere in DNS, whether internal or external to the zone:
+
+www-dev.example.com. IN CNAME lab.example.com.
+www.example.com.     IN CNAME www.redhat.com.
+CNAME records are useful, but should be used with some care. In general, pointing a CNAME records to other CNAME records should be avoided for efficiency and fragility reasons and to avoid creating a CNAME loop by accident. The chain of CNAME record must end in A and/or AAAA records. Note that there are legitimate uses for CNAME chains when using Content Delivery Networks (CDNs) to improve the speed and reliability of data delivery over the Internet. Likewise, NS and MX records must not be pointed at CNAME records but at names with A and/or AAAA records.
+
+[student@serverX ~]$ host -v -t A ipa-ca.server0.example.com
+Trying "ipa-ca.server0.example.com"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 11931
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 1, ADDITIONAL: 2
+
+;; QUESTION SECTION:
+;ipa-ca.server0.example.com.	IN	A
+
+;; ANSWER SECTION:
+ipa-ca.server0.example.com. 86400 IN	CNAME	server0.example.com.
+server0.example.com.	86400	IN	A	172.25.0.11
+
+Recieved 125 bytes from 172.25.254.254#53 in 1 ms
+PTR (pointer) records
+
+A PTR record maps IPv4 or IPv6 addresses to a host name. They are used for reverse DNS resolution.
+
+PTR records code the IP address in a special format that acts like a host name. For IPv4 addresses, the address is reversed, most specific part first, and the result is treated as a host in a subdomain of the special domain in-addr.arpa. For IPv6 addresses, the address is split into subdomains on nibble boundaries (every hexadecimal digit) and set up as a subdomain of the special domain ip6.arpa, as seen in the following example. While this syntax may seem strange, it makes it simpler for DNS administrators to delegate responsibility for ranges of addresses to other DNS administrators.
+
+[student@serverX ~]$ host -v -t PTR 172.25.0.10
+Trying "10.0.25.172.in-addr.arpa"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 36389
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
+
+;; QUESTION SECTION:
+;10.0.25.172.in-addr.arpa.	IN	PTR
+
+;; ANSWER SECTION:
+10.0.25.172.in-addr.arpa. 86400	IN	PTR	desktop0.example.com.
+
+Received 127 bytes from 172.25.254.254#53 in 2 ms
+[student@serverX ~]$ host -v -t PTR 2001:503:ba3e::2:30
+Trying "0.3.0.0.2.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.e.3.a.b.3.0.5.0.1.0.0.2.ip6.arpa"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 32138
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;0.3.0.0.2.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.e.3.a.b.3.0.5.0.1.0.0.2.ip6.arpa. IN PTR
+
+;; ANSWER SECTION:
+0.3.0.0.2.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.e.3.a.b.3.0.5.0.1.0.0.2.ip6.arpa. 86400 IN PTR a.root-servers.net.
+
+Received 122 bytes from 172.25.254.254#53 in 174 ms
+NS (name server) records
+
+An NS record maps a domain name to a DNS name server which is authoritative for its DNS zone.
+
+Every public authoritative name server for the zone must have an NS record.
+
+[student@serverX ~]$ host -v -t NS example.com
+Trying "example.com"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 29362
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 2
+
+;; QUESTION SECTION:
+;example.com.			IN	NS
+
+;; ANSWER SECTION:
+example.com.		86400	IN	NS	classroom.example.com.
+
+Received 80 bytes from 172.25.254.254#53 in 0 ms
+SOA (start of authority) records
+
+An SOA record provides information about how a DNS zone works.
+
+There will be exactly one SOA record for a zone. It specifies which of the zone's name servers is the primary one (the master), information on how secondary (slave) name servers should update their copy of the information, and the zone's management contact. Its data field contains the following elements:
+
+Table 20.2. SOA record data elements
+
+Data element	Content
+Master nameserver	The host name of the nameserver which is the original source of domain information, and which may accept dynamic DNS updates if the zone supports them.
+RNAME	The email address of the person responsible for the DNS zone (the hostmaster). The @ in the email address is replaced with a "." in the RNAME. For example, an email address of hostmaster@example.com is written as hostmaster.example.com.
+Serial number	The version number of the zone, which is increased when there is any change to zone records.
+Refresh	How frequently the slave servers should check for zone updates, in seconds.
+Retry	How long a slave server should wait before retrying a failed refresh attempt, in seconds.
+Expiry	If refreshes have been failing, how long a slave server should wait before it stops using its old copy of the zone to respond to queries, in seconds.
+Minimum	If a resolver looks up a name and it does not exist (gets a nonexistent domain (NXDOMAIN) response), how long it should cache the information that the record does not exist, in seconds.
+
+[student@serverX ~]$ host -v -t SOA example.com
+Trying "example.com"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 58434
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;example.com.			IN	SOA
+
+;; ANSWER SECTION:
+example.com.		86400	IN	SOA	classroom.example.com. root.classroom.example.com. 2013091600 3600 300 604800 60
+
+Received 121 bytes from 172.25.254.254#53 in 0 ms
+MX (mail exchange) records
+
+An MX record maps a domain name to a mail exchange which will accept email for that name.
+
+The data for this record type is a preference number (lowest preferred) used to determine the order in which to pick between multiple MX records, and a host name for a mail exchange for that name.
+
+[student@serverX ~]$ host -v -t MX example.com
+Trying "example.com"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 47187
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
+
+;; QUESTION SECTION:
+;example.com.			IN	MX
+
+;; ANSWER SECTION:
+example.com.		86400	IN	MX	10 classroom.example.com.
+
+Received 96 bytes from 172.25.254.254#53 in 0 ms
+TXT (text) records
+
+A TXT record is used to map a name to arbitrary human-readable text.
+
+TXT records are commonly used to supply data used by Sender Policy Framework (SPF), DomainKeys Identified Mail (DKIM), Domain-based Message Authentication, Reporting and Conformance (DMARC), and so on.
+
+[student@serverX ~]$ host -v -t TXT lwn.net
+Trying "lwn.net"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 41137
+;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;lwn.net.			IN	TXT
+
+;; ANSWER SECTION:
+lwn.net.		28619	IN	TXT	"v=spf1 ip4:72.51.34.34 ip4:70.33.254.29 -all"
+
+Received 638 bytes from 192.168.2.11#53 in 74 ms
+SRV (service) records
+
+An SRV record is used to locate the hosts which support a particular service for a domain.
+
+Using a domain name formatted to include a service and a protocol name, _service._protocol.domainname, SRV records provide the names of the hosts that provide that service for the domain, as well as the port number that the service listens on. SRV records also include priority and weight values to indicate the order in which hosts should be used when multiple hosts are available for a particular service.
+
+This example SRV record indicates that the server0.example.com domain provides the LDAP service using TCP on port 389 on host server0.example.com with a priority of 0 and a weighting of 100.
+
+[student@serverX ~]$ host -v -t SRV _ldap._tcp.server0.example.com
+Trying "_ldap._tcp.server0.example.com"
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 35665
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 3
+
+;; QUESTION SECTION:
+;_ldap._tcp.server0.example.com.	IN	SRV
+
+;; ANSWER SECTION:
+_ldap._tcp.server0.example.com.	86400 IN SRV	0 100 389 server0.example.com.
+
+Received 154 bytes from 172.25.254.254#53 in 0 ms
+Hosts and resource records
+A typical host, whether a client or a server, will have the following records:
+
+One or more A and/or AAAA records mapping its host name to its IP addresses
+
+A PTR record for each of its IP addresses, reverse mapping them to its host name
+
+Optionally, one or more CNAME records mapping alternate names to its canonical host name
+
+A DNS zone will typically have, in addition to the records for the hosts in the zone:
+
+Exactly one SOA record to specify how the zone works
+
+An NS record for each of its authoritative name servers
+
+One or more MX records mapping the domain name to the mail exchange which receives email for addresses ending in the domain name
+
+Optionally, one or more TXT records for functions such as SPF or Google Site Verification
+
+Optionally, one or more SRV records to locate services in the domain
+
+REFERENCES
+host(1) and dig(1) man pages
+
+RFC 1034: Domain names - concepts and facilities
+
+RFC 1035: Domain names - implementation and specification
+
+RFC 2181: Clarifications to the DNS Specification
+
+
+
+
+
+
+Quiz: Practice: DNS Resource Record
+Match the following resource record types to the descriptions listed in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+Purpose	Resource record type
+Contains authoritative information for a zone, such as the email contact and several values that configure interactions between slave and master DNS servers.	SOA
+Maps host names to IPv4 addresses.	A
+Identifies the authoritative nameservers for a zone.	NS
+Used to publish location of network services for a domain.	SRV
+Identifies the mail exchanges responsible for accepting emails for a domain.	MX
+Maps host names to IPv6 addresses.	AAAA
+Enables reverse DNS lookups of IP addresses to host names.	PTR
+Aliases a name to a canonical name.	CNAME
+Used to publish arbitrary human-readable text. Commonly used for SPF, DKIM, and DMARC.	TXT
+

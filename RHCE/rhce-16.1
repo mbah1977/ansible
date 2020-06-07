@@ -1,0 +1,285 @@
+Chapter 16. Virtualization and Kickstart
+Defining the Anaconda Kickstart System
+Quiz: Practice: Kickstart File Syntax and Modification
+Deploying a New Virtual System with Kickstart
+Guided Exercise: Practice: Installing a System Using Kickstart
+Managing a Local Virtualization Host
+Quiz: Practice: Managing a Local Virtualization Host
+Abstract
+
+Overview
+Goal	To automate the installation of Red Hat Enterprise Linux on virtual machines with Kernel-based Virtual Machine (KVM) and libvirt.
+Objectives	
+Explain Kickstart concepts and architecture.
+
+Create a Kickstart configuration file.
+
+Install a Red Hat Enterprise Linux system as a host for running virtual machines.
+
+Sections	
+Defining the Anaconda Kickstart System (and Practice)
+
+Deploying a New Virtual System with Kickstart (and Practice)
+
+Managing a Local Virtualization Host (and Practice)
+
+Defining the Anaconda Kickstart System
+Kickstart automates Red Hat Enterprise Linux installation using a text file.
+
+Kickstart configuration files start with commands, followed by the %packages section.
+
+Optional %post and %pre sections can contain scripting that customizes installations.
+
+Objectives
+After completing this section, students should be able to identify key configuration elements found inside a Kickstart configuration file.
+
+Introduction to Kickstart installations
+A system administrator can automate the installation of Red Hat Enterprise Linux using a feature called Kickstart. Anaconda, the Red Hat installer, needs to be told how to install a system: partition disks, configure network interfaces, select which packages to install, etc. This is an interactive process by default. A Kickstart installation uses a text file to provide all of the answers to these questions, so no interaction is required.
+
+NOTE
+Kickstart in Red Hat Enterprise Linux is similar to Jumpstart for Oracle Solaris, or to an unattended installation for Microsoft Windows.
+
+Kickstart configuration files begin with a list of commands that define how the target machine is to be installed. Lines that start with # characters are comments that are ignored by the installer. Additional sections begin with a line that starts with a % character and end with a line with the %end directive.
+
+The %packages section specifies the software to be installed on the target system. Individual packages are specified by name (without versions). Package groups can be specified by name or ID, and start with an @ character. Environment groups (groups of package groups) can be specified with the @^ followed immediately by the name or ID of the environment group. Groups have mandatory, default, and optional components. Normally, mandatory and default components will be installed by Kickstart. Package or group names that are preceded with a - character are excluded from installation unless they are mandatory or installed due to RPM dependencies from other packages.
+
+Two additional sections are the %pre and %post scripts. %post scripts are more common. They configure the system after all of the software has been installed. The %pre script is executed before any disk partitioning is done.
+
+The configuration commands must be specified first. The %pre, %post, and %packages can occur in any order after the configuration commands.
+
+Kickstart configuration file commands
+Installation commands
+
+url: Specifies the location for the installation media.
+
+Example:
+
+url --url="ftp://installserver.example.com/pub/RHEL7/dvd"
+repo: This option tells Anaconda where to find the packages for installation. This option must point to a valid yum repository.
+
+Example:
+
+repo --name="Custom Packages" --baseurl="ftp://repo.example.com/custom"
+text: Forces text mode install.
+
+vnc: Allows the graphical installation to be viewed remotely via VNC.
+
+Example:
+
+vnc --password=redhat
+askmethod: Do not automatically use the CD-ROM as the source of packages when installation media is detected in the CD-ROM drive.
+
+Partitioning commands
+
+clearpart: Clears the specified partitions before installation.
+
+Example:
+
+clearpart --all --drives=sda,sdb --initlabel
+part: Specifies the size, format, and name of a partition.
+
+Example:
+
+part /home --fstype=ext4 --label=homes --size=4096 --maxsize=8192 --grow
+ignoredisk: Ignores the specified disks when installing.
+
+Example:
+
+ignoredisk --drives=sdc
+bootloader: Defines where to install the bootloader.
+
+Example:
+
+bootloader --location=mbr --boot-drive=sda
+volgroup, logvol: Creates LVM volume groups and logical volumes.
+
+Example:
+
+part pv.01 --size=8192
+volgroup myvg pv.01
+logvol / --vgname=myvg --fstype=xfs --size=2048 --name=rootvol --grow
+logvol /var --vgname=myvg --fstype=xfs --size=4096 --name=varvol
+zerombr: Disks whose formatting is unrecognized are initialized.
+
+Network commands
+
+network: Configures network information for target system and activates network devices in installer environment.
+
+Example:
+
+network --device=eth0 --bootproto=dhcp
+firewall: This option defines how the firewall will be configured on the target system.
+
+Example:
+
+firewall --enabled --service=ssh,cups
+Configuration commands
+
+lang: This required command sets the language to use during installation and the default language of the installed system.
+
+Example:
+
+lang en_US.UTF-8
+keyboard: This required command sets the system keyboard type.
+
+Example:
+
+keyboard --vckeymap=us --xlayouts='us','us'
+timezone: Defines timezone, NTP servers, and whether the hardware clock uses UTC.
+
+Example:
+
+timezone --utc --ntpservers=time.example.com Europe/Amsterdam
+auth: This required command sets up the authentication options for the system.
+
+Example:
+
+auth --useshadow --enablemd5 --passalgo=sha512
+rootpw: Defines the initial root password.
+
+Example:
+
+rootpw --plaintext redhat
+or
+
+rootpw --iscrypted $6$KUnFfrTzO8jv.PiH$YlBbOtXBkWzoMuRfb0.SpbQ....XDR1UuchoMG1
+selinux: Sets the state of SELinux on the installed system.
+
+Example:
+
+selinux --enforcing
+services: Modifies the default set of services that will run under the default runlevel.
+
+Example:
+
+services --disabled=network,iptables,ip6tables --enabled=NetworkManager,firewalld
+group, user: Create a local group or user on the system.
+
+Example:
+
+group --name=admins --gid=10001
+user --name=jdoe --gecos="John Doe" --groups=admins --password=changeme --plaintext
+Miscellaneous commands
+
+logging: This command defines how Anaconda will log during the installation.
+
+Example:
+
+logging --host=loghost.example.com --level=info
+firstboot: Determines whether firstboot starts the first time the system is booted.
+
+Example:
+
+firstboot --disabled
+reboot, poweroff, halt: Specify what should happen after the installation finishes.
+
+NOTE
+The ksverdiff utility from the pykickstart package is useful for identifying changes in Kickstart file syntax between two versions of Red Hat Enterprise Linux or Fedora.
+
+For example, ksverdiff -f RHEL6 -t RHEL7 will identify changes in syntax from RHEL 6 to RHEL 7. Available versions are listed in the top of the file /usr/lib/python2.7/site-packages/pykickstart/version.py.
+
+Example Kickstart file:
+The first part of the file consists of the installation commands, like disk partitioning and installation source.
+
+#version=RHEL7
+# System authorization information
+auth --useshadow --enablemd5
+# Use network installation
+url --url="http://classroom.example.com/content/rhel7.0/x86_64/dvd/"
+# Firewall configuration
+firewall --enabled --service=ssh
+firstboot --disable
+ignoredisk --only-use=vda
+# Keyboard layouts
+keyboard --vckeymap=us --xlayouts='us','us'
+# System language
+lang en_US.UTF-8
+# Installation logging level
+logging --level=info
+# Network information
+network  --bootproto=dhcp
+# Root password
+rootpw --iscrypted $6$/h/Mumvarr2dKrv1$Krv7h9.QoV0s....foMXsGXP1KllaiJ/w7EWiL1
+# SELinux configuration
+selinux --enforcing
+# System services
+services --disabled="kdump,rhsmcertd" --enabled="network,sshd,rsyslog,chronyd"
+# System timezone
+timezone --utc America/Los_Angeles
+# System bootloader configuration
+bootloader --location=mbr --boot-drive=vda
+# Clear the Master Boot Record
+zerombr
+# Partition clearing information
+clearpart --all --initlabel 
+# Disk partitioning information
+part / --fstype="xfs" --ondisk=vda --size=10000
+The second part contains the %packages section, detailing which packages and package groups should be installed, and which packages shouldn't be installed.
+
+%packages
+@core
+chrony
+cloud-init
+dracut-config-generic
+dracut-norescue
+firewalld
+grub2
+kernel
+rsync
+tar
+-NetworkManager
+-plymouth
+ 
+%end
+The last part contains any %pre and %post installation scripts.
+
+%post --erroronfail
+ 
+# For cloud images, 'eth0' _is_ the predictable device name, since
+# we don't want to be tied to specific virtual (!) hardware
+rm -f /etc/udev/rules.d/70*
+ln -s /dev/null /etc/udev/rules.d/80-net-name-slot.rules
+ 
+# simple eth0 config, again not hard-coded to the build hardware
+cat > /etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
+DEVICE="eth0"
+BOOTPROTO="dhcp"
+ONBOOT="yes"
+TYPE="Ethernet"
+USERCTL="yes"
+PEERDNS="yes"
+IPV6INIT="no"
+EOF
+ 
+%end
+NOTE
+In a Kickstart file, missing required values cause the installer to interactively prompt for an answer or to abort the installation entirely.
+
+REFERENCES
+ksverdiff(1) man page
+
+The file /usr/share/doc/pykickstart-*/kickstart-docs.txt provided by the pykickstart package contains useful and detailed information on the syntax of Kickstart files.
+
+Additional information may be available in the Red Hat Enterprise Linux Installation Guide for RHEL 7 located at:
+
+
+
+
+Quiz: Practice: Kickstart File Syntax and Modification
+Match the following Kickstart commands with their descriptions in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+Description	Command
+Section of a Kickstart configuration file that specifies what software is installed on the new system.	
+Required Kickstart command that configures how users access the system.	
+Location of the software used by Kickstart to install a system.	
+Scripting in a Kickstart configuration file that is executed after the software is installed on a system.	
+Kickstart command that specifies which partitions should be cleared before installation.	
+Modifies which services will start by default at system boot.	
+Defines the default authentication credentials for the superuser.	
+Kickstart command that specifies the size, format, and name of a disk partition.	
+Kickstart command used to specify NTP servers.	
+Determines the network configuration for the installation and the target system.

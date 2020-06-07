@@ -1,0 +1,183 @@
+Deploying a New Virtual System with Kickstart
+The system-config-kickstart utility can be used to create a Kickstart configuration file.
+
+Another way to create a Kickstart configuration file is to use a text editor and the ksvalidator command to check for syntax errors.
+
+The ks=ksfile-location option to the Anaconda kernel specifies where to find the Kickstart configuration file.
+
+Objectives
+After completing this section, students should be able to:
+
+Create a Kickstart configuration file with the system-config-kickstart utility.
+
+Modify an existing Kickstart configuration file with a text editor and check its syntax with ksvalidator.
+
+Publish a Kickstart configuration file to the installer.
+
+Perform a network Kickstart installation.
+
+Kickstart installation steps
+An ordered process is required to automate the successful installation of Red Hat Enterprise Linux.
+
+Three steps must be taken to perform a Kickstart installation:
+
+Create a Kickstart configuration file.
+
+Publish the Kickstart configuration file to the installer.
+
+Boot Anaconda and point it to the Kickstart configuration file.
+
+Creating a Kickstart configuration file
+There are two ways to create a Kickstart configuration file:
+
+Use the system-config-kickstart utility.
+
+Use a text editor.
+
+The system-config-kickstart utility presents a number of graphical dialog boxes, takes inputs from the user, then creates a text file with Kickstart directives that correspond to the user's choices. Each dialog box corresponds to a category of questions asked by the Red Hat installer, Anaconda. Optionally, an existing configuration file can be passed as an argument and system-config-kickstart will use it to populate values for configuration options. system-config-kickstart is provided by the system-config-kickstart package.
+
+
+Figure 16.1: Configuring storage with system-config-kickstart
+Creating a Kickstart configuration file from scratch with a text editor is rare. The Anaconda installer creates a file called /root/anaconda-ks.cfg that contains the Kickstart directives that can be used to generate the freshly installed system. This file makes a good starting point when creating a Kickstart configuration file with a text editor.
+
+The following are some reasons for creating a Kickstart file manually instead of using system-config-kickstart:
+
+The GUI and/or system-config-kickstart is unavailable.
+
+Advanced disk partition configuration instructions are needed. system-config-kickstart does not support LVM and software RAID.
+
+Individual packages need to be included or omitted (not just groups).
+
+More advanced scripting is needed in the %pre and %post sections.
+
+ksvalidator is a utility that checks for syntax errors in a Kickstart configuration file. It will ensure keywords and options are properly used, but it will not validate URL paths, individual packages, or groups, nor any part of %post or %pre scripts. For instance, if the firewall --disabled directive is misspelled, ksvalidator could produce one of the following errors:
+
+[student@desktopX]$ ksvalidator /tmp/anaconda-ks.cfg
+The following problem occurred on line 10 of the kickstart file:
+ 
+Unknown command: frewall
+ 
+[student@desktopX]$ ksvalidator /tmp/anaconda-ks.cfg
+The following problem occurred on line 10 of the kickstart file:
+ 
+no such option: --dsabled
+The pykickstart RPM provides ksvalidator.
+
+Publish the Kickstart configuration file to Anaconda
+Make the Kickstart configuration file available to the installer:
+
+Network servers: FTP, HTTP, NFS
+
+DHCP/TFTP server
+
+USB disk or CD-ROM
+
+Local hard disk
+
+The installer must be able to access the Kickstart file to begin an automated installation. Although there are several methods to make the Kickstart configuration file available, the most common is through a network server such as an FTP server, a web server, or an NFS server. Network servers facilitate Kickstart file maintenance because changes only need to be made once and take effect immediately.
+
+Providing Kickstart files on USB or CD-ROM is another convenient way to publish configuration files. The Kickstart configuration file is embedded on the boot media used to start the installation. When changes are made, new installation media must be generated.
+
+It is possible to provide the Kickstart file on a local disk. This allows a quick way to rebuild a development server.
+
+Boot Anaconda and point it to the Kickstart configuration file
+Once a Kickstart method is chosen, the installer must be told where the Kickstart file is located. This is done by passing a ks=LOCATION argument to the installation kernel. The following are some sample specifications:
+
+ks=http://server/dir/file
+
+ks=ftp://server/dir/file
+
+ks=nfs:server:/dir/file
+
+ks=hd:device:/dir/file
+
+ks=cdrom:/dir/file
+
+
+Figure 16.2: Specifying the Kickstart file location during PXE boot
+For virtual machine installations using the Virtual Machine Manager or virt-manager, the Kickstart URL can be specified in a box under URL Options. When installing physical machines, boot using installation media and press the Tab key to interrupt the boot process. Enter one of the ks= entries above as a parameter to the installation kernel.
+
+REFERENCES
+ksvalidator(1) and system-config-kickstart(8) man pages
+
+
+
+
+Guided Exercise: Practice: Installing a System Using Kickstart
+In this lab, you will create a Kickstart configuration file, confirm it is syntactically correct, and publish it for use.
+
+Resources
+Files:	/root/anaconda-ks.cfg
+Machines:	desktopX
+Outcomes
+
+You will have a Kickstart configuration file based on the anaconda-ks.cfg file on desktopX. It will install packages from classroom.example.com, use DHCP for networking, partition storage and install packages according to specifications, and perform minor customization of the newly installed system.
+
+Reset your desktopX system.
+
+Log into and set up your desktopX system.
+
+[student@desktopX ~]$ lab kickstart setup
+Copy /root/anaconda-ks.cfg on desktopX to a file called kickstart.cfg that student can edit.
+
+[student@desktopX ~]$ sudo cat /root/anaconda-ks.cfg > kickstart.cfg
+Make the following changes to kickstart.cfg.
+
+Change the url command to specify the HTTP installation source media used in the classroom:
+
+url --url="http://classroom.example.com/content/rhel7.0/x86_64/dvd/"
+Configure the network to use DHCP. There should only be a single network directive that looks like the following:
+
+network --bootproto=dhcp
+Modify the disk configuration to only have the following three directives:
+
+# Clear the Master Boot Record
+zerombr
+# Partition clearing information
+clearpart --all --initlabel
+# Disk partitioning information
+part / --fstype="xfs" --ondisk=vda --size=5120
+Be sure the size is adjusted to 5120.
+
+Comment the reboot directive:
+
+#reboot
+Change the packages that are installed to include httpd, but not cloud-init. Simplify the package specification to look exactly like the following:
+
+@core
+chrony
+dracut-config-generic
+dracut-norescue
+firewalld
+grub2
+kernel
+rsync
+tar
+httpd
+-plymouth
+Delete all of the content in the %post section except for the following lines:
+
+%post --erroronfail
+# make sure firstboot doesn't start
+echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
+# append /etc/issue with a custom message
+echo "Kickstarted for class on $(date)" >> /etc/issue
+%end
+Set the root password to redhat. Change the line that starts with rootpw to:
+
+rootpw --plaintext redhat
+Use the ksvalidator command to check the Kickstart file for syntax errors.
+
+[student@desktopX ~]$ ksvalidator kickstart.cfg
+Copy kickstart.cfg to the /var/www/html/ks-config directory.
+
+[student@desktopX ~]$ sudo cp ~student/kickstart.cfg /var/www/html/ks-config
+Run the lab kickstart grading script on desktopX to confirm the specified changes have been made and the kickstart file is available via HTTP.
+
+[root@desktopX ~]# lab kickstart grade
+Kickstart file available via HTTP ..... PASS
+Confirming installation media ......... PASS
+Checking installed disk size .......... PASS
+Confirming network configuration ...... PASS
+Checking software package selection ... PASS
+

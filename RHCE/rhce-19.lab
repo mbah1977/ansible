@@ -1,0 +1,80 @@
+Lab: Lab: Network Port Security
+In this lab, you will configure a custom firewall zone, service, and a custom SELinux port type.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+An SSHD service listening on both the regular port 22/TCP, as well as the new nonstandard port 999/TCP, protected through a custom firewall zone and a custom firewall service.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab custom-sshd setup
+Since some of your co-workers sometimes have to use your serverX machine from a network that blocks outgoing access to port 22/TCP, you have decided to bind your sshd daemon to the nonstandard port 999/TCP. The sshd daemon should also still be available over the standard port 22/TCP. The lab custom-sshd setup script has already configured the sshd daemon to listen on these ports, but has not yet performed any additional configuration that might be necessary.
+
+After ensuring sshd listens on these ports, you will need to update the firewall on serverX as well. Use the following criteria when configuring the firewall:
+
+All connections from the 172.25.X.0/24 network should be routed through the work zone.
+
+In addition to the regular ssh port, port 999/TCP should also be available in the work zone.
+
+After you have completed your work, you can run the command lab custom-sshd grade on your desktopX machine to verify your work.
+
+Verify that sshd is indeed listening on both port 22/TCP and port 999/TCP. If not, investigate and fix.
+
+Use ss to find all the ports where sshd is listening.
+
+[student@serverX ~]$ sudo ss -tulpn | grep sshd
+tcp    LISTEN    0    128                    *:22                      *:*
+  users:(("sshd",4864,3))
+tcp    LISTEN    0    128                   :::22                     :::*
+  users:(("sshd",4864,4))
+The previous output indicates that sshd is only bound to port 22/TCP. Restart the sshd.service service and check the status output.
+
+[student@serverX ~]$ sudo systemctl restart sshd.service
+[student@serverX ~]$ sudo systemctl status -l sshd.service
+...
+May 12 12:41:37 serverX.example.com sshd[23036]: error: Bind to port 999 on 0.0.0.0 failed: Permission denied.
+...
+Depending on the speed and configuration of your system the previous command might also include some sealert output. If an SELinux was caused by a service this information typically shows up with some delay in the output of systemctl status, but a lack of sealert output is not a guarantee that this is not an SELinux issue.
+
+That Permission denied while binding to port 999/TCP is most likely an SELinux denial. Use sealert to find any SELinux messages related to this.
+
+[student@serverX ~]$ sudo sealert -a /var/log/audit/audit.log
+...
+SELinux is preventing /usr/sbin/sshd from name_bind access on the tcp socket.
+...
+Use the advice from sealert to allow sshd to bind to port 999/TCP.
+
+[student@serverX ~]$ sudo semanage port -a -t ssh_port_t -p tcp 999
+Restart sshd.service and verify if it is now bound to port 999/TCP as well.
+
+[student@serverX ~]$ sudo systemctl restart sshd.service
+[student@serverX ~]$ sudo ss -tulpn | grep sshd
+...
+tcp    LISTEN    0    128                    *:999                     *:*
+  users:(("sshd",4864,3))
+...
+Route all traffic from the 172.25.X.0/24 subnet through the work zone.
+
+Permanently route all traffic from the 172.25.X.0/24 subnet through the work zone.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --zone=work --add-source=172.25.X.0/24 
+Open port 999/TCP in the work zone.
+
+Add the port.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --zone=work --add-port=999/tcp
+Reload the firewall on serverX to activate your changes.
+
+[student@serverX ~]$ sudo firewall-cmd --reload
+From desktopX, verify your configuration by running lab custom-sshd grade.
+
+[student@desktopX ~]$ lab custom-sshd grade
+...
+Overall result: PASS
+

@@ -1,0 +1,112 @@
+Masquerading and Port Forwarding
+In this section, students learned how to describe and implement Network Address Translation (NAT).
+
+Objectives
+After completing this section, students should be able to describe and implement Network Address Translation (NAT).
+
+Network Address Translation (NAT)
+firewalld supports two types of Network Address Translation (NAT): masquerading and port forwarding. Both can be configured on a basic level with regular firewall-cmd rules, and more advanced forwarding configurations can be accomplished with rich rules. Both forms of NAT modify certain aspects of a packet, like the source or destination, before sending it on.
+
+Managing masquerading and port forwarding
+Masquerading
+With masquerading, a system will forward packets that are not directly addressed to itself to the intended recipient, while changing the source address of the packets that go through to its own public IP address. When answers to those packets come in, the firewall will then modify the destination address to the address of the original host, and send the packet on. This is usually used on the edge of a network to provide Internet access to an internal network. Masquerading is a form of Network Address Translation (NAT).
+
+IMPORTANT
+Masquerading can only be used with IPv4, not with IPv6.
+
+
+Figure 19.1: A sample network layout for NAT
+An example of how masquerading works based on the network layout described in Figure 19.1: A sample network layout for NAT.
+
+One of the machines behind the firewall sends a packet to an address outside of the local network. The packet has a source address of 10.0.0.100 (the address of the machine), and a destination address of 2.17.39.214.
+
+Since the destination address is not on the local subnet, the packet will be routed to the default gateway configured on the source machine; in this case, 10.0.0.1, the IP address of the firewall.
+
+The firewall accepts the packet, changes the source address to 1.2.3.4 (the external IP for the firewall), stores a reference to this connection in its connection state table, then passes it to a router on the Internet based on its routing table.
+
+An answer to the packet comes back from the Internet. The router looks up the connection in its connection state table, then changes the destination address to 10.0.0.100 (the original sender), and passes the packet on.
+
+The original sender receives the answer to its request.
+
+Configuring masquerading
+
+To configure masquerading for a zone with regular firewall-cmd commands, use the following syntax:
+
+[root@serverX ~]# firewall-cmd --permanent --zone=<ZONE> --add-masquerade
+This will masquerade any packets sent to the firewall from clients defined in the sources for that zone (both interfaces and subnets) that are not addressed to the firewall itself.
+
+To gain more control over what clients will be masqueraded, a rich rule can be used as well.
+
+[root@serverX ~]# firewall-cmd --permanent --zone=<ZONE> --add-rich-rule='rule family=ipv4 source address=192.168.0.0/24 masquerade'
+Port forwarding
+Another form of NAT is port forwarding. With port forwarding, traffic to a single port is forwarded either to a different port on the same machine, or to a port on a different machine. This mechanism is typically used to “hide” a server behind another machine, or to provide access to a service on an alternate port.
+
+IMPORTANT
+When a port forward is configured to forward packets to a different machine, any replies from that machine will normally be sent directly to the original client from that machine. Since this will result in an invalid connection on most configurations, the machine that is forwarded to will have to be masqueraded through the firewall that performed the port forwarding.
+
+A common configuration is to forward a port from the firewall machine to a machine that is already masqueraded behind the firewall.
+
+An example of a port forward based on the network layout described in Figure 19.1: A sample network layout for NAT. Assume that the machine with the IP address 10.0.0.100 behind the firewall is running a web server on port 8080/TCP, and that the firewall is configured to forward traffic coming in on port 80/TCP on its external interface to port 8080/TCP on that machine.
+
+A client from the Internet sends a packet to port 80/TCP on the external interface of the firewall.
+
+The firewall changes the destination address and port of this packet to 10.0.0.100 and 8080/TCP and forwards it on. The source address and port remain unchanged.
+
+The machine behind the firewall sends a response to this packet. Since this machine is being masqueraded (and the firewall is configured as the default gateway), this packet is sent to the original client, appearing to come from the external interface on the firewall.
+
+Configuring port forwarding
+
+To configure port forwarding with regular firewall-cmd commands, use the following syntax:
+
+[root@serverX ~]# firewall-cmd --permanent --zone=<ZONE> --add-forward-port=port=<PORTNUMBER>:proto=<PROTOCOL>[:toport=<PORTNUMBER>][:toaddr=<IPADDR>]
+Both the toport= and toaddr= parts are optional, but at least one of those two will need to be specified.
+
+As an example, the following command will forward incoming connections on port 513/TCP on the firewall to port 132/TCP on the machine with the IP address 192.168.0.254 for clients from the public zone:
+
+[root@serverX ~]# firewall-cmd --permanent --zone=public --add-forward-port=port=513:proto=tcp:toport=132:toaddr=192.168.0.254
+To gain more control over port forwarding rules, the following syntax can be used with rich rules:
+
+forward-port port=<PORTNUM> protocol=tcp|udp [to-port=<PORTNUM>] [to-addr=<ADDRESS>]
+An example that uses rich rules to forward traffic from 192.168.0.0/26 in the work zone to port 80/TCP to port 8080/TCP on the firewall machine itself:
+
+[root@serverX ~]# firewall-cmd --permanent --zone=work --add-rich-rule='rule family=ipv4 source address=192.168.0.0/26 forward-port port=80 protocol=tcp to-port=8080'
+REFERENCES
+firewalld.richlanguage(5) and firewall-cmd(1) man pages
+
+
+
+
+
+Guided Exercise: Practice: Forwarding a Port
+In this lab, you will configure your serverX system to forward a request to port 443/tcp from desktopX to port 22/tcp.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+Custom firewall rules that configure a port forward.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Your company is running a trial for a new bastion host. As part of this trial, your desktopX should be able to connect to the SSH daemon on your serverX system on port 443/tcp. Since this is purely a trial, you do not wish to bind sshd to that port directly, and only your desktopX should be able to connect using port 443/tcp.
+
+It has been decided that you, the chosen one, will implement this using firewalld rich rules.
+
+Configure the firewall on serverX to forward port 443/tcp to 22/tcp, but only for your desktopX machine. The IP address of your desktopX machine is 172.25.X.10.
+
+Permanently add the port forwarding firewall rule on serverX.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-rich-rule 'rule family=ipv4 source address=172.25.X.10/32 forward-port port=443 protocol=tcp to-port=22'
+Reload the firewall configuration to activate your changes.
+
+[student@serverX ~]$ sudo firewall-cmd --reload
+Test if sshd is now available on port 443/tcp from your desktopX system.
+
+[student@desktopX ~]$ ssh -p 443 serverX.example.com
+The authenticity of host '[serverX.example.com]:443 ([172.25.X.11]:443)' can't be established.
+ECDSA key fingerprint is XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX.
+Are you sure you want to continue connecting (yes/no)? yes
+student@serverX.example.com's password: student
+

@@ -1,0 +1,473 @@
+Managing Network Teaming
+In this section, students learned how to:
+
+Navigate and modify network teaming configuration files.
+
+Modify team runner configuration settings.
+
+Use teamnl and teamdctl to troubleshoot network teaming.
+
+Objectives
+After completing this section, students should be able to troubleshoot and change the configuration of a team interface.
+
+Network teaming configuration files
+Managing Network Teaming
+NetworkManager creates configuration files for network teaming in the /etc/sysconfig/network-scripts the same way it does for other interfaces. A configuration file is created for each of the interfaces: for the team, and each of the ports.
+
+The configuration file for the team interface defines the IP settings for the interface. The DEVICETYPE variable informs the initialization scripts this is a network team interface. Parameters for teamd configuration are defined in the TEAM_CONFIG variable. Note that the contents of TEAM_CONFIG uses JSON syntax.
+
+# /etc/sysconfig/network-scripts/ifcfg-team0
+DEVICE=team0
+DEVICETYPE=Team
+TEAM_CONFIG="{\"runner\": {\"name\": \"broadcast\"}}"
+BOOTPROTO=none
+IPADDR0=172.25.5.100
+PREFIX0=24
+NAME=team0
+ONBOOT=yes
+The following is an example configuration file for a team port interface.
+
+# /etc/sysconfig/network-scripts/ifcfg-team0-eth1
+DEVICE=eth1
+DEVICETYPE=TeamPort
+TEAM_MASTER=team0
+NAME=team0-eth1
+ONBOOT=yes
+The DEVICETYPE variable informs the initialization scripts this is a team port interface. The TEAM_MASTER variable defines which team device it is a port for.
+
+Setting and adjusting team configuration
+Initial network team configuration is set when the team interface is created. The default runner is roundrobin, but a different runner can be chosen by specifying a JSON string when the team is created with the team.config subcommand. Default values for runner parameters are used when they are not specified.
+
+A different runner can be assigned to an existing team, or runner parameters can be adjusted using the nmcli con mod command. The configuration changes can be specified as a JSON string (in the case of simple changes) or the name of a file with a more complex JSON configuration can be given.
+
+nmcli con mod IFACE team.config JSON-configuration-file-or-string
+The following example shows how to assign different priorities to port interfaces in an active-backup team:
+
+[root@demo ~]# cat /tmp/team.conf
+{
+    "device": "team0",
+    "mcast_rejoin": {
+        "count": 1
+    },
+    "notify_peers": {
+        "count": 1
+    },
+    "ports": {
+        "eth1": {
+	    "prio": -10,
+	    "sticky": true,
+            "link_watch": {
+                "name": "ethtool"
+            }
+        },
+        "eth2": {
+	    "prio": 100,
+            "link_watch": {
+                "name": "ethtool"
+            }
+        }
+    },
+    "runner": {
+        "name": "activebackup"
+    }
+}
+[root@demo ~]# nmcli con mod team0 team.config /tmp/team.conf
+NOTE
+Any changes made do not go into effect until the next time the team interface is brought up.
+
+The link_watch settings in the configuration file determines how the link state of the port interfaces are monitored. The default looks like the following, and uses functionality similar to the ethtool command to check the link of each interface:
+
+"link_watch": {
+    "name": "ethtool"
+}
+Another way to check link state is to periodically use an ARP ping packet to check for remote connectivity. Local and remote IP addresses and timeouts would have to be specified. A configuration that would accomplish that would look similar to the following:
+
+"link_watch":{
+    "name": "arp_ping",
+    "interval": 100,
+    "missed_max": 30,
+    "source_host": "192.168.23.2",
+    "target_host": "192.168.23.1"
+},
+NOTE
+Be aware that omitted options revert to their default values when they are not specified in the JSON file.
+
+Troubleshooting network teams
+The teamnl and teamdctl commands are very useful for troubleshooting network teams. These commands only work on network teams that are up. The following examples show some typical uses for these commands.
+
+Display the team ports of the team0 interface:
+
+[root@demo ~]# teamnl team0 ports
+ 4: eth2: up 0Mbit HD 
+ 3: eth1: up 0Mbit HD 
+Display the currently active port of team0:
+
+[root@demo ~]# teamnl team0 getoption activeport
+3
+Set the option for the active port of team0:
+
+[root@demo ~]# teamnl team0 setoption activeport 3
+Use teamdctl to display the current state of the team0 interface:
+
+[root@demo ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+ports:
+  eth2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+  eth1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+runner:
+  active port: eth1
+Use teamdctl to display the current JSON configuration for team0:
+
+[root@demo ~]# teamdctl team0 config dump
+{
+    "device": "team0",
+    "mcast_rejoin": {
+        "count": 1
+    },
+    "notify_peers": {
+        "count": 1
+    },
+    "ports": {
+        "eth1": {
+            "link_watch": {
+                "name": "ethtool"
+            },
+            "prio": -10,
+            "sticky": true
+        },
+        "eth2": {
+            "link_watch": {
+                "name": "ethtool"
+            },
+            "prio": 100
+        }
+    },
+    "runner": {
+        "name": "activebackup"
+    }
+}
+REFERENCES
+teamd.conf(5) and teamnl(8) man pages
+
+i
+
+Guided Exercise: Practice: Managing Network Teaming
+In this lab, you will manage your network team interface. You will deactivate it, change its runner to roundrobin, and reactivate it. You will use teamdctl and teamnl to get information about the team interface.
+
+Resources:
+Files:	/etc/sysconfig/network-scripts/ifcfg-*
+Machines:	serverX
+Outcomes:
+
+A network team interface called team0 will have a static IP address of 192.168.0.100/24 and will be built upon two port interfaces: eno1 and eno2. Its runner will be changed to roundrobin, then changed back to activebackup.
+
+Complete the Configuring Network Teaming practice exercise in the previous section. This exercise uses the teamed interfaces created in that practice exercise.
+
+Log into your server system and become root.
+
+[student@serverX ~]$ sudo -i
+Get the initial state of the teamed interfaces on the system.
+
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+ports:
+  eno1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+  eno2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+runner:
+  active port: eno1
+Examine the configuration files created by NetworkManager that apply to the team interfaces and its ports.
+
+Display the file for the team interface and note how it defines the runner to be used and the IPv4 network settings for the interface.
+
+[root@serverX ~]# cat /etc/sysconfig/network-scripts/ifcfg-team0
+DEVICE=team0
+TEAM_CONFIG="{\"runner\": {\"name\": \"activebackup\"}}"
+DEVICETYPE=Team
+BOOTPROTO=none
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+NAME=team0
+UUID=5dc435ac-e4ac-403a-8e8f-163b163bf49b
+ONBOOT=yes
+IPADDR0=192.168.0.100
+PREFIX0=24
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+Display the configuration files for the port interfaces. Take special notice of the values of the TEAM_MASTER and DEVICETYPE shell variables.
+
+[root@serverX ~]# cat /etc/sysconfig/network-scripts/ifcfg-team0-port1
+BOOTPROTO=dhcp
+DEFROUTE=yes
+PEERDNS=yes
+PEERROUTES=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+IPV6_FAILURE_FATAL=no
+NAME=team0-port1
+UUID=f5664c4e-1dba-43f8-8427-35aee0594ed3
+DEVICE=eno1
+ONBOOT=yes
+TEAM_MASTER=team0
+DEVICETYPE=TeamPort
+[root@serverX ~]# cat /etc/sysconfig/network-scripts/ifcfg-team0-port2
+BOOTPROTO=dhcp
+DEFROUTE=yes
+PEERDNS=yes
+PEERROUTES=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+IPV6_FAILURE_FATAL=no
+NAME=team0-port2
+UUID=174e4402-b169-47d1-859f-9a4b3f30000f
+DEVICE=eno2
+ONBOOT=yes
+TEAM_MASTER=team0
+DEVICETYPE=TeamPort
+Bring the team0 interface down and edit the configuration file to use the roundrobin runner.
+
+Bring the team0 interface down.
+
+[root@serverX ~]# nmcli dev dis team0
+Edit the configuration file for team0 and adjust it to use the roundrobin runner.
+
+[root@serverX ~]# vim /etc/sysconfig/network-scripts/ifcfg-team0
+[root@serverX ~]# grep runner /etc/sysconfig/network-scripts/ifcfg-team0
+TEAM_CONFIG="{\"runner\": {\"name\": \"roundrobin\"}}"
+Use nmcli to make NetworkManager reload the updated configuration.
+
+[root@serverX ~]# nmcli con load /etc/sysconfig/network-scripts/ifcfg-team0
+Bring the team0 interface back up.
+
+Tell NetworkManager to activate team0.
+
+[root@serverX ~]# nmcli con up team0
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/12)
+Check the current state of team0.
+
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: roundrobin
+Log into another window and ping the local network gateway through the team0 interface.
+
+[root@serverX ~]# ping -I team0 192.168.0.254
+PING 192.168.0.254 (192.168.0.254) from 192.168.0.100 team0: 56(84) bytes of data.
+From 192.168.0.100 icmp_seq=1 Destination Host Unreachable
+From 192.168.0.100 icmp_seq=2 Destination Host Unreachable
+From 192.168.0.100 icmp_seq=3 Destination Host Unreachable
+...Output omitted...
+The ping command fails to contact the gateway because the teamed interface doesn't have any active ports.
+
+Activate one of the port interfaces for team0.
+
+Use nmcli to activate the team0-port1 interface.
+
+[root@serverX ~]# nmcli con up team0-port1
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/13)
+Display the state of the teamed interface.
+
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: roundrobin
+ports:
+  eno1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+ping the local network gateway through the team0 interface. It should be able to reach the gateway.
+
+[root@serverX ~]# ping -I team0 192.168.0.254
+PING 192.168.0.254 (192.168.0.254) from 192.168.0.100 team0: 56(84) bytes of data.
+64 bytes from 192.168.0.254: icmp_seq=1 ttl=64 time=0.516 ms
+64 bytes from 192.168.0.254: icmp_seq=2 ttl=64 time=0.703 ms
+64 bytes from 192.168.0.254: icmp_seq=3 ttl=64 time=0.422 ms
+Bring up the other team port for team0.
+
+Use nmcli to activate the team0-port2 interface.
+
+[root@serverX ~]# nmcli con up team0-port2
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/14)
+Display the updated state of the teamed interface.
+
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: roundrobin
+ports:
+  eno1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+  eno2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+Use teamdctl to display the configuration for team0.
+
+[root@serverX ~]# teamdctl team0 config dump
+{
+    "device": "team0",
+    "ports": {
+        "eno1": {
+            "link_watch": {
+                "name": "ethtool"
+            }
+        },
+        "eno2": {
+            "link_watch": {
+                "name": "ethtool"
+            }
+        }
+    },
+    "runner": {
+        "name": "roundrobin"
+    }
+}
+Use the teamnl command to display the tunable options for team0.
+
+[root@serverX ~]# teamnl team0 options
+ queue_id (port:eno2) 0 
+ priority (port:eno2) 0 
+ user_linkup_enabled (port:eno2) false 
+ user_linkup (port:eno2) true 
+ enabled (port:eno2) true 
+ queue_id (port:eno1) 0 
+ priority (port:eno1) 0 
+ user_linkup_enabled (port:eno1) false 
+ user_linkup (port:eno1) true 
+ enabled (port:eno1) true 
+ mcast_rejoin_interval 0 
+ mcast_rejoin_count 0 
+ notify_peers_interval 0 
+ notify_peers_count 0 
+ mode roundrobin 
+Modify the team0 interface so it uses the activebackup runner instead of roundrobin.
+
+The interface can only be modified after it is brought down.
+
+[root@serverX ~]# nmcli dev dis team0
+Use nmcli to tune the teamed interface to use the activebackup runner.
+
+[root@serverX ~]# nmcli con mod team0 team.config '{"runner": {"name": "activebackup"}}'
+Examine the changes made to the interface's configuration file.
+
+[root@serverX ~]# cat /etc/sysconfig/network-scripts/ifcfg-team0
+DEVICE=team0
+TEAM_CONFIG="{\"runner\": {\"name\": \"activebackup\"}}"
+DEVICETYPE=Team
+BOOTPROTO=none
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+NAME=team0
+UUID=5dc435ac-e4ac-403a-8e8f-163b163bf49b
+ONBOOT=yes
+IPADDR0=192.168.0.100
+PREFIX0=24
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+Reactivate the teamed interface and both of its port interfaces.
+
+Use nmcli to activate the teamed interface.
+
+[root@serverX ~]# nmcli con up team0
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/15)
+Display its initial state. Note that the port interfaces didn't get activated.
+
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+runner:
+  active port: 
+Activate the two port interfaces and display the resulting teamed interface state.
+
+[root@serverX ~]# nmcli con up team0-port1
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/16)
+[root@serverX ~]# nmcli con up team0-port2
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/17)
+[root@serverX ~]# teamdctl team0 state
+setup:
+  runner: activebackup
+ports:
+  eno1
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+  eno2
+    link watches:
+      link summary: up
+      instance[link_watch_0]:
+        name: ethtool
+        link: up
+runner:
+  active port: eno1
+Restart ping and make sure it works once the first port interface is brought back up.
+
+[root@serverX ~]# ping -I team0 192.168.0.254
+PING 192.168.0.254 (192.168.0.254) from 192.168.0.100 team0: 56(84) bytes of data.
+64 bytes from 192.168.0.254: icmp_seq=1 ttl=64 time=0.516 ms
+64 bytes from 192.168.0.254: icmp_seq=2 ttl=64 time=0.703 ms
+64 bytes from 192.168.0.254: icmp_seq=3 ttl=64 time=0.422 ms
+Use the teamnl to display the options available to an activebackup team device.
+
+[root@serverX ~]# teamnl team0 options
+ queue_id (port:eno2) 0 
+ priority (port:eno2) 0 
+ user_linkup_enabled (port:eno2) false 
+ user_linkup (port:eno2) true 
+ enabled (port:eno2) false 
+ queue_id (port:eno1) 0 
+ priority (port:eno1) 0 
+ user_linkup_enabled (port:eno1) false 
+ user_linkup (port:eno1) true 
+ enabled (port:eno1) true 
+ activeport 3 
+ mcast_rejoin_interval 0 
+ mcast_rejoin_count 1 
+ notify_peers_interval 0 
+ notify_peers_count 1 
+ mode activebackup 
+

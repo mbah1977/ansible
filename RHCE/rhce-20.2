@@ -1,0 +1,264 @@
+Configuring a Caching Nameserver
+In this section, students learned how to:
+
+Identify the need for DNSSEC validation on a caching nameserver.
+
+Configure unbound DNS server as a caching nameserver.
+
+Administer unbound's cache data.
+
+Objectives
+After completing this section, students should be able to configure a secure, caching nameserver using the unbound DNS server.
+
+Caching nameservers and DNSSEC
+Caching nameserver
+
+Caching nameservers store DNS query results in a local cache and removes resource records from the cache when their TTLs expire. It is common to set up caching nameservers to perform queries on behalf of clients on the local network. This greatly improves the efficiency of DNS name resolutions by reducing DNS traffic across the Internet. As the cache grows, DNS performance improves as the caching nameserver answers more and more client queries from its local cache.
+
+DNSSEC validation
+
+Given the stateless nature of UDP, DNS transactions are prone to spoofing and tampering. Caching nameservers have historically been favored targets of attackers looking to redirect or hijack network traffic. This is often achieved by exploiting vulnerabilities in DNS server software to fool a DNS server into accepting and populating malicious data into its cache, a technique commonly referred to as cache poisoning. Once the attacker succeeds in poisoning a DNS server's cache, they effectively compromise the DNS data received by the numerous clients utilizing the caching name service on the DNS server and can consequently redirect or hijack the clients' network traffic.
+
+While a caching nameserver can greatly improve DNS performance on the local network, they can also provide improved security by performing Domain Name System Security Extensions (DNSSEC) validation. DNSSEC validation enabled at the caching nameserver allows the authenticity and integrity of resource records to be validated prior to being placed in the cache for use by clients, and therefore protects clients against the consequences of cache poisoning.
+
+Configuring and administering unbound as a caching nameserver
+Several packages are available for configuring a caching nameserver, including bind, dnsmasq, and unbound. In this example, please follow along while the instructor demonstrates the configuration and administration of unbound as a secure, caching nameserver with DNSSEC validation enabled.
+
+Configuring unbound
+
+To configure unbound as a secure, caching nameserver:
+
+Install unbound.
+
+As root, install the unbound package.
+
+[root@serverX ~]# yum install -y unbound
+Start and enable unbound.service.
+
+[root@serverX ~]# systemctl start unbound.service
+[root@serverX ~]# systemctl enable unbound.service
+ln -s '/usr/lib/systemd/system/unbound.service' '/etc/systemd/system/multi-user.target.wants/unbound.service'
+Configure the network interface to listen on.
+
+By default, unbound only listens on the localhost network interface. To make unbound available to remote clients as a caching nameserver, use the interface option in the server clause of /etc/unbound/unbound.conf to specify the network interface(s) to listen on. A value of 0.0.0.0 will configure unbound to listen on all network interfaces:
+
+interface: 0.0.0.0
+Configure client access.
+
+By default, unbound refuses recursive queries from all clients. In the server clause of /etc/unbound/unbound.conf, use the access-control option to specify which clients are allowed to make recursive queries.
+
+access-control: 172.25.0.0/24 allow
+Configure forwarding.
+
+In /etc/unbound/unbound.conf, create a forward-zone clause to specify which DNS server(s) to forward queries to. DNS servers can be specified by host name using the forward-host option, or by IP address using the forward-addr option. For a caching nameserver, forward all queries by specifying a forward-zone of ".".
+
+forward-zone:
+  name: "."
+  forward-addr: 172.25.254.254
+If desired, bypass DNSSEC validation for select unsigned zones.
+
+By default, unbound is enabled to perform DNSSEC validation to verify all DNS responses received. The domain-insecure option in the server clause of /etc/unbound/unbound.conf can be used to specify a domain for which DNSSEC validation should be skipped. This is often desirable when dealing with an unsigned internal domain that would otherwise fail trust chain validation.
+
+domain-insecure: example.com
+If desired, install trust anchors for select signed zones without complete chain of trust.
+
+Since not all ccTLDs have completed implementation of DNSSEC, the subdomains of these ccTLDs can be DNSSEC-signed but still have a broken chain of trust. This problem can be overcome by using the trust-anchor option in the server clause of /etc/unbound/unbound.conf to specify a trust anchor for the zone. Obtain the DNSKEY record for the key signing key (KSK) of the zone using dig and input it as the value for the trust-anchor option.
+
+[student@serverX ~]$ dig +dnssec DNSKEY example.com
+trust-anchor: "example.com. 3600 IN DNSKEY 257 3 8 AwEAAawt7HplI5M8GGAsxuyCyjF0l+QlcgVN11CRZ4vP66qbDCX0BnSh Z11BGb//4zSG/8mmBHirL2FLg+mVuIIxig+iroZYjh4iTKVOhv2hZftR wyrQHK++qXvCCWN3ki51RG/e8R4kOEV71rZ8OgQvPWx6F91qroqOPpcf 7PPxippeHOn+PxnP0hpyLyo1mx1rPs/cMpL3jOMufGP+LJYh+fBU7lt0 sP5i09HaJPruzyZML9BPtpv8ZAdQhwtXVG0+MnET2qT/1+TljpxZn6ye egFRCFRHBjMo6iiRJnUWra/klkrgEn2Q+BXGTOMTTKQdYz4OxYEa1z7a pu3a09dYNBM="
+Save changes to /etc/unbound/unbound.conf.
+
+Check the /etc/unbound/unbound.conf configuration file for syntax errors.
+
+[root@serverX ~]# unbound-checkconf
+unbound-checkconf: no errors in /etc/unbound/unbound.conf
+Restart unbound.service.
+
+[root@serverX ~]# systemctl restart unbound.service
+Configure the firewall to allow DNS traffic.
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=dns
+success
+[root@serverX ~]# firewall-cmd --reload
+success
+Dumping and loading unbound cache
+
+Administrators of caching nameservers need to dump out cache data when troubleshooting DNS issues, such as those resulting from stale resource records. With an unbound DNS server, the cache can be dumped by running the unbound-control utility in conjunction with the dump_cache subcommand.
+
+[root@serverX ~]# unbound-control dump_cache
+START_RRSET_CACHE
+;rrset 86395 1 0 3 3
+classroom.example.com.	86395	IN	A	172.25.254.254
+;rrset 86395 1 0 7 3
+example.com.	86395	IN	NS	classroom.example.com.
+;rrset 86395 1 0 8 3
+example.com.	86395	IN	A	172.25.254.254
+END_RRSET_CACHE
+START_MSG_CACHE
+msg example.com. IN A 33152 1 86395 3 1 1 1
+example.com. IN A 0
+example.com. IN NS 0
+classroom.example.com. IN A 0
+END_MSG_CACHE
+EOF
+Executing unbound-control with the dump_cache command dumps out the cache to stdout in a text format. This output can be directed to a file for storage and be loaded back into cache later with unbound-control load_cache, if desired. unbound-control load_cache reads from stdin to populate the cache.
+
+[root@serverX ~]# unbound-control load_cache < dump.out
+ok
+Flushing unbound cache
+
+Administrators of caching nameservers also need to purge outdated resource records from cache from time to time. Erroneous and outdated resource records in cache will keep their newly corrected counterparts from becoming available to clients until the TTLs on the outdated resource records expire. Rather than waiting for TTL expiration, administrators can forcibly purge the outdated records from cache by executing unbound-control with the flush subcommand.
+
+[root@serverX ~]# unbound-control flush www.example.com
+ok
+If all resource records belonging to a domain need to be purged from the cache of an unbound DNS server, unbound-control can be executed with the flush_zone subcommand.
+
+[root@serverX ~]# unbound-control flush_zone example.com
+ok removed 3 rrsets, 1 messages and 0 key entries
+Updating Local Caching unbound Configuration with dnssec-trigger
+
+In addition to providing caching name service for a local subnet, unbound can also be useful as a local caching nameserver to provide secure DNS name resolution for local use on an individual system. For a local caching nameserver setup, the nameserver entry in /etc/resolv.conf will be configured to point to localhost where unbound is listening. The unbound configuration will forward DNS requests to upstream nameservers and validate their responses.
+
+For DHCP systems running local caching name service, the upstream nameservers specified in unbound's configuration may become outdated if DNS servers provided by DHCP change. The dnssec-trigger tool supplied by the package of the same name can be leveraged to automatically update forwarder settings in unbound's configuration file to point to the new DNS servers. The use of the dnssec-trigger tool in conjunction with unbound is mostly useful for secure DNS name resolution on roaming client machines.
+
+REFERENCES
+unbound(8), unbound-checkconf(8), unbound.conf(5), unbound-control(8), dnssec-trigger(8) man pages
+
+
+
+
+
+Guided Exercise: Practice: Configuring unbound as a Caching Nameserver
+In this lab, you will configure unbound as a caching nameserver and administer its cache data.
+
+Resources:
+Files:	/etc/unbound/unbound.conf
+Machines:	
+desktopX
+
+serverX
+
+Outcomes:
+
+The unbound service enabled and configured as a caching nameserver on serverX to listen on interface 172.25.X.11 and to accept connections from 172.25.X.0/24. Recursive queries are forwarded to 172.25.254.254. The example.com zone is exempted from DNSSEC validation.
+
+Reset the desktopX system.
+
+Reset the serverX system.
+
+Log into the desktopX system.
+
+Log into the serverX system and switch to root using sudo -i.
+
+You have been asked to improve name resolution performance and enhance DNS security in your company's datacenter. You have decided to deploy a caching nameserver using an unbound DNS server. You will configure unbound to respond only to queries on the datacenter subnet, 172.25.X.0/24. Recursive queries will be forwarded to the company's main internal DNS server at 172.25.254.254. This main internal DNS server hosts an internal, split DNS copy of the company's example.com zone. This example.com zone is not DNSSEC-signed, so it will need to be exempted from DNSSEC validation on your caching nameserver. After configuration of the caching nameserver is complete on serverX, you will test it by querying for the host names desktopX.example.com and serverX.example.com from desktopX. Verify that the queries made are populated into the nameserver's cache. Lastly, you will purge serverX.example.com from the cache.
+
+Install the unbound package on serverX.
+
+[root@serverX ~]# yum install -y unbound
+Enable and start the unbound service.
+
+[root@serverX ~]# systemctl enable unbound.service
+ln -s '/usr/lib/systemd/system/unbound.service' '/etc/systemd/system/multi-user.target.wants/unbound.service'
+[root@serverX ~]# systemctl start unbound.service
+Configure unbound to allow queries from the 172.25.X.0/24 subnet, exempt the example.com zone from DNSSEC validation, and forward all queries to 172.25.254.254.
+
+By default, unbound listens on the loopback interface. Configure unbound to listen on the 172.25.X.11 interface on serverX by adding the following option in the server clause of /etc/unbound/unbound.conf.
+
+interface: 172.25.X.11
+Allow queries from the 172.25.X.0/24 subnet by adding the following option in the server clause of /etc/unbound/unbound.conf.
+
+access-control: 172.25.X.0/24 allow
+Exempt the example.com zone from DNSSEC validation by adding the following option in the server clause of /etc/unbound/unbound.conf.
+
+domain-insecure: "example.com"
+Forward all queries to 172.25.254.254 by adding a forward-zone clause to the end of the /etc/unbound/unbound.conf file.
+
+forward-zone:
+            name: .
+            forward-addr: 172.25.254.254
+Check /etc/unbound/unbound.conf for syntax errors.
+
+[root@serverX ~]# unbound-checkconf
+unbound-checkconf: no errors in /etc/unbound/unbound.conf
+Restart the unbound service.
+
+[root@serverX ~]# systemctl restart unbound.service
+Configure the firewall to allow DNS traffic.
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=dns
+success
+[root@serverX ~]# firewall-cmd --reload
+success
+Verify the caching name service by performing queries and examining the contents of the cache.
+
+Dump the cache to see its contents.
+
+[root@serverX ~]# unbound-control dump_cache
+    START_RRSET_CACHE
+    END_RRSET_CACHE
+    START_MSG_CACHE
+    END_MSG_CACHE
+    EOF
+From desktopX, query serverX for the A record of host name desktopX.example.com.
+
+[student@desktopX ~]$ dig @serverX.example.com A desktopX.example.com
+...
+desktopX.example.com.	86349	IN	A	172.25.X.10
+...
+From desktopX, query serverX for the A record of host name serverX.example.com.
+
+[student@desktopX ~]$ dig @serverX.example.com A serverX.example.com
+...
+serverX.example.com.	86364	IN	A	172.25.X.11
+...
+On serverX, dump out the cache again. You should see the queried records in the cache.
+
+[root@serverX ~]# unbound-control dump_cache
+START_RRSET_CACHE
+;rrset 85886 1 0 8 3
+serverX.example.com.	85886	IN	A	172.25.X.11
+;rrset 85878 1 0 8 X
+desktopX.example.com.	85878	IN	A	172.25.X.10
+;rrset 85878 1 0 7 3
+example.com.	85878	IN	NS	classroom.example.com.
+;rrset 85878 1 0 3 3
+classroom.example.com.	85878	IN	A	172.25.254.254
+END_RRSET_CACHE
+START_MSG_CACHE
+msg desktopX.example.com. IN A 33152 1 85878 3 1 1 1
+desktopX.example.com. IN A 0
+example.com. IN NS 0
+classroom.example.com. IN A 0
+msg serverX.example.com. IN A 33152 1 85886 3 1 1 1
+serverX.example.com. IN A 0
+example.com. IN NS 0
+classroom.example.com. IN A 0
+END_MSG_CACHE
+EOF
+Purge the serverX.example.com record from the cache.
+
+[root@serverX ~]# unbound-control flush serverX.example.com
+ok
+On serverX, dump out the cache again. You should no longer see the A record for serverX.example.com in the cache.
+
+[root@serverX ~]# unbound-control dump_cache
+START_RRSET_CACHE
+;rrset 85878 1 0 8 X
+desktopX.example.com.	85878	IN	A	172.25.X.10
+;rrset 85878 1 0 7 3
+example.com.	85878	IN	NS	classroom.example.com.
+;rrset 85878 1 0 3 3
+classroom.example.com.	85878	IN	A	172.25.254.254
+END_RRSET_CACHE
+START_MSG_CACHE
+msg desktopX.example.com. IN A 33152 1 85878 3 1 1 1
+desktopX.example.com. IN A 0
+example.com. IN NS 0
+classroom.example.com. IN A 0
+msg serverX.example.com. IN A 33152 1 85886 3 1 1 1
+serverX.example.com. IN A 0
+example.com. IN NS 0
+classroom.example.com. IN A 0
+END_MSG_CACHE
+EOF
+

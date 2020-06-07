@@ -1,0 +1,242 @@
+DNS Troubleshooting
+In this section, students learned how to:
+
+Identify symptoms and causes of common DNS issues.
+
+Interpret results of diagnostic tools used in DNS troubleshooting.
+
+Define common DNS response codes.
+
+Objectives
+After completing this section, students should be able to:
+
+Use dig to troubleshoot common DNS problems.
+
+Identify symptoms and causes associated with common DNS issues.
+
+Troubleshooting DNS
+Due to the client-server architecture of DNS, properly working DNS name resolution on a system is almost always dependent on not only the proper configuration and operation of DNS on that system, but also on that of its resolving nameserver and the many authoritative nameservers used to resolve its DNS requests. Since DNS is a distributed directory , recursive name resolution often involves numerous behind-the-scenes interactions with many different authoritative nameservers. These numerous interactions create many possible points for failure.
+
+The use of caching nameservers significantly reduces DNS workloads and improves DNS performance. However, the caching function adds another point of failure by creating scenarios where it is possible for DNS responses received by clients to be inaccurate due to the data no longer being current.
+
+Due to the critical role that DNS plays in the functioning of network services, it is important that Linux administrators be able to quickly resolve DNS issues when they occur, in order to minimize service interruptions. The key to accurate and efficient DNS troubleshooting is being able to pinpoint which of the multiple points in the myriad of behind-the-scenes client-server interactions is responsible for the unexpected behavior observed. This requires the use of proper tools and a clear understanding of the diagnostic data they provide. Domain Internet Groper (dig) is a good tool for investigating DNS issues due to its verbose diagnostic output.
+
+Name resolution methods
+
+Because DNS service is often the most widely used method of name resolution, it often bears the blame whenever unexpected name resolution results occur. Remember that aside from DNS, in a heterogeneous environment, name resolution on networked hosts can occur via other methods, such as local hosts files, Windows Internet Name Service (WINS), etc.
+
+On Linux systems, name resolution is attempted first with the hosts file /etc/hosts by default, per order specified in /etc/nsswitch.conf. Therefore, when beginning name resolution troubleshooting, do not leap to the assumption that the issue resides with DNS. Begin first by identifying the name resolution mechanism which is in play, rather than simply starting with DNS. The getent command from the glibc-common package, as well as the gethostip command from the syslinux package, can both be used to perform name resolution, mirroring the process used by most applications in following the order of host name resolution as dictated by /etc/nsswitch.conf.
+
+[student@desktopX ~]$ getent hosts example.com
+172.25.254.254  example.com
+[student@desktopX ~]$ gethostip example.com
+example.com 172.25.254.254 AC19FEFE
+If the result of getent or gethostip differs from that produced by dig, then it's a clear indication that something besides DNS is responsible for the unexpected name resolution result. Consult /etc/nsswitch.conf to determine what other name resolution mechanisms are employed before DNS.
+
+Client-server network connectivity
+
+For DNS name resolution to work properly, a system must first be able to conduct client-server interactions with its resolving nameserver or other authoritative nameservers. Some common DNS issues that have their origin at this layer are the result of resolver and firewall misconfigurations.
+
+When using dig to troubleshoot a DNS issue, if a response is not received from a DNS server, it is a clear indication that the cause lies with the client-server network connectivity to the DNS server.
+
+[student@desktopX ~]$ dig A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> A example.com
+;; global options: +cmd
+;; connection timed out; no servers could be reached
+A possible cause is the inability to reach the DNS server due to incorrect DNS server IP address(es) in a system's DNS configuration. This could be in /etc/resolv.conf in the case of a system acting as a DNS client or in the forward-zone clause of /etc/unbound/unbound.conf in the case of a system configured as an unbound caching nameserver.
+
+Another possible cause are firewall rules, on either the client or server system, blocking DNS traffic on port 53. While DNS mostly uses the UDP protocol, it is important to note that when response data sizes exceed 512 bytes, or 4096 bytes in the case of DNS servers that support Extension Mechanism for DNS (EDNS), resolvers will fall back to using TCP to retry the query. Therefore, proper DNS configuration should allow for DNS traffic on port 53 for both UDP and TCP. Allowing port 53 traffic for UDP only will result in a truncation error when the resolver encounters a response that is larger than what it can handle over UDP.
+
+[student@desktopX ~]$ dig @serverX.example.com A labhost1.example.com
+;; Truncated, retrying in TCP mode.
+;; Connection to 172.25.1.11#53(172.25.1.11) for labhost1.example.com failed:
+host unreachable.
+dig's tcp or vc options are helpful for troubleshooting whether DNS queries can succeed with TCP. These options force dig to use TCP, rather than the default behavior of using UDP first and falling back to TCP only when response size necessitates it.
+
+[student@desktopX ~]$ dig +tcp A example.com
+When dealing with DNS issues at the network layer, dig provides very sparse output and it is therefore often useful to also use a network packet analyzer, such as tcpdump, to determine what is transpiring behind the scenes at the network layer. Using tcpdump, the administrator can determine information that cannot be ascertained with dig alone, such as the destination IP address of the DNS request, if request packets leave the client, if request packets reach the server, if response packets leave the server, if response packets reach the client, etc.
+
+DNS response codes
+If DNS client-server communication is successful, dig will generate much more verbose output detailing the nature of the response received from the DNS server. The status field in the HEADER section of dig's output reports the response code generated by the DNS server in response to the client's query.
+
+[student@desktopX ~]$ dig A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> A example.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 30523
+...
+A status of NOERROR indicates the query was resolved successfully. If the server encounters problems fulfilling the client's query, one of the following common error statuses will be displayed.
+
+Table 20.3. DNS Return Codes
+
+Code	Meaning
+SERVFAIL	The nameserver encountered a problem while processing the query.
+NXDOMAIN	The queried name does not exist in the zone.
+REFUSED	The nameserver refused the client's DNS request due to policy restrictions.
+
+SERVFAIL
+
+A common cause of SERVFAIL status is the failure of the DNS server to communicate with the nameservers authoritative for the name being queried. This may be due to the authoritative nameservers being unavailable. It could also be a problem at the network layer interfering with the client-server communication between the DNS server and the authoritative nameservers, such as network routing issues or firewall rules at any hop in the network path.
+
+To determine why a nameserver is generating a SERVFAIL status while performing recursion on behalf of a client's query, the administrator of the nameserver will need to determine which nameserver communication is causing the failure. dig's +trace option is helpful in this scenario to see the results of nameserver's iterative queries starting with the root nameservers.
+
+NXDOMAIN
+
+An NXDOMAIN status indicates that no records were found associated with the name queried. If this is not the expected result and the query is directed at a server that is not authoritative for the name, then the server's cache may contain a negative cache for the name. The user can either wait for the server to expire the negative cache of that name, or submit a request to the server administrator to flush the name from the server's cache. Once the name is removed from cache, the server will query the authoritative nameserver to receive current resource records for the name.
+
+The other scenario where an NXDOMAIN status may be unexpectedly encountered is when querying a CNAME record containing an orphaned CNAME. In a CNAME record, the name on the right side of the record, the canonical name, should point to a name that contains either A or AAAA records. If these associated A or AAAA records are nonexistent or are later removed, then the canonical name in the CNAME record is orphaned. When this occurs, queries for the owner name in the CNAME record will no longer be resolvable and will result in an NXDOMAIN return code.
+
+REFUSED
+
+A REFUSED status indicates that the DNS server has a policy restriction which keeps it from fulfilling the client's query. Policy restrictions are often implemented on DNS servers to restrict which clients can make recursive queries and zone transfer requests. Some common causes of an unexpected REFUSED return code are clients configured to query the wrong DNS servers or DNS server misconfiguration causing valid client requests to be refused.
+
+Other common DNS issues
+Outdated cached data
+
+A DNS return code of NOERROR signifies that no errors were encountered in resolving a query. However, it does not guarantee that there are no DNS issues present. There are situations where the DNS records in the DNS response may not match the expected result. The most common cause for an incorrect answer is that the answer originated from cached data, which is no longer current.
+
+In these situations, first confirm that the response is indeed nonauthoritative cached data. This can be easily determined by looking at the flags section of dig's output. DNS responses, which are authoritative answers, will be indicated by the presence of the aa flag.
+
+[student@desktopX ~]$ dig A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> A example.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 22257
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
+DNS responses that originate from cached data are not authoritative and therefore will not have the aa flag set. The other telltale sign that an answer is coming from cache is the counting down of the resource record's TTL value in the responses of each subsequent query. TTLs of cached data will continuously count down to expiration while TTLs of authoritative data will always remain static.
+
+Responses for nonexistent records
+
+If a record has been removed from a zone and a response is still received when querying for the record, first confirm that the queries are not being answered from cached data. If the answer is authoritative as confirmed by the presence of the aa flag in dig's output, then a possible cause is the presence of a wildcard (*) record in the zone.
+
+*.example.com. IN A 172.25.254.254
+A wildcard record serves as a catchall for all queries of a given type for a nonexistent name. With the previous wildcard record in place, if an A record previously existed for serverX.example.com and it is removed, queries for the name will still succeed and the IP address in the wildcard A record will be provided in its place.
+
+Non-FQDN name errors
+
+In a zone file, host names which are not expressed as Fully Qualified Domain Names (FQDNs) are automatically expanded to FQDNs by appending the name of the zone. To indicate that a name is an FQDN in a zone file, it must be ended with a ".", i.e., "www.example.com.". Failure to do so can lead to different issues depending on the type of record that the mistake is made in. For example, such a mistake made in the type-specific data portion of NS records have the potential of incapacitating an entire zone, while a mistake made in MX records could cause a complete halt of email delivery for a domain.
+
+Looping CNAME records
+
+While technically feasible, CNAME records that point to CNAME records should be avoided to reduce DNS lookup inefficiency. Another reason this is undesirable is the possibility of creating unresolvable CNAME loops, such as:
+
+test.example.com. IN CNAME lab.example.com.
+lab.example.com.  IN CNAME test.example.com.
+While a CNAME record with an orphaned CNAME will result in an NXDOMAIN status, looping CNAME records will return as NOERROR.
+
+Missing PTR records
+
+Many network services use DNS to perform reverse lookups of incoming connections from clients. The absence of PTR records in DNS may result in issues, the nature of which varies depending on the service. SSHD, by default, will perform reverse lookups of connecting client IPs. Absence of PTR records will lead to delays in the establishment of these connections.
+
+Many MTAs incorporate reverse DNS lookups of connecting client IPs as a defense against malicious email clients. In fact, many MTAs are configured to reject client connections for IPs, which cannot be resolved with a PTR query in DNS. As such, administrators supporting network services need to ensure that they understand the requirements these services have for not just forward, but also reverse DNS lookups.
+
+Round-robin DNS
+
+A name can have multiple A or AAAA records in DNS. This is known as round-robin DNS, and is often used as a simple, low-cost, load-balancing mechanism to distribute network resource loads across multiple hosts. When a DNS client queries for a name that contains multiple A or AAAA records, all records are returned as a set. However, the order that the records are returned in the set permutates for each query. Since clients normally make use of the first address in the set, the variation in the order of the records in each response effectively results in a distribution of network service requests across the multiple IP addresses in these round-robin DNS records.
+
+While round-robin DNS is a valid technical configuration, there are times when this configuration is inadvertently created. When a request to change the IP address of an A record is mistakenly implemented as a resource record addition rather than a resource record modification, then round-robin DNS is created. If the network resources on the old IP address is retired, the load distribution effect of the round-robin DNS will result in service failures for approximately half of the clients.
+
+REFERENCES
+dig(1), getent(1), gethostip(1) man pages
+
+
+
+
+Guided Exercise: Practice: Troubleshooting DNS
+In this lab, you will troubleshoot and resolve a name resolution issue by systematically verifying name service configurations to pinpoint the cause.
+
+Resources:
+Files:	
+/etc/nsswitch.conf
+
+/etc/hosts
+
+/etc/resolv.conf
+
+Machines:	
+desktopX
+
+Outcomes:
+
+The root cause for failed name resolution for example.com on desktopX will be identified and fixed. After the issue is resolved, name resolution for example.com on desktopX will succeed.
+
+Reset the desktopX system.
+
+Log into and set up the desktopX system.
+
+[student@desktopX ~]$ lab dnsissue2 setup
+A user reports that there is an issue occurring when an SSH session is initiated to example.com from desktopX and a "Could not resolve hostname example.com: Name or service not known" error is being generated. Therefore, the user complains that there is a problem with DNS name resolution of example.com. Like all other hosts on the network, desktopX should be using 172.25.254.254 for DNS resolution. You will troubleshoot the issue, identify the root cause, apply a fix, and then verify that the problem is resolved.
+
+NOTE
+You can not actually login to example.com using SSH. Seeing a login prompt is all that is required, and the login prompt can be cancelled by pressing Ctrl+C
+
+Replicate the reported issue by attempting an SSH session to example.com from desktopX.
+
+[student@desktopX ~]$ ssh example.com
+ssh: Could not resolve hostname example.com: Name or service not known
+Verify the result of name resolution for example.com.
+
+[student@desktopX ~]$ getent hosts example.com
+[student@desktopX ~]$
+Verify configurations which affect name resolution.
+
+Verify the order that name services are used.
+
+[student@desktopX ~]$ grep ^hosts: /etc/nsswitch.conf
+hosts:      files dns
+Since files are used first, verify the contents of /etc/hosts.
+
+[student@desktopX ~]$ grep [[:space:]]example.com /etc/hosts
+[student@desktopX ~]$
+Since no hosts file entry exist for example.com, verify the contents of /etc/resolv.conf; you should see that an incorrect nameserver IP is the cause of the name resolution failure.
+
+[student@desktopX ~]$ grep ^nameserver /etc/resolv.conf
+nameserver 172.25.254.255
+[student@desktopX ~]$ dig @172.25.254.255 A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> @172.25.254.255 A example.com
+; (1 server found)
+;; global options: +cmd
+;; connection timed out; no servers could be reached
+As root, fix the error in /etc/resolv.conf and verify that this resolves the name resolution issue.
+
+Since the nameserver entry populated by DHCP appears to have been manually modified, as root, force a refresh of the data from DHCP and validate that the entry is fixed.
+
+[student@desktopX ~]$ sudo systemctl restart NetworkManager
+[student@desktopX ~]$ grep ^nameserver /etc/resolv.conf
+nameserver 172.25.254.254
+Verify the results of name resolution for example.com.
+
+[student@desktopX ~]$ getent hosts example.com
+172.25.254.254  example.com
+[student@desktopX ~]$ dig A example.com
+; <<>> DiG 9.9.4-RedHat-9.9.4-14.el7 <<>> example.com
+;; global options: +cmd
+;; Got answer:
+;; -->>HEADER<<-- opcode: QUERY, status: NOERROR, id: 36048
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;example.com.			IN	A
+
+;; ANSWER SECTION:
+example.com.		86400	IN	A	172.25.254.254
+
+;; AUTHORITY SECTION:
+example.com.		86400	IN	NS	classroom.example.com.
+
+;; ADDITIONAL SECTION:
+classroom.example.com.	86400	IN	A	172.25.254.254
+
+;; Query time: 1 msec
+;; SERVER: 172.25.254.254#53(172.25.254.254)
+;; WHEN: Thu May 15 07:28:35 EDT 2014
+;; MSG SIZE  rcvd: 96
+Verify that SSH connection to example.com from desktopX now succeeds.
+
+[student@desktopX ~]$ ssh example.com
+The authenticity of host 'example.com (172.25.254.254)' can't be established.
+ECDSA key fingerprint is 12:b3:c8:3e:6b:d2:9f:43:67:a5:f2:2a:f0:7c:2f:b6.
+Are you sure you want to continue connecting (yes/no)?
+

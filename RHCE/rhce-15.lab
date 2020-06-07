@@ -1,0 +1,73 @@
+
+Lab: Lab: Limiting Network Communication
+In this lab, you will configure a firewall on your serverX system to block all access to services other than ssh and a web server running on port 8080/TCP.
+
+Resources
+Machines:	serverX and desktopX
+Outcomes:
+
+A firewall configured on serverX blocking access to services other than ssh and 8080/TCP.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab firewall setup
+Reset your desktopX system.
+
+Your company has decided to run a new web app. This application listens on ports 80/TCP and 8080/TCP. Due to security considerations, only port 8080/TCP should be reachable from the outside world. It is understood that ssh (port 22/TCP) should also be available. All changes you make should persist across a reboot.
+
+Important: The graphical interface used in the Red Hat Online Learning environment needs port 5900/TCP to remain available as well. This port is also known under the service name vnc-server. If you accidentally lock yourself out from your serverX, you can either attempt to recover by using ssh to your serverX machine from your desktopX machine, or reset your serverX machine. If you elect to reset your serverX machine, you will have to run the setup scripts for this lab again. The configuration on your machines already includes a custom zone called ROL that opens these ports.
+
+When you are done with your work, reboot your serverX machine, then run the command lab firewall grade from your desktopX machine to verify your work.
+
+Configure your system so that the iptables and ip6tables services will not be accidentally started by an administrator.
+
+[student@serverX ~]$ sudo systemctl mask iptables
+[student@serverX ~]$ sudo systemctl mask ip6tables
+Check if the firewalld service is running. If not, start it.
+
+[student@serverX ~]$ sudo systemctl status firewalld
+If the previous step indicated that firewalld was not enabled and/or running:
+
+[student@serverX ~]$ sudo systemctl enable firewalld
+[student@serverX ~]$ sudo systemctl start firewalld
+Verify that the default firewall zone is set to public.
+
+[student@serverX ~]$ sudo firewall-cmd --get-default-zone
+public
+If the previous step returned another zone:
+
+[student@serverX ~]$ sudo firewall-cmd --set-default-zone public
+Verify that there are no unwanted ports open in the permanent configuration for the public zone.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --zone=public --list-all
+public (default)
+  interfaces:
+  sources:
+  services: dhcpv6-client ssh
+  ports:
+  masquerade: no
+  forward-ports:
+  icmp-blocks:
+  rich rules:
+Add port 8080/TCP to the permanent configuration for the public zone. Verify your configuration.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --zone=public --add-port 8080/tcp
+[student@serverX ~]$ sudo firewall-cmd --permanent --zone=public --list-all
+public (default)
+  interfaces:
+  sources:
+  services: dhcpv6-client ssh
+  ports: 8080/tcp
+  masquerade: no
+  forward-ports:
+  icmp-blocks:
+  rich rules:
+Reboot your serverX machine. (For a quick test, you can also use sudo firewall-cmd --reload.)
+
+From your desktopX machine, run lab firewall grade to verify your work.
+
+[student@desktopX ~]$ lab firewall grade
+Red Hat Training + Certification logoRed Hat logo
+Privacy Policy

@@ -1,0 +1,226 @@
+Accessing Network Storage with SMB
+Identify the share details; for example, smbclient -L //server.
+
+Create a mount point directory.
+
+mount or update /etc/fstab to mount the SMB share.
+
+umount to unmount a share.
+
+Use autofs service for automounting, using the same mount options as mount.
+
+enable the service so it starts at boot.
+
+start the service.
+
+Use -fstype=cifs and prefix the URI with a ":".
+
+Objectives
+After completing this section, students should be able to:
+
+Mount and unmount SMB file systems using the command line.
+
+Automount SMB file systems.
+
+Manually mounting and unmounting SMB file systems
+Many organizations need to provide network storage and print services for a range of desktop operating systems. Red Hat Enterprise Linux uses the Samba server to provide services that Microsoft Windows clients can use. Samba implements the Server Message Block (SMB) protocol, and Common Internet File System (CIFS) is a dialect of SMB. Often the two names are used interchangeably.
+
+Connecting to SMB/CIFS shares
+
+Red Hat desktops and servers can connect to shares offered via any server that use the SMB protocol.
+
+Three Basic Steps for Accessing an SMB Share
+
+Identify the remote share to access.
+
+Determine a mount point where the share should be mounted and create the mount point's empty directory.
+
+Mount the network file system with an appropriate command or configuration change.
+
+Before starting, there is one package that must be installed in order to mount SMB shares: cifs-utils. Both the mount command and autofs automounter rely on this package for mounting CIFS file systems.
+
+A second package, samba-client, has some useful command-line utilities—for example, smbclient—and is often worth installing as well.
+
+Mount SMB Share
+
+Identify: The administrator for the SMB server host can provide share details, such as username and password, share names, etc. An alternative is to use a client that can browse the shares, such as smbclient.
+
+[student@desktopX ~]$ smbclient -L //serverX
+The -L option asks the smbclient to list the shares available on serverX.
+
+Mount point: Use mkdir to create a mount point in a suitable location.
+
+[student@desktopX ~]$ mkdir -p /mountpoint
+Mount: There are two choices here: manually or incorporated in the /etc/fstab file. Switch to root or use sudo for either operation.
+
+Manual: Use the mount command.
+
+[student@desktopX ~]$ sudo mount -t cifs -o guest //serverX/share /mountpoint
+The -t cifs option is the file system type for SMB shares and the -o guest option tells mount to try and authenticate as a guest account without a password.
+
+/etc/fstab: Use vim to edit the /etc/fstab file and add the mount entry to the bottom of the file. The SMB share will be mounted at each system boot.
+
+[student@desktopX ~]$ sudo vim /etc/fstab
+...
+//serverX/share  /mountpoint  cifs  guest  0 0
+Use umount, using root privileges, to manually unmount the share.
+
+[student@desktopX ~]$ sudo umount /mountpoint
+Authentication to SMB shares
+
+SMB shares can be flagged as non-browsable, meaning clients such as smbclient will not display them. The SMB shares are still accessible by explicitly specifying the SMB share name during the mount operation.
+
+SMB servers typically restrict access to specific users, or groups of users. Accessing protected shares will require appropriate credentials be presented to the SMB server. There are a range of authentication methods that an SMB server can choose to implement, too many to cover here.
+
+A common choice for authentication is username and password pairs. These can either be added to the mount command (or /etc/fstab entry) or stored in a credentials file that is referenced during the mount operation. The mount command will prompt for a password if it is not provided, but it must be provided if using /etc/fstab. Guest access can be explicitly requested with the guest option.
+
+Some examples:
+
+[student@desktopX ~]$ sudo mount -t cifs -o guest //serverX/docs /public/docs
+Mount the SMB share //serverX/docs at /public/docs and attempt to authenticate as guest.
+
+[student@desktopX ~]$ sudo mount -t cifs -o username=watson //serverX/cases /bakerst/cases
+Mount the SMB share //serverX/cases at /bakerst/cases and attempt to authenticate as watson. The mount command will prompt for the password in this example.
+
+The credentials file offers better security because the password is stored in a more secure file, whereas the /etc/fstab file is easily examined.
+
+[student@desktopX ~]$ sudo mount -t cifs -o credentials=/secure/sherlock //serverX/sherlock /home/sherlock/work
+Mount the SMB share //serverX/sherlock at /home/sherlock/work and attempt to authenticate using the credentials stored in /secure/sherlock.
+
+The format for the credentials file is:
+
+username=username
+password=password
+domain=domain
+It should be placed somewhere secure with only root access (for example, chmod 600).
+
+During file operations, the SMB server will check file access against the credentials used to mount the share. The client will check file access against the UID/GID of the files sent from the server. This means that the client will need to have the same UID/GID, and if necessary, supplementary group membership as the files on the SMB server.
+
+There are a number of mount options that handle local access checking and alternate authentication methods, such as multiuser (and cifscreds) and Kerberos-based options. They will not be covered here; for more information, refer to the man pages and articles available at access.redhat.com.
+
+Mounting SMB file systems with the automounter
+Using the mount command requires root privileges to connect to the SMB shares. Alternatively, entries can be added to /etc/fstab, but then the connections to the SMB servers would be active all the time.
+
+The automounter, or autofs, service can be configured to mount SMB shares "on demand" when a process attempts to access a file on the SMB share. The automounter will then unmount the share once it is no longer in use, after a certain period of inactivity.
+
+The process for setting up an automount on a SMB share using autofs is essentially the same as other automounts:
+
+Add an auto.master.d configuration file that identifies the base directory for shares and the associated mapping file.
+
+Create or edit the mapping file to include the mount details for the SMB share.
+
+Enable and start the autofs service.
+
+NOTE
+If it is not already installed, install the autofs package. Like mount, the automounter is also dependent on the cifs-utils package for mounting SMB shares.
+
+The mapping file
+
+The file system type needs to be specified with the -fstype=cifs option and then a comma-separated list of mount options, the same mount options used by the mount command. The server URI address needs to be prefixed with a colon ":".
+
+An example:
+
+The following creates an automount at /bakerst/cases for SMB share //serverX/cases, and authenticates against the credentials file /secure/sherlock.
+
+/etc/auto.master.d/bakerst.autofs content:
+
+/bakerst   /etc/auto.bakerst
+/etc/auto.bakerst content:
+
+cases  -fstype=cifs,credentials=/secure/sherlock  ://serverX/cases
+/secure/sherlock content (owned by root, perms 600):
+
+username=sherlock
+password=violin221B
+domain=BAKERST
+autofs enable and start:
+
+[student@desktopX ~]$ sudo systemctl enable autofs
+[student@desktopX ~]$ sudo systemctl start autofs
+REFERENCES
+mount(8), umount(8), fstab(5), mount.cifs(8), smbclient(1), autofs(5), automount(8), and auto.master(5) man pages
+
+
+
+Guided Exercise: Practice: Mounting a SMB File System
+In this lab, you will create a mount entry in /etc/fstab and mount it.
+
+Resources:
+Files:	samba.txt in the server directory, for testing.
+Machines:	desktopX and serverX
+Outcomes:
+
+cifs-utils package installed.
+
+The serverX student home folder mounted at /home/student/work.
+
+The /etc/fstab file includes the mount entry.
+
+Reset your serverX system.
+
+Log into and set up your server system.
+
+[student@serverX ~]$ lab samba setup
+Reset your desktopX system.
+
+Log into desktopX and open a terminal.
+
+You have a home directory on serverX that is used to store work-related documents. The directory is shared via Samba to support all of the company desktop operating systems.
+
+The serverX administrator has confirmed that the share name is student and that the uid/gid are the same as your desktopX instance; the share password is student.
+
+Install the Package
+
+Use yum to install cifs-utils.
+
+[student@desktopX ~]$ sudo yum -y install cifs-utils
+Loaded plugins: langpacks
+Resolving Dependencies
+...
+Complete!
+This package provides support for mounting CIFS file systems and is used by the mount command.
+
+Create the Mount Point
+
+Use mkdir to create the work directory mount point.
+
+[student@desktopX ~]$ mkdir ~/work
+Create the Credentials File
+
+Use mkdir to create the secure directory.
+
+[student@desktopX ~]$ sudo mkdir /secure
+Use vim to create the credentials file student.smb and populate it.
+
+[student@desktopX ~]$ sudo vim /secure/student.smb
+Add the following lines:
+
+username=student
+password=student
+domain=MYGROUP
+Use chmod to protect the secure directory and the student.smb credentials file.
+
+[student@desktopX ~]$ sudo chmod 770 /secure
+[student@desktopX ~]$ sudo chmod 600 /secure/student.smb
+Update /etc/fstab and Mount
+
+Use vim to add the mount settings to the end of /etc/fstab.
+
+[student@desktopX ~]$ sudo vim /etc/fstab
+...
+//serverX/student  /home/student/work  cifs  credentials=/secure/student.smb  0 0
+Use mount to verify the settings and mount the file system.
+
+[student@desktopX ~]$ sudo mount -a
+This command should report no errors. If it does, check your settings in /etc/fstab.
+
+Check Your Access
+
+Use cat to output the samba.txt file.
+
+[student@desktopX ~]$ cat ~/work/samba.txt
+Success
+Use echo to write to the work mount point.
+
+[student@desktopX ~]$ echo testing > ~/work/test.txt
+
