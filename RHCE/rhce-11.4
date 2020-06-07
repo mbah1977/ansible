@@ -1,0 +1,64 @@
+
+Preserving the systemd Journal
+Configuring systemd-journald to permanently store the journal on disk.
+
+Objectives
+After completing this section, students should be able to configure systemd-journald to store its journal on disk rather than in memory.
+
+Store the system journal permanently
+By default, the systemd journal is kept in /run/log/journal, which means it is cleared when the system reboots. The journal is a new mechanism in Red Hat Enterprise Linux 7, and for most installations, a detailed journal that starts with the last boot is sufficient.
+
+If the directory /var/log/journal exists, the journal will log to that directory instead. The advantage of this is the historic data will be available immediately at boot. However, even with a persistent journal, not all data will be kept forever. The journal has a built-in log rotation mechanism that will trigger monthly. In addition, by default, the journal will not be allowed to get larger than 10% of the file system it is on, or leave less than 15% of the file system free. These values can be tuned in /etc/systemd/journald.conf, and the current limits on the size of the journal are logged when the systemd-journald process starts, as can be seen by the following command, which shows the top two lines of journalctl output:
+
+[root@serverX ~]# journalctl | head -2
+-- Logs begin at Wed 2014-03-05 15:13:37 CST, end at Thu 2014-03-06 21:57:54 CST. --
+Mar 05 15:13:37 serverX.example.com systemd-journal[94]: Runtime journal is using 8.0M (max 277.8M, leaving 416.7M of free 2.7G, current limit 277.8M).
+The systemd journal can be made persistent by creating the directory /var/log/journal as user root:
+
+[root@serverX ~]# mkdir /var/log/journal
+Ensure that the /var/log/journal directory is owned by the root user and group systemd-journal, and has the permissions 2755.
+
+[root@serverX ~]# chown root:systemd-journal /var/log/journal
+[root@serverX ~]# chmod 2755 /var/log/journal
+Either a reboot of the system or sending the special signal USR1 as user root to the systemd-journald process is required.
+
+[root@serverX ~]# killall -USR1 systemd-journald
+Since the systemd journal is now persistent across reboots, journalctl -b can reduce the output by only showing the log messages since the last boot of the system.
+
+[root@serverX ~]# journalctl -b
+NOTE
+When debugging a system crash with a persistent journal, it is usually required to limit the journal query to the reboot before the crash happened. The -b option can be accompanied by a negative number indicating to how many prior system boots the output should be limited. For example, the journalctl -b -1 limits the output to the previous boot.
+
+REFERENCES
+mkdir(1), systemd-journald(1), and killall(1) man pages
+
+Additional information may be available in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+
+
+
+
+
+
+Guided Exercise: Practice: Configure a Persistent systemd Journal
+In this lab, students will make the systemd journal persistent.
+
+Outcomes:
+
+The systemd journal is written to disk.
+
+Configure the systemd journal to be persistent across reboots.
+
+Configure the directory /var/log/journal on serverX.
+
+[root@serverX ~]# mkdir /var/log/journal
+[root@serverX ~]# chown root:systemd-journal /var/log/journal
+[root@serverX ~]# chmod 2755 /var/log/journal
+Send the USR1 signal to the systemd-journald or reboot serverX.
+
+[root@serverX ~]# killall -USR1 systemd-journald
+To verify the systemd journal is persistent, look for a new directory with the systemd journal log files that have been written to /var/log/journal. (The exact files which appear may vary on your system, but the directory should have similar contents to the following example.)
+
+[root@serverX ~]# ls /var/log/journal/4513ad59a3b442ffa4b7ea88343fa55f
+system.journal     user-1000.journal
+

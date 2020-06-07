@@ -1,0 +1,243 @@
+
+Maintaining Accurate Time
+Time synchronization is important for log file analysis.
+
+Objectives
+After completing this section, students should be able to maintain accurate time synchronization and time zone configuration to ensure correct timestamps in system logs.
+
+Set local clocks and time zone
+Correct synchronized system time is very important for log file analysis across multiple systems. The Network Time Protocol (NTP) is a standard way for machines to provide and obtain correct time information on the Internet. A machine may get accurate time information from public NTP services on the Internet such as the NTP Pool Project. A high-quality hardware clock to serve accurate time to local clients is another option.
+
+The timedatectl command shows an overview of the current time-related system settings, including current time, time zone, and NTP synchronization settings of the system.
+
+[student@serverX ~]$ timedatectl
+      Local time: Thu 2014-02-13 02:16:15 EST
+  Universal time: Thu 2014-02-13 07:16:15 UTC
+        RTC time: Thu 2014-02-13 07:16:15
+        Timezone: America/New_York (EST, -0500)
+     NTP enabled: yes
+NTP synchronized: no
+ RTC in local TZ: no
+      DST active: no
+ Last DST change: DST ended at
+                  Sun 2013-11-03 01:59:59 EDT
+                  Sun 2013-11-03 01:00:00 EST
+ Next DST change: DST begins (the clock jumps one hour forward) at
+                  Sun 2014-03-09 01:59:59 EST
+                  Sun 2014-03-09 03:00:00 EDT
+A database with known time zones is available and can be listed with:
+
+[student@serverX ~]$ timedatectl list-timezones
+Africa/Abidjan
+Africa/Accra
+Africa/Addis_Ababa
+Africa/Algiers
+Africa/Asmara
+Africa/Bamako
+...
+Time zone names are based on the public "tz" (or "zoneinfo") time zone database maintained by IANA. Time zones are named based on continent or ocean, then typically but not always the largest city within the time zone region. For example, most of the US Mountain time zone is "America/Denver."
+
+Selecting the correct name can be non-intuitive in cases where localities inside the time zone have different daylight saving time rules. For example, in the USA, much of the state of Arizona (US Mountain time) does not have a daylight saving time adjustment at all and is in the time zone "America/Phoenix."
+
+The command tzselect is useful for identifying correct zoneinfo time zone names. It interactively prompts the user with questions about the system's location, and outputs the name of the correct time zone. It does not make any changes to the time zone setting of the system.
+
+The system setting for the current time zone can be adjusted as user root:
+
+[root@serverX ~]# timedatectl set-timezone America/Phoenix
+[root@serverX ~]# timedatectl
+      Local time: Thu 2014-02-13 00:23:54 MST
+  Universal time: Thu 2014-02-13 07:23:54 UTC
+        RTC time: Thu 2014-02-13 07:23:53
+        Timezone: America/Phoenix (MST, -0700)
+     NTP enabled: yes
+NTP synchronized: no
+ RTC in local TZ: no
+      DST active: n/a
+To change the current time and date settings with the timedatectl command, the set-time option is available. The time is specified in the "YYYY-MM-DD hh:mm:ss" format, where either date or time can be omitted. To change the time to 09:00:00, run:
+
+[root@serverX ~]$ timedatectl set-time 9:00:00
+[root@serverX ~]$ timedatectl
+      Local time: Thu 2014-02-13 09:00:27 MST
+  Universal time: Thu 2014-02-13 16:00:27 UTC
+        RTC time: Thu 2014-02-13 16:00:28
+        Timezone: America/Phoenix (MST, -0700)
+     NTP enabled: yes
+NTP synchronized: no
+ RTC in local TZ: no
+      DST active: n/a
+The set-ntp option enables or disables NTP synchronization for automatic time adjustment. The option requires either a true or false argument to turn it on or off. To turn on NTP synchronization, run:
+
+[student@desktopX ~]$ timedatectl set-ntp true
+Configuring and monitoring chronyd
+The chronyd service keeps the usually-inaccurate local hardware clock (RTC) on track by synchronizing it to the configured NTP servers, or if no network connectivity is available, to the calculated RTC clock drift which is recorded in the driftfile specified in the /etc/chrony.conf configuration file.
+
+By default, chronyd uses servers from the NTP Pool Project for the time synchronization and does not need additional configuration. It may be useful to change the NTP servers when the machine in question is on an isolated network.
+
+The quality of an NTP time source is determined by the stratum value reported by the time source. The stratum determines the number of hops the machine is away from a high-performance reference clock. The reference clock is a stratum 0 time source. An NTP server directly attached to it is a stratum 1, while a machine synchronizing time from the NTP server is a stratum 2 time source.
+
+There are two categories of time sources that can be configured in the /etc/chrony.conf configuration file, server and peer. The server is one stratum above the local NTP server, and the peer is at the same stratum level. More than one server and more than one peer can be specified, one per line.
+
+The first argument of the server line is the IP address or DNS name of the NTP server. Following the server IP address or name, a series of options for the server can be listed. It is recommended to use the iburst option, because after the service starts, four measurements are taken in a short time period for a more accurate initial clock synchronization.
+
+To reconfigure the chronyd server to synchronize with classroom.example.com instead of the default servers configured in the /etc/chrony.conf, remove the other server entries and replace them with the following configuration file entry:
+
+# Use public servers from the pool.ntp.org project.
+server classroom.example.com iburst
+After pointing chronyd to the local time source, classroom.example.com, the service needs to be restarted:
+
+[root@serverX ~]# systemctl restart chronyd
+The chronyc command acts as a client to the chronyd service. After setting up NTP synchronization, it is useful to verify the NTP server was used to synchronize the system clock. This can be achieved with the chronyc sources command or, for more verbose output with additional explanations about the output, chronyc sources -v:
+
+[root@serverX ~]$ chronyc sources -v
+210 Number of sources = 1
+
+  .-- Source mode  '^' = server, '=' = peer, '#' = local clock.
+ / .- Source state '*' = current synced, '+' = combined , '-' = not combined,
+| /   '?' = unreachable, 'x' = time may be in error, '~' = time too variable.
+||                                                 .- xxxx [ yyyy ] +/- zzzz
+||                                                /   xxxx = adjusted offset,
+||         Log2(Polling interval) -.             |    yyyy = measured offset,
+||                                  \            |    zzzz = estimated error.
+||                                   |           |                         
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^* classroom.example.com         8   6    17    23   -497ns[-7000ns] +/-  956us
+The * character in the S (Source state) field indicates that the classroom.example.com server has been used as a time source and is the NTP server the machine is currently synchronized to.
+
+NOTE
+Red Hat Enterprise Linux 6 and earlier use ntpd and ntpq to manage the NTP configuration. Further information may be found in the documentation for Red Hat Enterprise Linux 6.
+
+REFERENCES
+timedatectl(1), tzselect(8), chronyd(8), chrony.conf(5), and chronyc(1) man pages
+
+Additional information may be available in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+NTP Pool Project
+
+Time Zone Database
+
+
+
+
+
+
+Guided Exercise: Practice: Adjusting System Time
+In this lab, students will adjust the timezone on a system and synchronize the hardware clock with a NTP time source.
+
+Outcomes
+
+Students will configure the serverX system to use the time zone appropriate for Haiti and configure chronyd on serverX to use the NTP server running on classroom.example.com as time source.
+
+Your serverX machine has been relocated to Haiti. Change the time zone on the serverX machine appropriate for Haiti and verify the time zone has been changed properly.
+
+Identify the correct time zone for Haiti on serverX.
+
+[root@serverX ~]# tzselect
+Please identify a location so that time zone rules can be set correctly.
+Please select a continent or ocean.
+ 1) Africa
+ 2) Americas
+ 3) Antarctica
+ 4) Arctic Ocean
+ 5) Asia
+ 6) Atlantic Ocean
+ 7) Australia
+ 8) Europe
+ 9) Indian Ocean
+10) Pacific Ocean
+11) none - I want to specify the time zone using the Posix TZ format.
+#? 2
+Please select a country.
+ 1) Anguilla                 28) Haiti
+ 2) Antigua & Barbuda        29) Honduras
+ 3) Argentina                30) Jamaica
+ 4) Aruba                    31) Martinique
+ 5) Bahamas                  32) Mexico
+ 6) Barbados                 33) Montserrat
+... output omitted ...
+26) Guatemala                53) Virgin Islands (US)
+27) Guyana
+#? 28
+
+The following information has been given:
+
+	Haiti
+
+Therefore TZ='America/Port-au-Prince' will be used.
+Local time is now:	Thu Nov 20 11:07:46 EST 2014.
+Universal Time is now:	Thu Nov 20 16:07:46 UTC 2014.
+Is the above information OK?
+1) Yes
+2) No
+#? 1
+
+You can make this change permanent for yourself by appending the line
+	TZ='America/Port-au-Prince'; export TZ
+to the file '.profile' in your home directory; then log out and log in again.
+
+Here is that TZ value again, this time on standard output so that you
+can use the /usr/bin/tzselect command in shell scripts:
+America/Port-au-Prince
+Change the time zone to America/Port-au-Prince on serverX.
+
+[root@serverX ~]# timedatectl set-timezone America/Port-au-Prince
+Verify the time zone has been properly set on serverX.
+
+[root@serverX ~]# timedatectl
+      Local time: Wed 2014-11-20 11:09:00 EST
+  Universal time: Wed 2014-11-20 16:09:00 UTC
+        RTC time: Wed 2014-11-20 16:09:00
+        Timezone: America/Port-au-Prince (EST, -0500)
+     NTP enabled: yes
+NTP synchronized: no
+ RTC in local TZ: no
+      DST active: no
+ Last DST change: DST ended at
+                  Sun 2014-11-02 01:59:59 EDT
+                  Sun 2014-11-02 01:00:00 EST
+ Next DST change: DST begins (the clock jumps one hour forward) at
+                  Sun 2015-03-08 01:59:59 EST
+                  Sun 2015-03-08 03:00:00 EDT
+Enable NTP synchronization on the serverX system and use classroom.example.com as time source.
+
+Configure chronyd to synchronize the time on serverX with classroom.example.com. Edit /etc/chrony.conf to resemble the following configuration file excerpt:
+
+# Use public servers from the pool.ntp.org project.
+# Please consider joining the pool (http://www.pool.ntp.org/join.html).
+# server 0.rhel.pool.ntp.org iburst
+# server 1.rhel.pool.ntp.org iburst
+# server 2.rhel.pool.ntp.org iburst
+# server 3.rhel.pool.ntp.org iburst
+server classroom.example.com iburst
+...
+Restart the chronyd service on serverX.
+
+[root@serverX ~]# systemctl restart chronyd
+Turn on NTP synchronization on serverX if it is not already turned on.
+
+[root@serverX ~]# timedatectl set-ntp true
+Verify the serverX system has its clock synchronized with classroom.example.com by using NTP.
+
+Verify the hardware clock on serverX was synchronized with NTP.
+
+[root@serverX ~]# timedatectl
+...
+NTP synchronized: yes
+...
+Verify that the classroom.example.com system is used as time source for synchronizing the clock on serverX.
+
+[root@serverX ~]# chronyc sources -v
+210 Number of sources = 1
+
+  .-- Source mode  '^' = server, '=' = peer, '#' = local clock.
+ / .- Source state '*' = current synced, '+' = combined , '-' = not combined,
+| /   '?' = unreachable, 'x' = time may be in error, '~' = time too variable.
+||                                                 .- xxxx [ yyyy ] +/- zzzz
+||                                                /   xxxx = adjusted offset,
+||         Log2(Polling interval) -.             |    yyyy = measured offset,
+||                                  \            |    zzzz = estimated error.
+||                                   |           |                         
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^* classroom.example.com         8   6    37    51   -25ns[-703us] +/-  128us
+

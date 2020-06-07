@@ -1,0 +1,155 @@
+
+Lab: Lab: Adding Disks, Partitions, and File Systems to a Linux System
+In this lab, you will create a GPT partition on a newly allocated disk, format the partition with an XFS file system, and configure the file system for persistent mounting. You will also create two 512 MiB swap partitions. You will configure one of the swap partitions to have a priority of 1.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+2 GiB XFS file system on a GPT partition on the second disk. The file system is persistently mounted at /backup.
+
+A 512 MiB swap partition enabled on the second disk with default priority.
+
+Another 512 MiB swap partition enabled on the second disk with a priority of 1.
+
+Reset your serverX system.
+
+Log into serverX.
+
+Switch to root using sudo -i.
+
+You have been asked to copy important data from the primary disk on serverX to a separate disk for safekeeping. You have been allocated a second disk on serverX for this purpose. You have decided to create a 2 GiB GPT partition on the second disk and format it with the XFS file system. To ensure that this new file system is always available, you will configure it to persistently mount.
+
+To compensate for the shortage of physical memory on serverX, you want to create and enable some swap space for use. You will create two 512 MiB swap partitions on the second disk and set the priority of one of the swap partitions to 1 so that it is preferred over the other swap partition.
+
+Reboot your serverX machine. Verify that the newly created XFS file system is persistently mounted at /backup. Also confirm that two swap spaces are activated upon boot, and one of the swap spaces has the default priority of -1 and the other has a priority of 1.
+
+When you have completed your work, run lab disk grade on your serverX machine to verify your work.
+
+Create a 2 GiB GPT partition on /dev/vdb of type Linux.
+
+Use gdisk to modify the second disk.
+
+[root@serverX ~]# gdisk /dev/vdb
+Add a new partition that is 2 GiB in size.
+
+Command (? for help): n
+Partition number (1-128, default 1): 1
+First sector (34-20971486, default = 2048) or {+-}size{KMGTP}: Enter
+Last sector (2048-20971486, default = 20971486) or {+-}size{KMGTP}: +2G
+Current type is 'Linux filesystem'
+Set the new partition to type Linux.
+
+Hex code or GUID (L to show codes, Enter = 8300): Enter
+Changed type of partition to 'Linux filesystem'
+Create two 512 MiB partitions on /dev/vdb of type Linux swap.
+
+Add a partition that is 512 MiB.
+
+Command (? for help): n
+Partition number (2-128, default 2): 2
+First sector (34-20971486, default = 4196352) or {+-}size{KMGTP}: Enter
+Last sector (4196352-20971486, default = 20971486) or {+-}size{KMGTP}: +512M
+Current type is 'Linux filesystem'
+Set the partition to type Linux swap.
+
+Hex code or GUID (L to show codes, Enter = 8300): L
+...
+8200 Linux swap            8300 Linux filesystem      8301 Linux reserved
+...
+Hex code or GUID (L to show codes, Enter = 8300): 8200
+Changed type of partition to 'Linux swap'
+Add another partition that is 512 MiB, and set its type to Linux swap.
+
+Command (? for help): n
+Partition number (3-128, default 3): 3
+First sector (34-20971486, default = 5244928) or {+-}size{KMGTP}: Enter
+Last sector (5244928-20971486, default = 20971486) or {+-}size{KMGTP}: +512M
+Current type is 'Linux filesystem'
+Hex code or GUID (L to show codes, Enter = 8300): 8200
+Changed type of partition to 'Linux swap'
+Verify the partitions.
+
+Command (? for help): p
+Disk /dev/vdb: 20971520 sectors, 10.0 GiB
+Logical sector size: 512 bytes
+Disk identifier (GUID): 9918D507-7344-406A-9902-D2503FA028EF
+Partition table holds up to 128 entries
+First usable sector is 34, last usable sector is 20971486
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 14679997 sectors (7.0 GiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048         4196351   2.0 GiB     8300  Linux filesystem
+   2         4196352         5244927   512.0 MiB   8200  Linux swap
+   3         5244928         6293503   512.0 MiB   8200  Linux swap
+Save the changes to the partition table.
+
+Command (? for help): w
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): y
+OK; writing new GUID partition table (GPT) to /dev/vdb.
+The operation has completed successfully.
+Run partprobe to make the kernel aware of the partition table change.
+
+[root@serverX ~]# partprobe
+Format the newly created partitions. Format the 2 GiB partition with an XFS file system. Initialize the two 512 MiB partitions as swap space.
+
+Format the newly created partition with the XFS file system.
+
+[root@serverX ~]# mkfs -t xfs /dev/vdb1
+    meta-data=/dev/vdb1              isize=256    agcount=4, agsize=131072 blks
+             =                       sectsz=512   attr=2, projid32bit=1
+             =                       crc=0
+    data     =                       bsize=4096   blocks=524288, imaxpct=25
+             =                       sunit=0      swidth=0 blks
+    naming   =version 2              bsize=4096   ascii-ci=0 ftype=0
+    log      =internal log           bsize=4096   blocks=2560, version=2
+             =                       sectsz=512   sunit=0 blks, lazy-count=1
+    realtime =none                   extsz=4096   blocks=0, rtextents=0
+Initialize the other two partitions as swap space.
+
+[root@serverX ~]# mkswap /dev/vdb2
+    Setting up swapspace version 1, size = 524284 KiB
+    no label, UUID=d00554b7-dfac-4034-bdd1-37b896023f2c
+[root@serverX ~]# mkswap /dev/vdb3
+    Setting up swapspace version 1, size = 524284 KiB
+    no label, UUID=af30cbb0-3866-466a-825a-58889a49ef33
+Configure the newly created XFS file system to persistently mount at /backup.
+
+Create the /backup directory mount point.
+
+[root@serverX ~]# mkdir /backup
+Determine the UUID of the first partition on the second disk.
+
+[root@serverX ~]# blkid /dev/vdb1
+/dev/vdb1: UUID="748ca35a-1668-4a2f-bfba-51ebe550f6f0" TYPE="xfs" PARTLABEL="Linux filesystem" PARTUUID="83b18afb-9c12-48bf-a620-7f8a612df5a8"
+Add an entry to /etc/fstab.
+
+UUID=748ca35a-1668-4a2f-bfba-51ebe550f6f0 /backup xfs defaults 0 2
+Configure the newly created swap spaces to be enabled at boot. Set one of the swap spaces to be preferred over the other.
+
+Add entries to /etc/fstab using the UUIDs generated by the previous mkswap steps. Set the priority on one of the swap spaces to 1.
+
+UUID=d00554b7-dfac-4034-bdd1-37b896023f2c swap swap defaults 0 0
+UUID=af30cbb0-3866-466a-825a-58889a49ef33 swap swap pri=1 0 0
+Reboot serverX. After the server has rebooted, log in and verify that /dev/vdb1 is mounted at /backup. Also verify that two 512 MiB swap partitions are enabled, and that one has default priority and the other has a priority of 1.
+
+[student@serverX ~]$ mount | grep ^/
+/dev/vda1 on / type xfs (rw,relatime,seclabel,attr2,inode64,noquota) 
+/dev/vdb1 on /backup type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
+[student@serverX ~]$ free
+             total       used       free     shared    buffers     cached
+Mem:       1885252     563528    1321724      17096        696     245224
+-/+ buffers/cache:     317608    1567644
+Swap:      1048568          0    1048568
+[student@serverX ~]$ swapon -s
+Filename                      Type       Size    Used  Priority
+/dev/vdb2                     partition  524284  0     -1
+/dev/vdb3                     partition  524284  0     1
+When you have completed your work, run lab disk grade on the serverX machine to verify your work.
+
+[student@serverX ~]$ lab disk grade

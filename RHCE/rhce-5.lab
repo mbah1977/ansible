@@ -1,0 +1,121 @@
+Lab: Lab: Managing SELinux Security
+In this lab, you will solve an SELinux access denial problem. System administrators are having trouble getting a new web server to deliver content to clients when SELinux is in enforcing mode.
+
+Solve this problem by making adjustments to SELinux. Do not disable SELinux or put it in permissive mode. Do not move the web content or reconfigure Apache in any way.
+
+Resources
+Machines:	serverX
+Outcomes:
+
+Launching a web server on serverX and pointing it to http://localhost/lab-content will display web content instead of an error message.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab selinux setup
+Launch a web browser on serverX and browse to http://localhost/lab-content. You will see an error message.
+
+Research and identify the SELinux issue that is preventing Apache from serving web content.
+
+Look in /var/log/messages for helpful error messages.
+
+[root@serverX ~]# tail /var/log/messages
+[... Output omitted ...]
+Feb 20 13:55:59 serverX dbus-daemon: dbus[427]: [system] Successfully activated
+  service 'org.fedoraproject.Setroubleshootd'
+Feb 20 13:55:59 serverX dbus[427]: [system] Successfully activated service
+  'org.fedoraproject.Setroubleshootd'
+Feb 20 13:56:01 serverX setroubleshoot: Plugin Exception restorecon
+Feb 20 13:56:01 serverX setroubleshoot: SELinux is preventing /usr/sbin/httpd
+  from open access on the file . For complete SELinux messages. run sealert -l
+  160daebd-0359-4f72-9dde-46e7fd244e27
+Especially note the setroubleshootd messages. Run sealert to get more detailed information about the SELinux error.
+
+[root@serverX ~]# sealert -l 160daebd-0359-4f72-9dde-46e7fd244e27
+SELinux is preventing /usr/sbin/httpd from open access on the file .
+
+*****  Plugin catchall_boolean (89.3 confidence) suggests   ******************
+
+If you want to allow httpd to read user content
+Then you must tell SELinux about this by enabling the 'httpd_read_user_content'
+boolean.
+You can read 'None' man page for more details.
+Do
+setsebool -P httpd_read_user_content 1
+
+*****  Plugin catchall (11.6 confidence) suggests   **************************
+
+If you believe that httpd should be allowed open access on the  file by default.
+Then you should report this as a bug.
+You can generate a local policy module to allow this access.
+Do
+allow this access for now by executing:
+# grep httpd /var/log/audit/audit.log | audit2allow -M mypol
+# semodule -i mypol.pp
+
+
+Additional Information:
+Source Context                system_u:system_r:httpd_t:s0
+Target Context                unconfined_u:object_r:user_tmp_t:s0
+Target Objects                 [ file ]
+Source                        httpd
+Source Path                   /usr/sbin/httpd
+Port                          <Unknown>
+Host                          serverX.example.com
+Source RPM Packages           httpd-2.4.6-14.el7.x86_64
+Target RPM Packages           
+Policy RPM                    selinux-policy-3.12.1-124.el7.noarch
+Selinux Enabled               True
+Policy Type                   targeted
+Enforcing Mode                Enforcing
+Host Name                     serverX.example.com
+Platform                      Linux serverX.example.com 3.10.0-84.el7.x86_64 #1
+                              SMP Tue Feb 4 16:28:19 EST 2014 x86_64 x86_64
+Alert Count                   1
+First Seen                    2014-02-20 13:55:56 EST
+Last Seen                     2014-02-20 13:55:56 EST
+Local ID                      160daebd-0359-4f72-9dde-46e7fd244e27
+
+Raw Audit Messages
+type=AVC msg=audit(1392922556.862:494): avc:  denied  { open } for  pid=24492
+comm="httpd" path="/var/web-content/lab-content/index.html" dev="vda1"
+ino=29062705 scontext=system_u:system_r:httpd_t:s0
+tcontext=unconfined_u:object_r:user_tmp_t:s0 tclass=file
+
+
+type=SYSCALL msg=audit(1392922556.862:494): arch=x86_64 syscall=open success=no
+exit=EACCES a0=7fda4c92eb40 a1=80000 a2=0 a3=0 items=0 ppid=24487 pid=24492
+auid=4294967295 uid=48 gid=48 euid=48 suid=48 fsuid=48 egid=48 sgid=48 fsgid=48
+tty=(none) ses=4294967295 comm=httpd exe=/usr/sbin/httpd
+subj=system_u:system_r:httpd_t:s0 key=(null)
+
+Hash: httpd,httpd_t,user_tmp_t,file,open
+Looking closely at the raw audit messages, you see that Apache cannot access /var/web-content/lab-content/index.html.
+
+Resolve the SELinux issue that is preventing Apache from serving web content.
+
+/var/web-content is a nonstandard location for Apache web content. Display the SELinux context of /var/web-content and the standard document root, /var/www/html.
+
+[root@serverX ~]# ls -d -Z /var/web-content /var/www/html
+drwxr-xr-x. root root unconfined_u:object_r:var_t:s0   /var/web-content
+drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 /var/www/html
+Create a file context rule that will set the default type to httpd_sys_content_t for /var/web-content and all files below it.
+
+[root@serverX ~]# semanage fcontext -a -t httpd_sys_content_t '/var/web-content(/.*)?'
+Use the restorecon command to set the SELinux context for the files in /var/web-content.
+
+[root@serverX ~]# restorecon -R /var/web-content/
+Verify the SELinux issue has been resolved and Apache is able to serve web content.
+
+Use your web browser to refresh the http://localhost/lab-content link. Now you should see some web content.
+
+This is the content for the SELinux chapter test. 
+Run the lab selinux grade command to confirm your findings.
+
+[root@serverX ~]# lab selinux grade
+Confirming SELinux is in enforcing mode...PASS
+Confirming files are in expected location...PASS
+Confirming the Apache DocumentRoot is unchanged...PASS
+Confirming the web content is accessible...PASS
+

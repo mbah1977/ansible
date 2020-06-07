@@ -1,0 +1,108 @@
+iLab: Lab: Managing Logical Volume Management (LVM) Storage
+In this lab, you will resize an existing logical volume, adding LVM resources as necessary, and then add a new logical volume with a persistently mounted XFS file system on it.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+Logical volume loans resized to 768MiB and persistently mounted at /finance/loans.
+
+A new 128MiB logical volume called risk with an XFS file system, persistently mounted at /finance/risk.
+
+Reset your serverX system.
+
+Log into and set up your server system.
+
+[student@serverX ~]$ lab lvm setup
+Open a terminal.
+
+Switch to root using sudo -i.
+
+Your company's finance department has a logical volume called loans that is starting to run out of disk space, and you have been asked to extend it to 768MiB in size.
+
+You have also been asked to create a new file system to host documents for the risk management team, part of the finance department; a 128MiB logical volume called risk has been agreed upon and it should be mounted on /finance/risk. Your company standard file system is XFS.
+
+There is a volume group called finance used to hold the department's logical volumes, but unfortunately it has insufficient space to extend the existing logical volume and add the new one, so you have been allocated a further 512MiB from the current hard disk. The partition needs to be created.
+
+When you are done, reboot your serverX machine, then run the command lab lvm grade from your serverX machine to verify your work.
+
+Create a 512MiB partition on /dev/vdb, initialize it as a physical volume, and extend the finance volume group with it.
+
+Use fdisk to create the 512MiB partition and set it to type Linux LVM.
+
+[root@serverX ~]# fdisk /dev/vdb
+Note: The following steps omit some output.
+
+Add a new primary partition of 512MiB.
+
+Command (m for help): n
+Partition type:
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended
+Select (default p): Enter
+Partition number (2-4, default 2): Enter
+First sector (1050624-20971519, default 1050624): Enter
+Last sector, +sectors or +size{K,M,G} (1050624-20971519, default 20971519): +512M
+Change the partition type to Linux LVM - 0x8e.
+
+Command (m for help): t
+Partition number (1,2, default 2): Enter
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'
+Write the changes to the partition table and quit.
+
+Command (m for help): w
+The partition table has been altered!
+Use partprobe to register the new partition with the kernel.
+
+[root@serverX ~]# partprobe
+Use pvcreate to initialize the partition as a PV.
+
+[root@serverX ~]# pvcreate /dev/vdb2
+  Physical volume "/dev/vdb2" successfully created
+Use vgextend to extend the VG named finance, using the new /dev/vdb2 PV.
+
+[root@serverX ~]# vgextend finance /dev/vdb2
+  Volume group "finance" successfully extended
+Extend the loans logical volume to 768MiB, including the file system.
+
+Use lvextend to extend the loans LV to 768MiB.
+
+[root@serverX ~]# lvextend -L 768M /dev/finance/loans
+  Extending logical volume loans to 768.00 MiB
+  Logical volume loans successfully resized
+NOTE
+Alternatively, you could have used -L +512M to resize the LV.
+
+Use xfs_growfs to extend the XFS file system to the remainder of the free space on the LV.
+
+[root@serverX ~]# xfs_growfs /finance/loans
+meta-data=/dev/mapper/finance-loans isize=256    agcount=4, agsize=16384 blks
+...
+NOTE
+This example shows the xfs_growfs step to extend the file system. An alternative would have been to add the "-r" option to the lvextend command.
+
+In the existing volume group, create a new logical volume called risk with a size of 128MiB. Add an XFS file system and mount it persistently on /finance/risk.
+
+Use lvcreate to create a 128MiB LV named risk from the finance VG.
+
+[root@serverX ~]# lvcreate -n risk -L 128M finance
+  Logical volume "risk" created
+Use mkfs to place an xfs file system on the risk LV; use the LV device name.
+
+[root@serverX ~]# mkfs -t xfs /dev/finance/risk
+meta-data=/dev/finance/risk      isize=256    agcount=4, agsize=8192 blks
+...
+Use mkdir to create a mount point at /finance/risk.
+
+[root@serverX ~]# mkdir /finance/risk
+Use vim to add the following line to the bottom of /etc/fstab on serverX:
+
+/dev/finance/risk  /finance/risk  xfs  defaults  1 2
+Use mount to verify the /etc/fstab entry and mount the new risk LV device.
+
+[root@serverX ~]# mount -a
+When you are done, reboot your serverX machine, then run the command lab lvm grade from your serverX machine to verify your work.
+
+[root@serverX ~]$ systemctl reboot
+[student@serverX ~]$ lab lvm grade

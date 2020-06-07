@@ -1,0 +1,91 @@
+
+Changing SELinux Modes
+setenforce changes the current SELinux mode of a system.
+
+The default SELinux mode of a system is defined in the /etc/selinux/config file.
+
+Objectives
+After completing this section, students should be able to:
+
+Change the current SELinux mode of a system.
+
+Set the default SELinux mode of a system.
+
+For troubleshooting purposes, SELinux protection can be temporarily disabled using SELinux modes. This section will look at how to change SELinux modes temporarily between enforcing and permissive mode. It will also look at how to set the default SELinux mode that is determined at boot time.
+
+Changing the current SELinux mode
+SELinux modes
+The setenforce command modifies the current SELinux mode:
+
+[root@serverX ~]# getenforce
+Enforcing
+[root@serverX ~]# setenforce
+usage:  setenforce [ Enforcing | Permissive | 1 | 0 ]
+[root@serverX ~]# setenforce 0
+[root@serverX ~]# getenforce
+Permissive
+[root@serverX ~]# setenforce Enforcing
+[root@serverX ~]# getenforce
+Enforcing
+Another way to temporarily set the SELinux mode is to pass a parameter to the kernel at boot time. Passing a kernel argument of enforcing=0 causes the system to boot into permissive mode. A value of 1 would specify enforcing mode. SELinux can be disabled when the selinux=0 argument is specified. A value of 1 would enable SELinux.
+
+Setting the default SELinux mode
+The configuration file that determines what the SELinux mode is at boot time is /etc/selinux/config. Notice that it contains some useful comments:
+
+# This file controls the state of SELinux on the system.
+# SELINUX= can take one of these three values:
+#     enforcing - SELinux security policy is enforced.
+#     permissive - SELinux prints warnings instead of enforcing.
+#     disabled - No SELinux policy is loaded.
+SELINUX=enforcing
+# SELINUXTYPE= can take one of these two values:
+#     targeted - Targeted processes are protected,
+#     minimum - Modification of targeted policy. Only selected processes
+#               are protected. 
+#     mls - Multi Level Security protection.
+SELINUXTYPE=targeted
+Use /etc/selinux/config to change the default SELinux mode at boot time. In the example shown, it is set to enforcing mode.
+
+Passing the selinux= and/or the enforcing= kernel arguments overrides any of the default values specified in /etc/selinux/config.
+
+REFERENCES
+getenforce(1), setenforce(1), and selinux_config(5) man pages
+
+
+
+
+Guided Exercise: Practice: Changing SELinux Modes
+In this lab, you will manage SELinux modes, both temporarily and persistently.
+
+Resources
+Machines:	serverX
+Outcomes:
+
+You will get practice viewing and setting the current SELinux mode.
+
+Log in as root on serverX. Display the current SELinux mode.
+
+[root@serverX ~]# getenforce
+Enforcing
+Change the default SELinux mode to permissive and reboot.
+
+[root@serverX ~]# vi /etc/selinux/config
+[root@serverX ~]# grep '^SELINUX' /etc/selinux/config
+SELINUX=permissive
+SELINUXTYPE=targeted
+[root@serverX ~]# reboot
+When serverX comes back up, log in as root and display the current SELinux mode.
+
+[root@serverX ~]# getenforce
+Permissive
+Change the default SELinux mode to enforcing.
+
+[root@serverX ~]# vi /etc/selinux/config
+[root@serverX ~]# grep '^SELINUX' /etc/selinux/config
+SELINUX=enforcing
+SELINUXTYPE=targeted
+Set the current SELinux mode to enforcing.
+
+[root@serverX ~]# setenforce 1
+[root@serverX ~]# getenforce
+Enforcing

@@ -1,0 +1,175 @@
+Managing User Passwords
+Manage password aging policies for users and manually lock, unlock, and expire accounts.
+
+Objectives
+After completing this section, students should be able to lock accounts manually or by setting a password-aging policy in the shadow password file.
+
+Shadow passwords and password policy
+In the distant past, encrypted passwords were stored in the world-readable /etc/passwd file. This was thought to be reasonably secure until dictionary attacks on encrypted passwords became common. At that point, the encrypted passwords, or "password hashes," were moved to the more secure /etc/shadow file. This new file also allowed password aging and expiration features to be implemented.
+
+There are three pieces of information stored in a modern password hash:
+
+$1$gCjLa2/Z$6Pu0EK0AzfCjxjv2hoLOB/
+
+1: The hashing algorithm. The number 1 indicates an MD5 hash. The number 6 appears when a SHA-512 hash is used.
+
+gCjLa2/Z: The salt used to encrypt the hash. This is originally chosen at random. The salt and the unencrypted password are combined and encrypted to create the encrypted password hash. The use of a salt prevents two users with the same password from having identical entries in the /etc/shadow file.
+
+6Pu0EK0AzfCjxjv2hoLOB/: The encrypted hash.
+
+When a user tries to log in, the system looks up the entry for the user in /etc/shadow, combines the salt for the user with the unencrypted password that was typed in, and encrypts them using the hashing algorithm specified. If the result matches the encrypted hash, the user typed in the right password. If the result doesn't match the encrypted hash, the user typed in the wrong password and the login attempt fails. This method allows the system to determine if the user typed in the correct password without storing that password in a form usable for logging in.
+
+NOTE
+Red Hat Enterprise Linux 6 and 7 support two new strong password hashing algorithms, SHA-256 (algorithm 5) and SHA-512 (algorithm 6). Both the salt string and the encrypted hash are longer for these algorithms. The default algorithm used for password hashes can be changed by the root user by running the command authconfig --passalgo with one of the arguments md5, sha256, or sha512, as appropriate.
+
+Red Hat Enterprise Linux 7 defaults to using SHA-512 encryption.
+
+/etc/shadow format
+
+The format of /etc/shadow follows (nine colon-separated fields):
+
+1name:2password:3lastchange:4minage:5maxage:6warning:7inactive:8expire:9blank
+1
+
+The login name. This must be a valid account name on the system.
+
+2
+
+The encrypted password. A password field which starts with a exclamation mark means that the password is locked.
+
+3
+
+The date of the last password change, represented as the number of days since 1970.01.01.
+
+4
+
+The minimum number of days before a password may be changed, where 0 means "no minimum age requirement."
+
+5
+
+The maximum number of days before a password must be changed.
+
+6
+
+The warning period that a password is about to expire. Represented in days, where 0 means "no warning given."
+
+7
+
+The number of days an account remains active after a password has expired. A user may still log into the system and change the password during this period. After the specified number of days, the account is locked, becoming inactive.
+
+8
+
+The account expiration date, represented as the number of days since 1970.01.01.
+
+9
+
+This blank field is reserved for future use.
+
+Password aging
+The following diagram relates the relevant password-aging parameters, which can be adjusted using chage to implement a password-aging policy.
+
+
+[root@serverX ~]# chage -m 0 -M 90 -W 7 -I 14 username
+chage -d 0 username will force a password update on next login.
+
+chage -l username will list a username's current settings.
+
+chage -E YYYY-MM-DD username will expire an account on a specific day.
+
+NOTE
+The date command can be used to calculate a date in the future.
+
+[student@serverX ~]$ date -d "+45 days"
+Sat Mar 22 11:47:06 EDT 2014
+Restricting access
+With the chage command, an account expiration can be set. Once that date is reached, the user cannot log into the system interactively. The usermod command can "lock" an account with the -L option.
+
+[student@serverX ~]$ sudo usermod -L elvis
+[student@serverX ~]$ su - elvis
+Password: elvis
+su: Authentication failure
+When a user has left the company, the administrator may lock and expire an account with a single usermod command. The date must be given as the number of days since 1970.01.01.
+
+[student@serverX ~]$ sudo usermod -L -e 1 elvis
+Locking the account prevents the user from authenticating with a password to the system. It is the recommended method of preventing access to an account by an employee who has left the company. If the employee returns, the account can later be unlocked with usermod -U USERNAME. If the account was also expired, be sure to also change the expiration date.
+
+The nologin shell
+
+Sometimes a user needs an account with a password to authenticate to a system, but does not need an interactive shell on the system. For example, a mail server may require an account to store mail and a password for the user to authenticate with a mail client used to retrieve mail. That user does not need to log directly into the system.
+
+A common solution to this situation is to set the user's login shell to /sbin/nologin. If the user attempts to log into the system directly, the nologin "shell" will simply close the connection.
+
+[root@serverX ~]# usermod -s /sbin/nologin student
+[root@serverX ~]# su - student
+Last login: Tue Feb  4 18:40:30 EST 2014 on pts/0
+This account is currently not available.
+NOTE
+Use of the nologin shell prevents interactive use of the system, but does not prevent all access. A user may still be able to authenticate and upload or retrieve files through applications such as web applications, file transfer programs, or mail readers.
+
+REFERENCES
+chage(1), usermod(8), shadow(5), crypt(3) man pages
+
+Guided Exercise: Practice: Managing User Password Aging
+In this lab, you will set unique password policies for users.
+
+Outcomes
+
+The password for romeo must be changed when the user first logs into the system, every 90 days thereafter, and the account expires in 180 days.
+
+Perform the following steps on serverX unless directed otherwise.
+
+Explore locking and unlocking accounts.
+
+Lock the romeo account.
+
+[student@serverX ~]$ sudo usermod -L romeo
+Attempt to log in as romeo.
+
+[student@serverX ~]$ su - romeo
+Password: romeo
+su: Authentication failure
+Unlock the romeo account.
+
+[student@serverX ~]$ sudo usermod -U romeo
+Change the password policy for romeo to require a new password every 90 days.
+
+[student@serverX ~]$ sudo chage -M 90 romeo
+[student@serverX ~]$ sudo chage -l romeo
+Last password change                                    : Feb 03, 2014
+Password expires                                        : May 04, 2014
+Password inactive                                       : never
+Account expires                                         : never
+Minimum number of days between password change          : 0
+Maximum number of days between password change          : 90
+Number of days of warning before password expires       : 7
+Additionally, force a password change on the first login for the romeo account.
+
+[student@serverX ~]$ sudo chage -d 0 romeo
+Log in as romeo and change the password to forsooth123.
+
+[student@serverX ~]$ su - romeo
+Password: romeo
+You are required to change your password immediately (root enforced)
+Changing password for romeo.
+(current) UNIX password: romeo
+New password: forsooth123 
+Retype new password: forsooth123 
+[romeo@serverX ~]$ exit
+Expire accounts in the future.
+
+Determine a date 180 days in the future.
+
+[student@serverX ~]$ date -d "+180 days"
+Sat Aug  2 17:05:20 EDT 2014
+Set accounts to expire on that date.
+
+[student@serverX ~]$ sudo chage -E 2014-08-02 romeo
+[student@serverX ~]$ sudo chage -l romeo
+Last password change                                    : Feb 03, 2014
+Password expires                                        : May 04, 2014
+Password inactive                                       : never
+Account expires                                         : Aug 02, 2014
+Minimum number of days between password change          : 0
+Maximum number of days between password change          : 90
+Number of days of warning before password expires       : 7
+

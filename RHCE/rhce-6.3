@@ -1,0 +1,146 @@
+Using nice and renice to Influence Process Priority
+nice is used to set the nice level for new processes.
+
+renice and top can be used to modify the nice level on an existing process.
+
+Both ps and top can be used to report on nice levels.
+
+Objectives
+After completing this section, students should be able to:
+
+Launch processes with a nice level set.
+
+Modify the nice level on a running process.
+
+Report on nice levels for processes.
+
+Reporting on nice levels
+The nice levels for existing processes can be viewed in a number of different ways. Most process management tools (like gnome-system-monitor) already display the nice level by default, or can be configure to display the nice level.
+
+Displaying nice levels with top
+
+The top command can be used to interactively view (and manage) processes. In a default configuration, top will display two columns of interest to the nice level: NI with the actual nice level, and PR, which displays the nice level as mapped to a larger priority queue, with a nice level of -20 mapping to a priority of 0 and a nice level of +19 mapping to a priority of 39.
+
+Displaying nice levels with ps
+
+The ps command can also display nice levels for processes, although it does not do so in most of its default output formats. Users can request exactly the columns they want from ps, however, and the name for the nice field is nice.
+
+The following example requests a list of all processes, with their pid, name, and nice level, sorted in descending order by nice level:
+
+[student@desktopX ~]$ ps axo pid,comm,nice --sort=-nice
+  PID COMMAND          NI
+   74 khugepaged       19
+  688 alsactl          19
+ 1953 tracker-miner-f  19
+   73 ksmd              5
+  714 rtkit-daemon      1
+IMPORTANT
+Some processes might report a - as their nice level. These processes are being run with a different scheduling policy, and will almost certainly be considered a higher priority by the scheduler. It is possible to display the scheduler policy by requesting the cls field from ps. A TS in this field indicates the process is run under SCHED_NORMAL and can use nice levels; anything else means a different scheduler policy is being used.
+
+Launching processes with a different nice level
+Whenever a process is started, it will normally inherit the nice level from its parent. This means that when a process is started from the command line, it will get the same nice level as the shell process that it was started from. In most cases, this will result in new processes running with a nice level of 0.
+
+To start a process with a different nice level, both users and system administrators can run their commands using the nice tool. Without any other options, running nice <COMMAND> will start <COMMAND> with a nice level of 10. Other nice levels can be selected by using the -n <NICELEVEL> option to the nice command. For example, to start the command dogecoinminer with a nice level of 15 and send it to the background immediately, the following command can be used:
+
+[student@desktopX ~]$ nice -n 15 dogecoinminer &
+IMPORTANT
+Unprivileged users are only allowed to set a positive nice level (0 to 19). Only root can set a negative nice level (-20 to -1).
+
+Changing the nice level of an existing process
+The nice level of an existing process can be changed from the command line using the renice command. The syntax for the renice command is as follows:
+
+renice -n <NICELEVEL> <PID>...
+
+For example, to change the nice level of all origami@home processes to -7, a system administrator could use the following command (note that more than one PID can be specified at once):
+
+[root@desktopX ~]# renice -n -7 $(pgrep origami@home)
+IMPORTANT
+Regular users are only allowed to raise the nice level on their processes. Only root can use renice to lower the nice level.
+
+The top command can also be used to (interactively) change the nice level on a process. From within top, press r, followed by the PID to be changed and the new nice level.
+
+REFERENCES
+nice(1), renice(1), and top(1) man pages
+
+
+
+Guided Exercise: Practice: Discovering Process Priorities
+In this exercise, you will experience the influence that nice levels have on relative process priorities.
+
+Resources
+Machines:	desktopX
+Outcomes:
+
+An interactive tour of the effects of nice levels.
+
+None
+
+Log in as student to your desktopX system.
+
+Using the special file /proc/cpuinfo, determine the number of CPU cores in your desktopX system, then start two instances of the command sha1sum /dev/zero & for each core.
+
+To determine the number of cores using /proc/cpuinfo:
+
+[student@desktopX ~]$ NCORES=$( grep -c '^processor' /proc/cpuinfo )
+Either manually or with a script, start two sha1sum /dev/zero & commands for every core in your system.
+
+NOTE
+The seq command prints a list of numbers.
+
+[student@desktopX ~]$ for I in $( seq $((NCORES*2)) )
+> do
+>    sha1sum /dev/zero &
+> done
+Verify that you have all the background jobs running that you expected (two for every core in your system).
+
+[student@desktopX ~]$ jobs
+[1]-  Running                 sha1sum /dev/zero &
+[2]+  Running                 sha1sum /dev/zero &
+...
+Inspect the CPU usage (as a percentage) of all your sha1sum processes, using the ps and pgrep commands. What do you notice?
+
+[student@desktopX ~]$ ps u $(pgrep sha1sum)
+The CPU percentage for all sha1sum processes is about equal.
+
+Use the killall command to terminate all your sha1sum processes.
+
+[student@desktopX ~]$ killall sha1sum
+Start two sha1sum /dev/zero & commands for each of your cores, but give exactly one of them a nice level of 10.
+
+[student@desktopX ~]$ for I in $( seq $((NCORES*2-1)) )
+> do
+>    sha1sum /dev/zero &
+> done
+[student@desktopX ~]$ nice -n10 sha1sum /dev/zero&
+Using the ps command, inspect the CPU usage of your sha1sum commands. Make sure you include the nice level in your output, as well as the PID and the CPU usage. What do you notice?
+
+[student@desktopX ~]$ ps -opid,pcpu,nice,comm $(pgrep sha1sum)
+The instance of sha1sum with the nice level of 10 gets significantly less CPU than the other instance(s).
+
+Use the renice command to set the nice level of the sha1sum with a nice level of 10 down to 5. The PID should still be visible in the output of the previous step.
+
+Did this work? Why not?
+
+[student@desktopX ~]$ renice -n 5 <PID>
+renice: failed to set priority for <PID> (process ID): Permission denied
+Unprivileged users are not allowed to set negative nice values or lower the nice value on an existing process.
+
+Using the sudo and renice commands, set the nice level for the process you identified in the previous step to -10.
+
+[student@desktopX ~]$ sudo renice -n -10 <PID>
+Start the top command as root, then use top to lower the nice level for the sha1sum process using the most CPU back down to 0. What do you observe afterwards?
+
+[student@desktopX ~]$ sudo top
+Identify the sha1sum process using the most CPU. It will be near the top of the screen.
+
+Press r to enter renice mode, then enter the PID you identified, or press Enter if the offered default PID is the one you want.
+
+Enter 0, then press Enter.
+
+All sha1sum commands are again using an (almost) equal amount of CPU.
+
+Important: Clean up by exiting top and killing all your sha1sum processes.
+
+Press q to exit top.
+
+[student@desktopX ~]$ killall sha1sum

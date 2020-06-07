@@ -1,0 +1,107 @@
+
+Chapter 11. System Logging and NTP
+System Log Architecture
+Quiz: Practice: System Logging Components
+Reviewing Syslog Files
+Guided Exercise: Practice: Finding Log Entries
+Reviewing systemd Journal Entries
+Guided Exercise: Practice: Finding Events With journalctl
+Preserving the systemd Journal
+Guided Exercise: Practice: Configure a Persistent systemd Journal
+Maintaining Accurate Time
+Guided Exercise: Practice: Adjusting System Time
+Lab: Lab: Analyzing and Storing Logs
+Abstract
+
+Overview
+Goal	To locate and accurately interpret relevant system log files for troubleshooting purposes.
+Objectives	
+Describe the basic syslog architecture in Red Hat Enterprise Linux 7.
+
+Interpret entries in relevant syslog files to troubleshoot problems or review system status.
+
+Find and interpret log entries in the systemd journal to troubleshoot problems or review system status.
+
+Configure systemd-journald to store its journal on disk rather than in memory.
+
+Maintain accurate time synchronization and time zone configuration to ensure correct timestamps in system logs.
+
+Sections	
+System Log Architecture (and Practice)
+
+Reviewing Syslog Files (and Practice)
+
+Reviewing systemd Journal Entries (and Practice)
+
+Preserving the systemd Journal (and Practice)
+
+Maintaining Accurate Time (and Practice)
+
+Lab	
+Analyzing and Storing Logs
+
+System Log Architecture
+The log architecture consists of systemd-journald for collecting and rsyslog to sort and write log messages to the log files.
+
+Objectives
+After completing this section, students should be able to describe the basic syslog architecture in Red Hat Enterprise Linux 7.
+
+System logging
+Processes and the operating system kernel need to be able to record a log of events that happen. These logs can be useful for auditing the system and troubleshooting problems. By convention, the /var/log directory is where these logs are persistently stored.
+
+A standard logging system based on the Syslog protocol is built into Red Hat Enterprise Linux. Many programs use this system to record events and organize them into log files. In Red Hat Enterprise Linux 7, syslog messages are handled by two services, systemd-journald and rsyslog.
+
+The systemd-journald daemon provides an improved log management service that collects messages from the kernel, the early stages of the boot process, standard output and error of daemons as they start up and run, and syslog. It writes these messages to a structured journal of events that, by default, does not persist between reboots. This allows syslog messages and events which are missed by syslog to be collected in one central database. The syslog messages are also forwarded by systemd-journald to rsyslog for further processing.
+
+The rsyslog service then sorts the syslog messages by type (or facility) and priority, and writes them to persistent files in the /var/log directory.
+
+The /var/log directory holds various system- and service-specific log files maintained by rsyslog:
+
+Table 11.1. Overview of system log files
+
+Log file	Purpose
+/var/log/messages
+
+Most syslog messages are logged here. The exceptions are messages related to authentication and email processing, that periodically run jobs, and those which are purely debugging-related.
+
+/var/log/secure
+
+The log file for security and authentication-related messages and errors.
+
+/var/log/maillog
+
+The log file with mail server-related messages.
+
+/var/log/cron
+
+The log file related to periodically executed tasks.
+
+/var/log/boot.log
+
+Messages related to system startup are logged here.
+
+
+REFERENCES
+systemd-journald.service(8), rsyslogd(8), and rsyslog.conf(5) man pages
+
+Additional information may be available in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+
+
+
+
+
+Quiz: Practice: System Logging Components
+Match the following items to their counterparts in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+Purpose	Log file
+Most syslog messages are logged here. The exceptions are messages related to authentication, email processing, and that periodically run jobs, or those which are purely debugging-related.	/var/log/messages
+The log file for security and authentication-related messages and errors.	/var/log/secure
+The directory to which rsyslog is writing all the log files.	/var/log
+The log file with mail server-related messages.	/var/log/maillog
+The log file related to periodically executed tasks.	/var/log/cron
+Messages related to system startup are logged here.

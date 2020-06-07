@@ -1,0 +1,109 @@
+Repairing File System Issues at Boot
+systemd will display an emergency shell in most cases dealing with file system issues.
+
+The emergency.target target can also be used to diagnose and fix file system issues.
+
+Objectives
+After completing this section, students should be able to repair file system issues during boot.
+
+Errors in /etc/fstab and corrupt file systems can stop a system from booting. In most cases, systemd will actually continue to boot after a timeout, or drop to an emergency repair shell that requires the root password.
+
+Dealing with boot-time file system issues
+The following table lists some common errors and their results.
+
+Problem	Result
+Corrupt file system
+
+systemd will attempt a fsck. If the problem is too serious for an automatic fix, the user will be prompted to run fsck manually from an emergency shell.
+
+Non-existent device/UUID referenced in /etc/fstab
+
+systemd will wait for a set amount of time, waiting for the device to become available. If the device does not become available, the user is dropped to an emergency shell after the timeout.
+
+Non-existent mount point in /etc/fstab
+
+systemd creates the mount point if possible; otherwise, it drops to an emergency shell.
+
+Incorrect mount option specified in /etc/fstab
+
+The user is dropped to an emergency shell.
+
+In all cases, an administrator can also utilize the emergency.target target to diagnose and fix the issue, since no file systems will be mounted before the emergency shell is displayed.
+
+NOTE
+When using the automatic recovery shell during file system issues, do not forget to issue a systemctl daemon-reload after editing /etc/fstab. Without this reload, systemd will continue using the old version.
+
+REFERENCES
+systemd-fsck(8), systemd-fstab-generator(3), and systemd.mount(5) man pages
+
+
+
+Guided Exercise: Practice: Repairing Boot Problems
+In this lab, you will recover from an error in /etc/fstab.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+After completing this exercise, your machine should boot normally again, without user intervention.
+
+Reset your serverX system.
+
+Log in and set up your serverX system:
+
+[student@serverX ~]$ lab bootbreakfs setup
+You had a new admin in your team, but it was decided that it would be in everybody's best interest if that admin pursued a different career.
+
+Now that your staffing issue has been solved, there are a couple of remaining issues. One of them is a machine that had been “fixed” by this admin.
+
+Take a good look at the console of your serverX machine. It seems it is stuck early on.
+
+Take a minute to speculate about a possible cause for this behavior, then reboot the machine and interrupt the boot loader menu countdown. (If you wait long enough, the system will eventually spawn a rescue shell by itself, but that can take a while.)
+
+Usually you would send a Ctrl+Alt+Del to your system to reboot it. This particular boot problem causes that key sequence to retry the boot sequence again without rebooting. In this case, either wait for the task to timeout or use the power switch to force a reboot.
+
+When the boot loader menu appears after the BIOS self-test, press any key to interrupt the countdown.
+
+Looking at the error you had during the previous boot, it appears that at least parts of the system are still functioning. Since you know the root password (redhat), attempt an emergency boot.
+
+Use the cursor keys to highlight the default boot loader entry.
+
+Press e to edit the current entry.
+
+Using the cursor keys, navigate to the line that starts with linux16.
+
+Press End to move the cursor to the end of the line.
+
+Append systemd.unit=emergency.target to the end of the line.
+
+Press Ctrl+x to boot using the modified config.
+
+Log into the emergency mode. Pay close attention to any errors you might receive.
+
+At the Give root password for maintenance prompt, enter redhat.
+
+Inspect what file systems are currently mounted.
+
+[root@localhost ~]# mount
+...
+/dev/vda1 on / type xfs (ro,relatime,seclabel,attr2,inode64,noquota)
+It appears that the root file system is mounted read-only; mount it read-write.
+
+[root@localhost ~]# mount -o remount,rw /
+Attempt to mount all the other file systems:
+
+[root@localhost ~]# mount -a
+mount: mount point /RemoveMe does not exist
+Open /etc/fstab in an editor and fix the issue.
+
+[root@localhost ~]# vi /etc/fstab
+Remove the invalid line (the one with RemoveMe).
+
+Save your changes, then exit your editor.
+
+Verify that your /etc/fstab is now correct by attempting to mount all entries.
+
+[root@localhost ~]# mount -a
+Exit your emergency shell and reboot the system by typing reboot. Your system should now boot normally.
+
+

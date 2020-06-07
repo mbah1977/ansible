@@ -1,0 +1,90 @@
+Repairing Boot Loader Issues
+Use e and Ctrl+x to edit boot loader entries in memory, then boot.
+
+Use grub2-mkconfig > /boot/grub2/grub.cfg to regenerate the boot loader configuration.
+
+grub2-install is used to reinstall the boot loader.
+
+Objectives
+After completing this section, students should be able to fix boot loader issues.
+
+The boot loader used by default on Red Hat Enterprise Linux 7 is grub2, the second major version of the GRand Unified Bootloader.
+
+grub2 can be used to boot on both BIOS and UEFI systems, and supports booting almost any operating system that runs on modern hardware.
+
+Dealing with boot loader issues
+The main configuration file for grub2 is /boot/grub2/grub.cfg, but administrators are not supposed to edit this file directly. Instead, a tool called grub2-mkconfig is used to generate that configuration using a set of different configuration files, and the list of installed kernels.
+
+grub2-mkconfig will look at /etc/default/grub for options such as the default menu timeout and kernel command line to use, then use a set of scripts in /etc/grub.d/ to generate a configuration file.
+
+To make permanent changes to the boot loader configuration, an administrator needs to edit the configuration files listed previously, then run the following command:
+
+[root@serverX ~]# grub2-mkconfig > /boot/grub2/grub.cfg
+In those cases where major changes have been made, an administrator might prefer to run that command without the redirection so that the results can be inspected first.
+
+Important directives
+
+To troubleshoot a broken grub2 configuration, an administrator will need to understand the syntax of /boot/grub2/grub.cfg first. Actual bootable entries are encoded inside menuentry blocks. In these blocks, linux16 and initrd16 lines point to the kernel to be loaded from disk (along with the kernel command line) and the initramfs to be loaded. During interactive editing at boot, Tab completion is available to find these files.
+
+The set root lines inside those blocks do not point to the root file system for the Red Hat Enterprise Linux 7 system, but instead point to the file system from which grub2 should load the kernel and initramfs files. The syntax is harddrive,partition, where hd0 is the first hard drive in the system, hd1 is the second, etc. The partitions are indicated as msdos1 for the first MBR partition, or gpt1 for the first GPT partition on that drive.
+
+Reinstalling the boot loader
+
+In those cases where the boot loader itself has become corrupted, it can be reinstalled using the grub2-install command. On BIOS systems, the disk where grub2 should be installed in the MBR should be provided as an argument. On UEFI systems, no arguments are necessary when the EFI system partition is mounted on /boot/efi.
+
+REFERENCES
+info grub2 (GNU GRUB Manual)
+
+info grub2-install (GNU GRUB Manual)
+
+Chapter 28: "Invoking grub2-install"
+
+
+
+
+
+
+
+Guided Exercise: Practice: Repairing a Boot Loader Problem
+In this lab, you will repair an issue with the boot loader configuration on one of your machines.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+A machine that boots normally without user intervention.
+
+Reset your serverX system.
+
+Log in and set up your serverX system:
+
+[student@serverX ~]$ lab bootbreakgrub setup
+One of your former co-workers was experimenting with speeding up the boot process on one of your machines. After a number of failed attempts, you have now been tasked with repairing the damage done.
+
+Look at the console of your serverX machine, then reboot the machine and interrupt the boot loader countdown timer.
+
+Send a Ctrl+Alt+Del to your system using the relevant button or menu entry.
+
+When the boot loader menu appears, press any key to interrupt the countdown.
+
+Move the cursor to the default boot entry, then press e to edit that entry. Inspect the configuration closely, looking for anything that seems out of the ordinary.
+
+Find the line that is blocking the boot process, modify it, then boot with these changes.
+
+os16 is not a valid grub directive. Change it to linux16.
+
+Press Ctrl+x to boot your system with the modified configuration.
+
+Wait for the system to boot, log in as student, elevate your privileges to root, then generate a new grub2 configuration. Do not immediately overwrite the existing configuration, but inspect the new config first.
+
+[student@serverX ~]$ sudo -i
+[root@serverX ~]# grub2-mkconfig
+Scroll through the output to see if it looks like a valid grub2 configuration.
+
+Commit the configuration to disk.
+
+[root@serverX ~]# grub2-mkconfig > /boot/grub2/grub.cfg
+Reboot your machine, and check if it boots normally again without user intervention.
+
+[root@serverX ~]# systemctl reboot
+

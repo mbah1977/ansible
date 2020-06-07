@@ -1,0 +1,233 @@
+Troubleshooting SELinux
+setroubleshootd generates log messages in /var/log/messages.
+
+The sealert command displays useful information that helps with SELinux troubleshooting.
+
+Objectives
+After completing this section, students should be able to use SELinux log analysis tools.
+
+Troubleshooting SELinux issues
+What should be done when SELinux prevents access to files on a server? There is a sequence of steps that should be taken when this occurs.
+
+Before thinking of making any adjustments, consider that SELinux may be doing its job correctly by prohibiting the attempted access. If a web server tries to access files in /home, this could signal a compromise of the service if web content isn't published by users. If access should have been granted, then additional steps need to be taken to solve the problem.
+
+The most common SELinux issue is an incorrect file context. This can occur when a file is created in a location with one file context and moved into a place where a different context is expected. In most cases, running restorecon will correct the issue. Correcting issues in this way has a very narrow impact on the security of the rest of the system.
+
+Another remedy for a too-restrictive access could be the adjustment of a Boolean. For example, the ftpd_anon_write Boolean controls whether anonymous FTP users can upload files. This Boolean would have to be turned on if it is desirable to allow anonymous FTP users to upload files to a server. Adjusting Booleans requires more care because they can have a broad impact on system security.
+
+It is possible that the SELinux policy has a bug that prevents a legitimate access. Since SELinux has matured, this is a rare occurrence. When it is clear that a policy bug has been identified, contact Red Hat support to report the bug so it can be resolved.
+
+Monitoring SELinux violations
+Monitoring SELinux violations
+The setroubleshoot-server package must be installed to send SELinux messages to /var/log/messages. setroubleshoot-server listens for audit messages in /var/log/audit/audit.log and sends a short summary to /var/log/messages. This summary includes unique identifiers (UUIDs) for SELinux violations that can be used to gather further information. sealert -l UUID is used to produce a report for a specific incident. sealert -a /var/log/audit/audit.log is used to produce reports for all incidents in that file.
+
+Consider the following sample sequence of commands on a standard Apache web server:
+
+[root@serverX ~]# touch /root/file3
+[root@serverX ~]# mv /root/file3 /var/www/html
+[root@serverX ~]# systemctl start httpd
+[root@serverX ~]# curl http://localhost/file3
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>403 Forbidden</title>
+</head><body>
+<h1>Forbidden</h1>
+<p>You don't have permission to access /file3
+on this server.</p>
+</body></html>
+Even though the contents of file3 are expected, the web server returns a permission denied error. Inspecting both /var/log/audit/audit.log and /var/log/messages can reveal some extra information about this error.
+
+[root@serverX ~]# tail /var/log/audit/audit.log
+...
+type=AVC msg=audit(1392944135.482:429): avc:  denied  { getattr } for
+  pid=1609 comm="httpd" path="/var/www/html/file3" dev="vda1" ino=8980981
+  scontext=system_u:system_r:httpd_t:s0
+  tcontext=unconfined_u:object_r:admin_home_t:s0 tclass=file
+...
+[root@serverX ~]# tail /var/log/messages
+...
+Feb 20 19:55:42 serverX setroubleshoot: SELinux is preventing /usr/sbin/httpd
+  from getattr access on the file . For complete SELinux messages. run
+  sealert -l 613ca624-248d-48a2-a7d9-d28f5bbe2763
+Both log files indicate that an SELinux denial is the culprit. The sealert command detailed in /var/log/messages can provide some extra information, including a possible fix.
+
+[root@serverX ~]# sealert -l 613ca624-248d-48a2-a7d9-d28f5bbe2763
+SELinux is preventing /usr/sbin/httpd from getattr access on the file .
+
+*****  Plugin catchall (100. confidence) suggests   **************************
+
+If you believe that httpd should be allowed getattr access on the
+  file by default.
+Then you should report this as a bug.
+You can generate a local policy module to allow this access.
+Do
+allow this access for now by executing:
+# grep httpd /var/log/audit/audit.log | audit2allow -M mypol
+# semodule -i mypol.pp
+
+
+Additional Information:
+Source Context                system_u:system_r:httpd_t:s0
+Target Context                unconfined_u:object_r:admin_home_t:s0
+Target Objects                 [ file ]
+Source                        httpd
+Source Path                   /usr/sbin/httpd
+Port                          <Unknown>
+Host                          serverX.example.com
+Source RPM Packages           httpd-2.4.6-14.el7.x86_64
+Target RPM Packages           
+Policy RPM                    selinux-policy-3.12.1-124.el7.noarch
+Selinux Enabled               True
+Policy Type                   targeted
+Enforcing Mode                Enforcing
+Host Name                     serverX.example.com
+Platform                      Linux serverX.example.com 3.10.0-84.el7.x86_64 #1
+                              SMP Tue Feb 4 16:28:19 EST 2014 x86_64 x86_64
+Alert Count                   2
+First Seen                    2014-02-20 19:55:35 EST
+Last Seen                     2014-02-20 19:55:35 EST
+Local ID                      613ca624-248d-48a2-a7d9-d28f5bbe2763
+
+Raw Audit Messages
+type=AVC msg=audit(1392944135.482:429): avc:  denied  { getattr } for
+  pid=1609 comm="httpd" path="/var/www/html/file3" dev="vda1" ino=8980981
+  scontext=system_u:system_r:httpd_t:s0
+  tcontext=unconfined_u:object_r:admin_home_t:s0 tclass=file
+
+type=SYSCALL msg=audit(1392944135.482:429): arch=x86_64 syscall=lstat
+  success=no exit=EACCES a0=7f9fed0edea8 a1=7fff7bffc770 a2=7fff7bffc770
+  a3=0 items=0 ppid=1608 pid=1609 auid=4294967295 uid=48 gid=48 euid=48
+  suid=48 fsuid=48 egid=48 sgid=48 fsgid=48 tty=(none) ses=4294967295
+  comm=httpd exe=/usr/sbin/httpd subj=system_u:system_r:httpd_t:s0 key=(null)
+
+Hash: httpd,httpd_t,admin_home_t,file,getattr
+NOTE
+The “Raw Audit Messages” section reveals the target file that is the problem, /var/www/html/file3. Also, the target context, tcontext, doesn't look like it belongs with a web server. Use the restorecon /var/www/html/file3 command to fix the file context. If there are other files that need to be adjusted, restorecon can recursively reset the context: restorecon -R /var/www/.
+
+REFERENCES
+sealert(8) man page
+
+
+
+
+Guided Exercise: Practice: Troubleshooting SELinux
+In this lab, you will learn how to troubleshoot SELinux security denials.
+
+Changing the DocumentRoot of an Apache web server introduces SELinux access denials. In this exercise, you will see how that issue could have been identified and resolved.
+
+Resources
+Machines:	serverX
+Outcomes:
+
+You will get some experience using SELinux troubleshooting tools.
+
+The Apache web server should already be installed and running on serverX.example.com.
+
+You should have completed the steps of the “Changing SELinux Contexts” practice exercise.
+
+Log in as root on serverX. Remove the file context rule created earlier and restore the /custom directory structure back to its original SELinux context.
+
+Remove the file context rule you added in the earlier lab.
+
+[root@serverX ~]# semanage fcontext -d -t httpd_sys_content_t '/custom(/.*)?'
+Change the file contexts to their original values.
+
+[root@serverX ~]# restorecon -Rv /custom
+restorecon reset /custom context unconfined_u:object_r:httpd_sys_content_t:s0
+  ->unconfined_u:object_r:default_t:s0
+restorecon reset /custom/index.html context unconfined_u:object_r:httpd_sys_
+  content_t:s0->unconfined_u:object_r:default_t:s0
+Open a web browser on serverX and try to view the following URL: http://localhost/index.html. You will get an error message that says you do not have permission to access the file.
+
+View the contents of /var/log/messages. You should see some output similar to the following:
+
+[root@serverX ~]# less /var/log/messages
+[... Output omitted ...]
+Feb 19 12:00:35 serverX setroubleshoot: SELinux is preventing /usr/sbin/httpd
+from getattr access on the file . For complete SELinux messages. run
+  sealert -l 82ead554-c3cb-4664-85ff-e6f256437c6c
+[... Output omitted ...]
+Run the suggested sealert command and see if you can identify the issue and a possible resolution.
+
+[root@serverX ~]# sealert -l 82ead554-c3cb-4664-85ff-e6f256437c6c
+SELinux is preventing /usr/sbin/httpd from getattr access on the file .
+
+*****  Plugin catchall_labels (83.8 confidence) suggests   *******************
+
+If you want to allow httpd to have getattr access on the  file
+Then you need to change the label on $FIX_TARGET_PATH
+Do
+# semanage fcontext -a -t FILE_TYPE '$FIX_TARGET_PATH'
+where FILE_TYPE is one of the following: NetworkManager_log_t, ...,
+httpd_sys_content_t, httpd_sys_htaccess_t, httpd_sys_ra_content_t,
+httpd_sys_rw_content_t, httpd_sys_script_exec_t, httpd_tmp_t, ...
+Then execute: 
+restorecon -v '$FIX_TARGET_PATH'
+
+*****  Plugin catchall (17.1 confidence) suggests   **************************
+
+If you believe that httpd should be allowed getattr access on the  file by
+  default.
+Then you should report this as a bug.
+You can generate a local policy module to allow this access.
+Do
+allow this access for now by executing:
+# grep httpd /var/log/audit/audit.log | audit2allow -M mypol
+# semodule -i mypol.pp
+
+Additional Information:
+Source Context                system_u:system_r:httpd_t:s0
+Target Context                unconfined_u:object_r:default_t:s0
+Target Objects                 [ file ]
+Source                        httpd
+Source Path                   /usr/sbin/httpd
+Port                          <Unknown>
+Host                          serverX.example.com
+Source RPM Packages           httpd-2.4.6-14.el7.x86_64
+Target RPM Packages           
+Policy RPM                    selinux-policy-3.12.1-124.el7.noarch
+Selinux Enabled               True
+Policy Type                   targeted
+Enforcing Mode                Enforcing
+Host Name                     serverX.example.com
+Platform                      Linux serverX.example.com 3.10.0-84.el7.x86_64 #1
+                              SMP Tue Feb 4 16:28:19 EST 2014 x86_64 x86_64
+Alert Count                   9
+First Seen                    2014-02-19 10:33:06 EST
+Last Seen                     2014-02-19 12:00:32 EST
+Local ID                      82ead554-c3cb-4664-85ff-e6f256437c6c
+
+Raw Audit Messages
+type=AVC msg=audit(1392829232.3:1782): avc:  denied  { getattr } for
+  pid=11870 comm="httpd" path="/custom/index.html" dev="vda1" ino=11520682
+  scontext=system_u:system_r:httpd_t:s0
+  tcontext=unconfined_u:object_r:default_t:s0 tclass=file
+
+type=SYSCALL msg=audit(1392829232.3:1782): arch=x86_64 syscall=lstat success=no
+  exit=EACCES a0=7f1854a3b068 a1=7fff493f2ff0 a2=7fff493f2ff0
+  a3=ffffffffffffffff items=0 ppid=11866 pid=11870 auid=4294967295 uid=48
+  gid=48 euid=48 suid=48 fsuid=48 egid=48 sgid=48 fsgid=48 tty=(none)
+  ses=4294967295 comm=httpd exe=/usr/sbin/httpd
+  subj=system_u:system_r:httpd_t:s0 key=(null)
+
+Hash: httpd,httpd_t,default_t,file,getattr
+Read the output from the sealert command. Identify which file the Apache web server is having trouble with and look for a possible remedy.
+
+At the top of the output, a solution is recommended.
+
+# semanage fcontext -a -t FILE_TYPE '$FIX_TARGET_PATH'
+where FILE_TYPE is one of the following: NetworkManager_log_t, ...,
+  httpd_sys_content_t, httpd_sys_htaccess_t, httpd_sys_ra_content_t,
+  httpd_sys_rw_content_t, httpd_sys_script_exec_t, httpd_tmp_t, ...
+Then execute: 
+restorecon -v '$FIX_TARGET_PATH'
+Look at the raw AVC message to identify the relevant process and file that is causing the alert.
+
+Raw Audit Messages
+type=AVC msg=audit(1392829232.3:1782): avc:  denied  { getattr } for
+  pid=11870 comm="httpd" path="/custom/index.html" dev="vda1" ino=11520682
+  scontext=system_u:system_r:httpd_t:s0
+  tcontext=unconfined_u:object_r:default_t:s0 tclass=file
+The process involved in the security denial is the httpd Apache web server and the file is /custom/index.html.
+
+Earlier, we resolved this issue using semanage and restorecon. You must decide if this SELinux violation is a security breach or if it is a legitimate access that requires SELinux to be adjusted to handle a non-standard directory structure.

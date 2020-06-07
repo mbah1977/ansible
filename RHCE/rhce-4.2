@@ -1,0 +1,248 @@
+iManaging Default Permissions and File Access
+Explain how default permissions are set by the system and use umask and SGID to control automatic access to files.
+
+Objectives
+After completing this section, students should be able to configure a directory in which newly created files are automatically writable by members of the group which owns the directory, using special permissions and default umask settings.
+
+Special permissions
+The setuid (or setgid) permission on an executable file means that the command will run as the user (or group) of the file, not as the user that ran the command. One example is the passwd command:
+
+[student@desktopX ~]$ ls -l /usr/bin/passwd
+-rwsr-xr-x. 1 root root 35504 Jul 16  2010 /usr/bin/passwd
+In a long listing, you can spot the setuid permissions by a lowercase s where you would normally expect the x (owner execute permissions) to be. If the owner does not have execute permissions, this will be replaced by an uppercase S.
+
+The sticky bit for a directory sets a special restriction on deletion of files: Only the owner of the file (and root) can delete files within the directory. An example is /tmp:
+
+[student@desktopX ~]$ ls -ld /tmp
+drwxrwxrwt. 39 root root 4096 Feb  8 20:52 /tmp
+In a long listing, you can spot the sticky permissions by a lowercase t where you would normally expect the x (other execute permissions) to be. If the other does not have execute permissions, this will be replaced by an uppercase T.
+
+Lastly, setgid on a directory means that files created in the directory will inherit the group affiliation from the directory, rather than inheriting it from the creating user. This is commonly used on group collaborative directories to automatically change a file from the default private group to the shared group.
+
+In a long listing, you can spot the setgid permissions by a lowercase s where you would normally expect the x (group execute permissions) to be. If the group does not have execute permissions, this will be replaced by an uppercase S.
+
+Table 4.1. Effects of special permissions on files and directories
+
+Special permission
+
+Effect on files
+
+Effect on directories
+
+u+s (suid)
+
+File executes as the user that owns the file, not the user that ran the file.
+
+No effect.
+
+g+s (sgid)
+
+File executes as the group that owns the file.
+
+Files newly created in the directory have their group owner set to match the group owner of the directory.
+
+o+t (sticky)
+
+No effect.
+
+Users with write on the directory can only remove files that they own; they cannot remove or force saves to files owned by other users.
+
+
+Setting special permissions
+
+Symbolically: setuid = u+s; setgid = g+s; sticky = o+t
+
+Numerically (fourth preceding digit): setuid = 4; setgid = 2; sticky = 1
+
+Examples
+
+Add the setgid bit on directory:
+
+[root@desktopX ~]# chmod g+s directory
+Set the setgid bit, and read/write/execute for user and group on directory:
+
+[root@desktopX ~]# chmod 2770 directory
+Default file permissions
+The default permissions for files are set by the processes that create them. For example, text editors create files so they are readable and writeable, but not executable, by everyone. The same goes for shell redirection. Additionally, binary executables are created executable by the compilers that create them. The mkdir command creates new directories with all permissions set—read, write, and execute.
+
+Experience shows that these permissions are not typically set when new files and directories are created. This is because some of the permissions are cleared by the umask of the shell process. The umask command without arguments will display the current value of the shell's umask:
+
+[student@desktopX ~]$ umask
+0002
+Every process on the system has a umask, which is an octal bitmask that is used to clear the permissions of new files and directories that are created by the process. If a bit is set in the umask, then the corresponding permission is cleared in new files. For example, the previous umask, 0002, clears the write bit for other users. The leading zeros indicate the special, user, and group permissions are not cleared. A umask of 077 clears all the group and other permissions of newly created files.
+
+Use the umask command with a single numeric argument to change the umask of the current shell. The numeric argument should be an octal value corresponding to the new umask value. If it is less than 3 digits, leading zeros are assumed.
+
+The system default umask values for Bash shell users are defined in the /etc/profile and /etc/bashrc files. Users can override the system defaults in their .bash_profile and .bashrc files.
+
+In this example, please follow along with the next steps while your instructor demonstrates the effects of umask on new files and directories.
+
+Create a new file and directory to see how the default umask affects permissions.
+
+[student@desktopX ~]$ touch newfile1
+[student@desktopX ~]$ ls -l newfile1
+-rw-rw-r--. 1 student student 0 May  9 01:54 newfile1
+[student@desktopX ~]$ mkdir newdir1
+[student@desktopX ~]$ ls -ld newdir1
+drwxrwxr-x. 2 student student 0 May  9 01:54 newdir1
+Set the umask value to 0. This setting will not mask any of the permissions of new files. Create a new file and directory to see how this new umask affects permissions.
+
+[student@desktopX ~]$ umask 0
+[student@desktopX ~]$ touch newfile2
+[student@desktopX ~]$ ls -l newfile2
+-rw-rw-rw-. 1 student student 0 May  9 01:54 newfile2
+[student@desktopX ~]$ mkdir newdir2
+[student@desktopX ~]$ ls -ld newdir2
+drwxrwxrwx. 2 student student 0 May  9 01:54 newdir2
+Set the umask value to 007. This setting will mask all of the “other” permissions of new files.
+
+[student@desktopX ~]$ umask 007
+[student@desktopX ~]$ touch newfile3
+[student@desktopX ~]$ ls -l newfile3
+-rw-rw----. 1 student student 0 May  9 01:55 newfile3
+[student@desktopX ~]$ mkdir newdir3
+[student@desktopX ~]$ ls -ld newdir3
+drwxrwx---. 2 student student 0 May  9 01:54 newdir3
+Set the umask value to 027. This setting will mask write access for group members and all of the “other” permissions of new files.
+
+[student@desktopX ~]$ umask 027
+[student@desktopX ~]$ touch newfile4
+[student@desktopX ~]$ ls -l newfile4
+-rw-r-----. 1 student student 0 May  9 01:55 newfile4
+[student@desktopX ~]$ mkdir newdir4
+[student@desktopX ~]$ ls -ld newdir4
+drwxr-x---. 2 student student 0 May  9 01:54 newdir4
+Log in as root to change the default umask for unprivileged users to prohibit all access for users not in their group.
+
+Modify /etc/bashrc and /etc/profile to change the default umask for Bash shell users. Since the default umask for unprivileged users is 0002, look for the umask command in these files that sets the umask to that value. Change them to set the umask to 007.
+
+[root@desktopX ~]# less /etc/bashrc
+    # You could check uidgid reservation validity in
+    # /usr/share/doc/setup-*/uidgid file
+    if [ $UID -gt 199 ] && [ "`id -gn`" = "`id -un`" ]; then
+       umask 002
+    else
+       umask 022
+    fi
+    
+    # Only display echos from profile.d scripts if we are no login shell
+[root@desktopX ~]# vim /etc/bashrc
+[root@desktopX ~]# less /etc/bashrc
+    # You could check uidgid reservation validity in
+    # /usr/share/doc/setup-*/uidgid file
+    if [ $UID -gt 199 ] && [ "`id -gn`" = "`id -un`" ]; then
+       umask 007
+    else
+       umask 022
+    fi
+    
+    # Only display echos from profile.d scripts if we are no login shell
+[root@desktopX ~]# less /etc/profile
+    # You could check uidgid reservation validity in
+    # /usr/share/doc/setup-*/uidgid file
+    if [ $UID -gt 199 ] && [ "`id -gn`" = "`id -un`" ]; then
+        umask 002
+    else
+        umask 022
+    fi
+    
+    for i in /etc/profile.d/*.sh ; do
+[root@desktopX ~]# vim /etc/profile
+[root@desktopX ~]# less /etc/profile
+    # You could check uidgid reservation validity in
+    # /usr/share/doc/setup-*/uidgid file
+    if [ $UID -gt 199 ] && [ "`id -gn`" = "`id -un`" ]; then
+        umask 007
+    else
+        umask 022
+    fi
+    
+    for i in /etc/profile.d/*.sh ; do
+Log back in as student and confirm that the umask changes you made are persistent.
+
+[student@desktopX ~]$ umask
+0007
+NOTE
+Other shells, such as tcsh, may have different system default initialization files in /etc and users' home directories.
+
+REFERENCES
+bash(1), ls(1), chmod(1), and umask(1) man pages
+
+
+
+
+Guided Exercise: Practice: Controlling New File Permissions and Ownership
+In this lab, you will control default permissions on new files using the umask command and setgid permission.
+
+Outcomes
+
+Create a shared directory where new files are automatically owned by the group ateam.
+
+Experiment with various umask settings.
+
+Adjust default permissions for specific users.
+
+Confirm your adjustment is correct.
+
+Reset your serverX system. Run lab permissions setup to create the alice account. The password for alice is password.
+
+Log in as alice on your serverX virtual machine and open a window with a Bash prompt. Use the umask command without arguments to display Alice's default umask value.
+
+[alice@serverX ~]$ umask
+0002
+Create a new directory /tmp/shared and a new file /tmp/shared/defaults to see how the default umask affects permissions.
+
+[alice@serverX ~]$ mkdir /tmp/shared
+[alice@serverX ~]$ ls -ld /tmp/shared
+drwxrwxr-x. 2 alice alice 6 Jan 26 18:43 /tmp/shared
+[alice@serverX ~]$ touch /tmp/shared/defaults
+[alice@serverX ~]$ ls -l /tmp/shared/defaults
+-rw-rw-r--. 1 alice alice 0 Jan 26 18:43 /tmp/shared/defaults
+Change the group ownership of /tmp/shared to ateam and record the new ownership and permissions.
+
+[alice@serverX ~]$ chown :ateam /tmp/shared
+[alice@serverX ~]$ ls -ld /tmp/shared
+drwxrwxr-x. 2 alice ateam 21 Jan 26 18:43 /tmp/shared
+Create a new file in /tmp/shared and record the ownership and permissions.
+
+[alice@serverX ~]$ touch /tmp/shared/alice3
+[alice@serverX ~]$ ls -l /tmp/shared/alice3
+-rw-rw-r--. 1 alice alice 0 Jan 26 18:46 /tmp/shared/alice3
+Ensure the permissions of /tmp/shared cause files created in that directory to inherit the group ownership of ateam.
+
+[alice@serverX ~]$ chmod g+s /tmp/shared
+[alice@serverX ~]$ ls -ld /tmp/shared
+drwxrwsr-x. 2 alice ateam 34 Jan 26 18:46 /tmp/shared
+[alice@serverX ~]$ touch /tmp/shared/alice4
+[alice@serverX ~]$ ls -l /tmp/shared/alice4
+-rw-rw-r--. 1 alice ateam 0 Jan 26 18:48 /tmp/shared/alice4
+Change the umask for alice such that new files are created with read-only access for the group and no access for other users. Create a new file and record the ownership and permissions.
+
+[alice@serverX ~]$ umask 027
+[alice@serverX ~]$ touch /tmp/shared/alice5
+[alice@serverX ~]$ ls -l /tmp/shared/alice5
+-rw-r-----. 1 alice ateam 0 Jan 26 18:48 /tmp/shared/alice5
+Open a new Bash shell as alice and view the umask.
+
+[alice@serverX ~]$ umask
+0027
+Change the default umask for alice to prohibit all access for users not in their group.
+
+[alice@serverX ~]# echo "umask 007" >> ~/.bashrc
+[alice@serverX ~]# cat ~/.bashrc
+# .bashrc
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+	. /etc/bashrc
+fi
+
+# Uncomment the following line if you don't like systemctl's auto-paging feature:
+# export SYSTEMD_PAGER=
+
+# User specific aliases and functions
+umask 007
+Log out and back into serverX as alice and confirm that the umask changes you made are persistent.
+
+[alice@serverX ~]$ umask
+0007

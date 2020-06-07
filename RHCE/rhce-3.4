@@ -1,0 +1,108 @@
+Managing Local Group Accounts
+Manage local groups with command-line tools.
+
+Objectives
+After completing this section, students should be able to create, modify, and delete locally defined group accounts.
+
+Managing supplementary groups
+A group must exist before a user can be added to that group. Several command-line tools are used to manage local group accounts.
+
+groupadd creates groups
+
+groupadd groupname without options uses the next available GID from the range specified in the /etc/login.defs file.
+
+The -g GID option is used to specify a specific GID.
+
+[student@serverX ~]$ sudo groupadd -g 5000 ateam
+NOTE
+Given the automatic creation of user private groups (GID 1000+), it is generally recommended to set aside a range of GID numbers to be used for supplementary groups. A higher range will avoid a collision with a system group (GID 0-999).
+
+The -r option will create a system group using a GID from the range of valid system GID numbers listed in the /etc/login.defs file.
+
+[student@serverX ~]$ sudo groupadd -r appusers
+groupmod modifies existing groups
+
+The groupmod command is used to change a group name to a GID mapping. The -n option is used to specify a new name.
+
+[student@serverX ~]$ sudo groupmod -n javaapp appusers
+The -g option is used to specify a new GID.
+
+[student@serverX ~]$ sudo groupmod -g 6000 ateam
+groupdel deletes a group
+
+The groupdel command will remove a group.
+
+[student@serverX ~]$ sudo groupdel javaapp
+A group may not be removed if it is the primary group of any existing user. As with userdel, check all file systems to ensure that no files remain owned by the group.
+
+usermod alters group membership
+
+The membership of a group is controlled with user management. Change a user's primary group with usermod -g groupname.
+
+[student@serverX ~]$ sudo usermod -g student student
+Add a user to a supplementary group with usermod -aG groupname username.
+
+[student@serverX ~]$ sudo usermod -aG wheel elvis
+IMPORTANT
+The use of the -a option makes usermod function in "append" mode. Without it, the user would be removed from all other supplementary groups.
+
+REFERENCES
+group(5), groupadd(8), groupdel(8), and usermod(8) man pages
+
+
+
+
+Guided Exercise: Practice: Managing Groups Using Command-line Tools
+In this lab, you will add users to newly created supplementary groups.
+
+Outcomes
+
+The shakespeare group consists of juliet, romeo, and hamlet. The artists group contains reba, dolly, and elvis.
+
+Perform the following steps on serverX unless directed otherwise.
+
+Become the root user at the shell prompt.
+
+[student@serverX ~]$ su -
+Password: redhat
+Create a supplementary group called shakespeare with a group ID of 30000.
+
+[root@serverX ~]# groupadd -g 30000 shakespeare
+Create a supplementary group called artists.
+
+[root@serverX ~]# groupadd artists
+Confirm that shakespeare and artists have been added by examining the /etc/group file.
+
+[root@serverX ~]# tail -5 /etc/group
+reba:x:1004:
+dolly:x:1005:
+elvis:x:1006:
+shakespeare:x:30000:
+artists:x:30001:
+Add the juliet user to the shakespeare group as a supplementary group.
+
+[root@serverX ~]# usermod -G shakespeare juliet
+Confirm that juliet has been added using the id command.
+
+[root@serverX ~]# id juliet
+uid=1001(juliet) gid=1001(juliet) groups=1001(juliet),30000(shakespeare)
+Continue adding the remaining users to groups as follows:
+
+Add romeo and hamlet to the shakespeare group.
+
+[root@serverX ~]# usermod -G shakespeare romeo
+[root@serverX ~]# usermod -G shakespeare hamlet
+Add reba, dolly, and elvis to the artists group.
+
+[root@serverX ~]# usermod -G artists reba
+[root@serverX ~]# usermod -G artists dolly
+[root@serverX ~]# usermod -G artists elvis
+Verify the supplemental group memberships by examining the /etc/group file.
+
+[root@serverX ~]# tail -5 /etc/group
+reba:x:1004:
+dolly:x:1005:
+elvis:x:1006:
+shakespeare:x:30000:juliet,romeo,hamlet
+artists:x:30001:reba,dolly,elvis
+

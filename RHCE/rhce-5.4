@@ -1,0 +1,89 @@
+Changing SELinux Booleans
+setsebool activates/deactivates SELinux policy rules.
+
+semanage boolean -l displays the persistent value of SELinux Booleans.
+
+Man pages that end with _selinux often provide useful information about SELinux Booleans.
+
+Objectives
+After completing this section, students should be able to use SELinux Booleans to make adjustments to policy behavior.
+
+Managing SELinux Booleans
+SELinux Booleans
+SELinux Booleans are switches that change the behavior of the SELinux policy. SELinux Booleans are rules that can be enabled or disabled. They can be used by security administrators to tune the policy to make selective adjustments.
+
+The selinux-policy-devel package provides many manual pages, *_selinux(8), which explain the purpose of the Booleans available for various services. If this package has been installed, the man -k '_selinux' command can list these documents.
+
+The getsebool command is used to display SELinux Booleans and setsebool is used to modify them. setsebool -P modifies the SELinux policy to make the modification persistent. semanage boolean -l will show whether or not a Boolean is persistent, along with a short description of the Boolean.
+
+[root@serverX ~]# getsebool -a
+abrt_anon_write --> off
+abrt_handle_event --> off
+abrt_upload_watch_anon_write --> on
+antivirus_can_scan_system --> off
+antivirus_use_jit --> off
+...
+[root@serverX ~]# getsebool httpd_enable_homedirs
+httpd_enable_homedirs --> off
+[root@serverX ~]# setsebool httpd_enable_homedirs on
+[root@serverX ~]# semanage boolean -l | grep httpd_enable_homedirs
+httpd_enable_homedirs          (on   ,  off)  Allow httpd to enable homedirs
+[root@serverX ~]# getsebool httpd_enable_homedirs
+httpd_enable_homedirs --> on
+[root@serverX ~]# setsebool -P httpd_enable_homedirs on
+[root@serverX ~]# semanage boolean -l | grep httpd_enable_homedirs
+httpd_enable_homedirs          (on   ,   on)  Allow httpd to enable homedirs
+To only list local modifications to the state of the SELinux booleans (any setting that differs from the default in the policy), the command semanage boolean -l -C can be used.
+
+[root@serverX ~]# semanage boolean -l -C
+SELinux boolean                State  Default Description
+
+cron_can_relabel               (off   ,   on)  Allow cron to can relabel
+REFERENCES
+booleans(8), getsebool(8), setsebool(8), semanage(8), semanage-boolean(8) man pages
+
+
+Guided Exercise: Practice: Changing SELinux Booleans
+Apache can publish web content hosted in users' home directories, but SELinux prevents this by default. In this exercise, you will identify and change the SELinux Boolean that will permit Apache to access user home directories.
+
+Resources
+Files:	/etc/httpd/conf.d/userdir.conf
+Machines:	serverX
+Outcomes:
+
+You will have a web server that publishes web content from users' home directories.
+
+The Apache web server should already be installed and running on serverX.example.com.
+
+Log in as root on serverX. Enable the Apache feature that permits users to publish web content from their home directories. Edit the /etc/httpd/conf.d/userdir.conf configuration file and change the line with the UserDir directive to read as follows:
+
+    UserDir public_html
+[root@serverX ~]# vi /etc/httpd/conf.d/userdir.conf
+[root@serverX ~]# grep '^ *UserDir' /etc/httpd/conf.d/userdir.conf
+    UserDir public_html
+Restart the Apache web service to make the changes take effect.
+
+[root@serverX ~]# systemctl restart httpd
+Create some web content that is published from a user's home directory.
+
+Log in as student in another window and create a public_html directory.
+
+[student@serverX ~]$ mkdir ~/public_html
+Create some content in a index.html file.
+
+[student@serverX ~]$ echo 'This is student content on serverX.' > ~/public_html/index.html
+Change the permissions on student's home directory so Apache can access the public_html subdirectory.
+
+[student@serverX ~]$ chmod 711 ~
+Open a web browser on serverX and try to view the following URL: http://localhost/~student/index.html. You will get an error message that says you do not have permission to access the file.
+
+In your root window, use the getsebool command to see if there are any Booleans that restrict access to home directories.
+
+[root@serverX ~]# getsebool -a | grep home
+[... Output omitted ...]
+httpd_enable_homedirs --> off
+[... Output omitted ...]
+Use setsebool to enable home directory access persistently.
+
+[root@serverX ~]# setsebool -P httpd_enable_homedirs on
+Try to view http://localhost/~student/index.html again. You should see the message “This is student content on serverX.”

@@ -1,0 +1,197 @@
+The Red Hat Enterprise Linux Boot Process
+The Red Hat Enterprise Linux 7 boot process can be broken down into four steps:
+
+Hardware (BIOS/UEFI)
+
+Boot loader (grub2)
+
+kernel and initramfs
+
+systemd
+
+systemctl reboot and systemctl poweroff reboot and power down a system, respectively.
+
+systemctl isolate desired.target switches to a new target at runtime.
+
+systemctl get-default and systemctl set-default can be used to query and set the default target.
+
+systemd.unit= on the kernel command line selects a different target at boot.
+
+Objectives
+After completing this section, students should be able to describe and influence the Red Hat Enterprise Linux boot process.
+
+The Red Hat Enterprise Linux 7 boot process
+Modern computer systems are complex combinations of hardware and software. Starting from an undefined, powered-down state to a running system with a (graphical) login prompt requires a large number of pieces of hardware and software to work together. The following list gives a high-level overview of the tasks involved for a physical x86_64 system booting Red Hat Enterprise Linux 7. The list for x86_64 virtual machines is roughly the same, but some of the hardware-specific steps are handled in software by the hypervisor.
+
+The machine is powered on. The system firmware (either modern UEFI or more old-fashioned BIOS) runs a Power On Self Test (POST), and starts to initialize some of the hardware.
+
+Configured using: The system BIOS/UEFI configuration screens, typically reached by pressing a certain key combination—e.g., F2—early during the boot process.
+
+The system firmware searches for a bootable device, either configured in the UEFI boot firmware or by searching for a Master Boot Record (MBR) on all disks, in the order configured in the BIOS.
+
+Configured using: The system BIOS/UEFI configuration screens, typically reached by pressing a certain key combination—e.g., F2—early during the boot process.
+
+The system firmware reads a boot loader from disk, then passes control of the system to the boot loader. On a Red Hat Enterprise Linux 7 system, this will typically be grub2.
+
+Configured using: grub2-install
+
+The boot loader loads its configuration from disk, and presents the user with a menu of possible configurations to boot.
+
+Configured using: /etc/grub.d/, /etc/default/grub, and (not manually) /boot/grub2/grub.cfg.
+
+After the user has made a choice (or an automatic timeout has happened), the boot loader loads the configured kernel and initramfs from disk and places them in memory. An initramfs is a gzip-ed cpio archive containing kernel modules for all hardware necessary at boot, init scripts, and more. On Red Hat Enterprise Linux 7, the initramfs contains an entire usable system by itself.
+
+Configured using: /etc/dracut.conf
+
+The boot loader hands control of the system over to the kernel, passing in any options specified on the kernel command line in the boot loader, and the location of the initramfs in memory.
+
+Configured using: /etc/grub.d/, /etc/default/grub, and (not manually) /boot/grub2/grub.cfg.
+
+The kernel initializes all hardware for which it can find a driver in the initramfs, then executes /sbin/init from the initramfs as PID 1. On Red Hat Enterprise Linux 7, the initramfs contains a working copy of systemd as /sbin/init, as well as a udev daemon.
+
+Configured using: init= command-line parameter.
+
+The systemd instance from the initramfs executes all units for the initrd.target target. This includes mounting the actual root file system on /sysroot.
+
+Configured using: /etc/fstab
+
+The kernel root file system is switched (pivoted) from the initramfs root file system to the system root file system that was previously mounted on /sysroot. systemd then re-executes itself using the copy of systemd installed on the system.
+
+systemd looks for a default target, either passed in from the kernel command line or configured on the system, then starts (and stops) units to comply with the configuration for that target, solving dependencies between units automatically. In its essence, a systemd target is a set of units that should be activated to reach a desired system state. These targets will typically include at least a text-based login or a graphical login screen being spawned.
+
+Configured using: /etc/systemd/system/default.target, /etc/systemd/system/
+
+Boot, reboot, and shut down
+To power off or reboot a running system from the command line, administrators can use the systemctl command.
+
+systemctl poweroff will stop all running services, unmount all file systems (or remount them read-only when they cannot be unmounted), and then power down the system.
+
+systemctl reboot will stop all running services, unmount all file systems, and then reboot the system.
+
+For the ease of backward compatibility, the poweroff and reboot commands still exist, but in Red Hat Enterprise Linux 7 they are symbolic links to the systemctl tool.
+
+IMPORTANT
+systemctl halt and halt are also available to stop the system, but unlike their poweroff equivalents, these commands do not power off the system; they bring a system down to a point where it is safe to manually power it off.
+
+Selecting a systemd target
+Systemd targets
+A systemd target is a set of systemd units that should be started to reach a desired state. The most important of these targets are listed in the following table.
+
+Target	Purpose
+graphical.target	System supports multiple users, graphical and text-based logins.
+multi-user.target	System supports multiple users, text-based logins only.
+rescue.target	sulogin prompt, basic system initialization completed.
+emergency.target	sulogin prompt, initramfs pivot complete and system root mounted on / read-only.
+It is possible for a target to be a part of another target; for example, the graphical.target includes multi-user.target, which in turn depends on basic.target and others. These dependencies can be viewed from the command line with the following command:
+
+[root@serverX ~]# systemctl list-dependencies graphical.target | grep target
+An overview of all available targets can be viewed with:
+
+[root@serverX ~]# systemctl list-units --type=target --all
+An overview of all targets installed on disk can be viewed with:
+
+[root@serverX ~]# systemctl list-unit-files --type=target --all
+Selecting a target at runtime
+
+On a running system, administrators can choose to switch to a different target using the systemctl isolate command; for example:
+
+[root@serverX ~]# systemctl isolate multi-user.target
+Isolating a target will stop all services not required by that target (and its dependencies), and start any required services that have not yet been started.
+
+NOTE
+Not all targets can be isolated. Only targets that have AllowIsolate=yes set in their unit files can be isolated; for example, the graphical.target target can be isolated, but the cryptsetup.target target cannot.
+
+Setting a default target
+
+When the system starts, and control is passed over to systemd from the initramfs, systemd will try to activate the default.target target. Normally the default.target target will be a symbolic link (in /etc/systemd/system/) to either graphical.target or multi-user.target.
+
+Instead of editing this symbolic link by hand, the systemctl tool comes with two commands to manage this link: get-default and set-default.
+
+[root@serverX ~]# systemctl get-default
+multi-user.target
+[root@serverX ~]# systemctl set-default graphical.target
+rm '/etc/systemd/system/default.target'
+ln -s '/usr/lib/systemd/system/graphical.target' '/etc/systemd/system/default.target'
+[root@serverX ~]# systemctl get-default
+graphical.target
+Selecting a different target at boot time
+
+To select a different target at boot time, a special option can be appended to the kernel command line from the boot loader: systemd.unit=.
+
+For example, to boot the system into a rescue shell where configuration changes can be made without (almost) any service running, the following can be appended from the interactive boot loader menu before starting:
+
+systemd.unit=rescue.target
+This configuration change will only affect a single boot, making it a useful tool for troubleshooting the boot process.
+
+To use this method of selecting a different target, use the following procedure for Red Hat Enterprise Linux 7 systems:
+
+(Re)boot the system.
+
+Interrupt the boot loader menu countdown by pressing any key.
+
+Move the cursor to the entry to be started.
+
+Press e to edit the current entry.
+
+Move the cursor to the line that starts with linux16. This is the kernel command line.
+
+Append systemd.unit=desired.target.
+
+Press Ctrl+x to boot with these changes.
+
+REFERENCES
+bootup(7), dracut.bootup(7), systemd.target(5), systemd.special(7), sulogin(8), and systemctl(1) man pages
+
+info grub2 (GNU GRUB Manual)
+
+
+
+
+Guided Exercise: Practice: Selecting a Boot Target
+In this lab, you will configure your serverX system to boot into different targets.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+A system booted into different targets.
+
+Reset your serverX system.
+
+On your serverX system, switch to the multi-user target manually without rebooting.
+
+[student@serverX ~]$ sudo systemctl isolate multi-user.target
+Log into a text-based console as root.
+
+Configure your serverX to automatically boot into the multi-user target after a reboot, then reboot your serverX system to verify.
+
+[root@serverX ~]# systemctl set-default multi-user.target
+rm '/etc/systemd/system/default.target'
+ln -s '/usr/lib/systemd/system/multi-user.target' '/etc/systemd/system/default.target'
+[root@serverX ~]# systemctl reboot
+Reboot your serverX system, then from within the boot loader menu, boot into the rescue target.
+
+Reboot your serverX machine.
+
+[root@serverX ~]# systemctl reboot
+Interrupt the boot loader when the menu appears by pressing any key.
+
+Move the selection to the default entry (the first one) using the cursor keys.
+
+Press e to edit the current entry.
+
+Move the cursor to the line that starts with linux16.
+
+Move the cursor to the end of the line (using the End key), and append the following text:
+
+systemd.unit=rescue.target
+Press Ctrl+x to boot using the modified configuration.
+
+When prompted for the root password, enter redhat.
+
+Set the default systemd target back to the graphical target.
+
+[root@serverX ~]# systemctl set-default graphical.target
+Press Ctrl+d to continue booting into the (new) default target.
+
+

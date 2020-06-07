@@ -1,0 +1,157 @@
+Repairing Common Boot Issues
+Use rd.break on the kernel command line to interrupt the boot process before control is handed over from the initramfs. The system will be mounted (read-only) under /sysroot.
+
+journalctl can be used to filter for specific boots with the -b option.
+
+The debug-shell.service service can be used to get an automatic root shell early during boot.
+
+Objectives
+After completing this section, students should be able to repair common boot issues.
+
+Recovering the root password
+One task that every system administrator should be able to accomplish is recovering a lost root password. If the administrator is still logged in, either as an unprivileged user but with full sudo access, or as root, this task is trivial. When the administrator is not logged in, this task becomes slightly more involved.
+
+Recovering the root password
+A number of methods exist to set a new root password. A system administrator could, for example, boot the system using a Live CD, mount the root file system from there, and edit /etc/shadow. In this section, we will explore a method that does not require the use of external media.
+
+NOTE
+On Red Hat Enterprise Linux 6 and earlier, an administrator could boot the system into runlevel 1, and be presented with a root prompt. The closest analogs to runlevel 1 on a Red Hat Enterprise Linux 7 machine are the rescue.target and emergency.target targets, both of which require the root password to log in.
+
+On Red Hat Enterprise Linux 7, it is possible to have the scripts that run from the initramfs pause at certain points, provide a root shell, and then continue when that shell exits. While this is mostly meant for debugging, it can also be used to recover a lost root password:
+
+Reboot the system.
+
+Interrupt the boot loader countdown by pressing any key.
+
+Move the cursor to the entry that needs to be booted.
+
+Press e to edit the selected entry.
+
+Move the cursor to the kernel command line (the line that starts with linux16).
+
+Append rd.break (this will break just before control is handed from the initramfs to the actual system).
+
+NOTE
+The initramfs prompt will show up on whatever console is specified last on the kernel commandline.
+
+Press Ctrl+x to boot with the changes.
+
+NOTE
+Pre-built images may place multiple console= arguments to the kernel to support a wide array of implementation scenarios. The caveat with rd.break is that while many of the kernel messages will be sent to all consoles, the prompt will ultimately use whichever console is last. If you do not get your prompt, you may want to temporarily re-order the console= arguments.
+
+At this point, a root shell will be presented, with the root file system for the actual system mounted read-only on /sysroot.
+
+IMPORTANT
+SELinux is not yet enabled at this point, so any new files being created will not have an SELinux context assigned to them. Keep in mind that some tools (such as passwd) first create a new file, then move it in place of the file they are intended to edit, effectively creating a new file without an SELinux context.
+
+To recover the root password from this point, use the following procedure:
+
+Remount /sysroot as read-write.
+
+switch_root:/# mount -o remount,rw /sysroot
+Switch into a chroot jail, where /sysroot is treated as the root of the file system tree.
+
+switch_root:/# chroot /sysroot
+Set a new root password:
+
+sh-4.2# passwd root
+Make sure that all unlabeled files (including /etc/shadow at this point) get relabeled during boot.
+
+sh-4.2# touch /.autorelabel
+Type exit twice. The first will exit the chroot jail, and the second will exit the initramfs debug shell.
+
+At this point, the system will continue booting, perform a full SELinux relabel, then reboot again.
+
+Using journalctl
+It can be useful to look at the logs of previous (failed) boots. If the journald log has been made persistent, this can be done with the journalctl tool.
+
+First make sure that you have persistent journald logging enabled:
+
+[root@serverX ~]# mkdir -p -m2775 /var/log/journal
+[root@serverX ~]# chown :systemd-journal /var/log/journal
+[root@serverX ~]# killall -USR1 systemd-journald
+To inspect the log files for a previous boot, use the -b option to journalctl. Without any arguments, the -b option will filter output only to messages pertaining to this boot, but with a negative number as an argument, it will filter on previous boots. For example:
+
+[root@serverX ~]# journalctl -b-1 -p err
+This command will show all messages rated as an error or worse from the previous boot.
+
+Diagnose and repair systemd boot issues
+If there are problems during the starting of services, there are a couple of tools available to system administrators that can help with debugging and/or troubleshooting:
+
+Early debug shell
+
+By running systemctl enable debug-shell.service, a root shell will be spawned on TTY9 (Ctrl+Alt+F9) early during the boot sequence. This shell is automatically logged in as root, so that an administrator can use some of the other debugging tools while the system is still booting.
+
+WARNING
+Do not forget to disable the debug-shell.service service when you are done debugging, as it leaves an unauthenticated root shell open to anyone with local console access.
+
+Emergency and rescue targets
+
+By appending either systemd.unit=rescue.target or systemd.unit=emergency.target to the kernel command line from the boot loader, the system will spawn into a special rescue or emergency shell instead of starting normally. Both of these shells require the root password. The emergency target keeps the root file system mounted read-only, while rescue.target waits for sysinit.target to complete first so that more of the system will be initialized (e.g., logging, file systems, etc.).
+
+These shells can be used to fix any issues that prevent the system from booting normally; for example, a dependency loop between services, or an incorrect entry in /etc/fstab. Exiting from these shells will continue with the regular boot process.
+
+Stuck jobs
+
+During startup, systemd spawns a number of jobs. If some of these jobs cannot complete, they will block other jobs from running. To inspect the current job list, an administrator can use the command systemctl list-jobs. Any jobs listed as running must complete before the jobs listed as waiting can continue.
+
+REFERENCES
+dracut.cmdline(7), systemd-journald(8), journalctl(1), sushell(8), and systemctl(1) man pages
+
+/usr/lib/systemd/system/debug-shell.service
+
+
+
+
+Guided Exercise: Practice: Resetting a Lost root Password
+In this lab, you will recover a lost root password.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+A recovered root password.
+
+Reset your serverX system.
+
+Log in and set up your serverX system:
+
+[student@serverX ~]$ lab rootpw setup
+The lab rootpw setup script has just reset your root password to a random string and rebooted your system. Without using sudo, break into your own system and reset the root password back to redhat.
+
+Reboot your system, and interrupt the countdown in the boot loader menu.
+
+Send a Ctrl+Alt+Del to your system using the relevant button or menu entry.
+
+When the boot loader menu appears, press any key to interrupt the countdown.
+
+Edit the default boot loader entry (in memory) to abort the boot process just after all file systems have been mounted, but before control is handed over to systemd, then boot.
+
+Use the cursor keys to highlight the default boot loader entry.
+
+Press e to edit the current entry.
+
+Using the cursor keys, navigate to the line that starts with linux16.
+
+Press End to move the cursor to the end of the line.
+
+Append rd.break to the end of the line.
+
+Press Ctrl+x to boot using the modified config.
+
+At the switch_root prompt, remount the /sysroot file systemd read-write, then use chroot to go into a chroot jail at /sysroot.
+
+switch_root:/# mount -o remount,rw /sysroot
+switch_root:/# chroot /sysroot
+Change the root password back to redhat.
+
+sh-4.2# echo redhat | passwd --stdin root
+Configure the system to automatically perform a full SELinux relabel after boot. This is necessary since the passwd tool re-created the /etc/shadow file without an SELinux context.
+
+sh-4.2# touch /.autorelabel
+Type exit twice to continue booting your system as normal. The system will run an SELinux relabel, then reboot again by itself.
+
+Verify your work by running the following command:
+
+[student@serverX ~]$ lab rootpw grade
+

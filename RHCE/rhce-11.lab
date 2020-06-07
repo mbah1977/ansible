@@ -1,0 +1,58 @@
+
+Lab: Lab: Analyzing and Storing Logs
+In this lab, students will change the time zone and log all authentication failure log entries into a separate file.
+
+Outcomes:
+
+On serverX, the timezone is set correctly for Jamaica, a command is run to display all journal entries recorded in the last 30 minutes, and rsyslog is configured to send all authpriv facility messages with alert or higher priority to a new log file, /var/log/auth-errors.
+
+Reset your serverX system.
+
+Your serverX machine has been relocated to Jamaica. Change the time zone on the serverX machine to Jamaica and verify the time zone has been changed properly.
+
+Identify the correct time zone for Jamaica on serverX.
+
+[root@serverX ~]# timedatectl list-timezones
+Africa/Abidjan
+Africa/Accra
+Africa/Addis_Ababa
+Africa/Algiers
+Africa/Asmara
+...
+America/Jamaica
+...
+Change the time zone to Jamaica on serverX.
+
+[root@serverX ~]# timedatectl set-timezone America/Jamaica
+Verify the time zone has been properly set on serverX.
+
+[root@serverX ~]# timedatectl
+      Local time: Thu 2014-02-13 11:16:59 EST
+  Universal time: Thu 2014-02-13 16:16:59 UTC
+        RTC time: Thu 2014-02-13 16:17:00
+        Timezone: America/Jamaica (EST, -0500)
+     NTP enabled: yes
+NTP synchronized: no
+ RTC in local TZ: no
+      DST active: n/a
+Display all systemd journal entries recorded in the last 30 minutes on serverX.
+
+Assuming the current time is 9:30:00, the following command would be used
+
+[root@serverX ~]# journalctl --since 9:00:00 --until 9:30:00
+Configure rsyslogd so that it records syslog messages related to authentication and security issues that have priority alert or higher to the file /var/log/auth-errors. Use the file /etc/rsyslog.d/auth-errors.conf to do this, creating the file if necessary. Test these changes by using the logger command.
+
+Add the directive to log authpriv.alert syslog messages to the /var/log/auth-errors file in the /etc/rsyslog.d/auth-errors.conf configuration file.
+
+[root@serverX ~]# echo "authpriv.alert /var/log/auth-errors" >/etc/rsyslog.d/auth-errors.conf
+Restart the rsyslog service on serverX.
+
+[root@serverX ~]# systemctl restart rsyslog
+Use the logger to create a new log entry to the /var/log/auth-errors on serverX.
+
+[root@serverX ~]# logger -p authpriv.alert "Logging test authpriv.alert"
+Verify the message sent to syslog with the logger command appears in the /var/log/auth-errors on serverX in the terminal with tail /var/log/auth-errors.
+
+[root@serverX ~]# tail /var/log/auth-errors
+Feb 13 11:21:53 server1 root: Logging test authpriv.alert
+

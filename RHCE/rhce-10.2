@@ -1,0 +1,292 @@
+Configuring Networking with nmcli
+Manage network devices with command-line utilities.
+
+Objectives
+After completing this section, students should be able to manage network settings and devices with nmcli and NetworkManager.
+
+NetworkManager
+NetworkManager is a daemon that monitors and manages network settings. In addition to the daemon, there is a GNOME Notification Area applet that provides network status information. Command-line and graphical tools talk to NetworkManager and save configuration files in the /etc/sysconfig/network-scripts directory.
+
+A device is a network interface. A connection is a configuration used for a device which is made up of a collection of settings. Multiple connections may exist for a device, but only one may be active at a time. For example, a system may normally be connected to a network with settings provided by DHCP. Occasionally, that system needs to be connected to a lab or data center network, which only uses static networking. Instead of changing the configuration manually, each configuration can be stored as a separate connection.
+
+Viewing network information with nmcli
+To display a list of all connections, use nmcli con show. To list only the active connections, add the --active option.
+
+[root@desktopX ~]# nmcli con show
+NAME            UUID                                  TYPE             DEVICE  
+static-eth0  f3e8dd32-3c9d-48f6-9066-551e5b6e612d  802-3-ethernet   eth0   
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet   -- 
+guest        f601ca8a-6647-4188-a431-dab48cc63bf4  802-11-wireless  wlp3s0  
+[root@desktopX ~]# nmcli con show --active
+NAME            UUID                                  TYPE             DEVICE  
+static-eth0  f3e8dd32-3c9d-48f6-9066-551e5b6e612d  802-3-ethernet   eth0   
+guest        f601ca8a-6647-4188-a431-dab48cc63bf4  802-11-wireless  wlp3s0  
+Specify a connection ID (name) to see the details of that connection. The lowercase settings represent the configuration of the connection. Setting and property names are defined in the nm-settings(5) man page. The uppercase settings are active data.
+
+[root@desktopX ~]# nmcli con show "static-eth0"
+...
+ipv4.method:                            manual
+ipv4.dns:                               172.25.254.254, 8.8.8.8
+ipv4.dns-search:                        
+ipv4.addresses:                         { ip = 172.25.X.10/24, gw = 172.25.X.254 }
+ipv4.routes:                            
+ipv4.ignore-auto-routes:                no
+ipv4.ignore-auto-dns:                   no
+ipv4.dhcp-client-id:                    --
+ipv4.dhcp-send-hostname:                yes
+ipv4.dhcp-hostname:                     --
+ipv4.never-default:                     no
+ipv4.may-fail:                          yes
+ipv6.method:                            auto
+...
+The nmcli command can also be used to show device status and details.
+
+[root@desktopX ~]# nmcli dev status
+DEVICE  TYPE      STATE      CONNECTION  
+eth0    ethernet  connected  static-eth0 
+wlp3s0  wifi      connected  guest    
+lo      loopback  unmanaged  --          
+[root@desktopX ~]# nmcli dev show eth0
+GENERAL.DEVICE:                         eth0
+GENERAL.TYPE:                           ethernet
+GENERAL.HWADDR:                         52:54:00:00:00:0A
+GENERAL.MTU:                            1500
+GENERAL.STATE:                          100 (connected)
+GENERAL.CONNECTION:                     static-eth0
+GENERAL.CON-PATH:                       /org/freedesktop/NetworkManager/ActiveConnection/1
+WIRED-PROPERTIES.CARRIER:               on
+IP4.ADDRESS[1]:                         ip = 172.25.X.10/24, gw = 172.25.X.254
+IP4.DNS[1]:                             172.25.254.254
+IP6.ADDRESS[1]:                         ip = fe80::5054:ff:fe00:b/64, gw = ::
+Creating network connections with nmcli
+When creating a new connection with nmcli, the order of the arguments is important. The common arguments appear first and must include the type and interface. Next, specify any type-specific arguments and finally specify the IP address, prefix, and gateway information. Multiple IP addresses may be specified for a single device. Additional settings such as a DNS server are set as modifications once the connection exists.
+
+Examples of creating new connections
+
+Follow along with the next steps while your instructor discusses nmcli syntax.
+
+Define a new connection named "default" which will autoconnect as an Ethernet connection on the eth0 device using DHCP.
+
+[root@desktopX ~]# nmcli con add con-name "default" type ethernet ifname eth0
+Create a new connection named "static" and specify the IP address and gateway. Do not autoconnect.
+
+[root@desktopX ~]# nmcli con add con-name "static" ifname eth0 autoconnect no type ethernet ip4 172.25.X.10/24 gw4 172.25.X.254
+The system will autoconnect with the DHCP connection at boot. Change to the static connection.
+
+[root@desktopX ~]# nmcli con up "static"
+Change back to the DHCP connection.
+
+[root@desktopX ~]# nmcli con up "default"
+IMPORTANT
+If the static connection is lost, the default connection will attempt to autoconnect. To administratively disable an interface and prevent any autoconnection, use nmcli dev disconnect DEVICENAME.
+
+Type options
+
+Type options depend on the type used. An ethernet-type connection may optionally specify a MAC address for the connection. A wifi-type connection must specify the SSID and may specify additional options. Many other types are available, including bridge, bond, team, VPN, and VLAN. To view all the options, use nmcli con add help.
+
+[root@desktopX ~]# nmcli con add help 
+Usage: nmcli connection add { ARGUMENTS | help }
+
+ARGUMENTS := COMMON_OPTIONS TYPE_SPECIFIC_OPTIONS IP_OPTIONS
+
+  COMMON_OPTIONS:
+                  type <type>
+                  ifname <interface name> | "*"
+                  [con-name <connection name>
+                  [autoconnect yes|no]
+
+                  [save yes|no]
+
+  TYPE_SPECIFIC_OPTIONS:
+    ethernet:     [mac <MAC address>
+                  [cloned-mac <cloned MAC address>
+                  [mtu <MTU>
+...
+
+Modifying network interfaces with nmcli
+An existing connection may be modified with nmcli con mod arguments. The arguments are sets of key/value pairs. The key includes a setting name and a property name. Use nmcli con show "<ID>" to see a list of current values for a connection. The nm-settings(5) man page documents the setting and property names and usage.
+
+[root@desktopX ~]# nmcli con show "static"
+connection.id:                          static
+connection.uuid:                        f3e8dd32-3c9d-48f6-9066-551e5b6e612d
+connection.interface-name:              eth0
+connection.type:                        802-3-ethernet
+connection.autoconnect:                 yes
+connection.timestamp:                   1394905322
+connection.read-only:                   no
+...
+Examples of connection modifications
+
+Follow along with the next steps while your instructor discusses nmcli syntax.
+
+Turn off autoconnect.
+
+[root@desktopX ~]# nmcli con mod "static" connection.autoconnect no
+Specify a DNS server.
+
+[root@desktopX ~]# nmcli con mod "static" ipv4.dns 172.25.X.254
+Some configuration arguments may have values added or removed. Add a +/- symbol in front of the argument. Add a secondary DNS server.
+
+[root@desktopX ~]# nmcli con mod "static" +ipv4.dns 8.8.8.8
+Replace the static IP address and gateway.
+
+[root@desktopX ~]# nmcli con mod "static" ipv4.addresses "172.25.X.10/24 172.25.X.254"
+Add a secondary IP address without a gateway.
+
+[root@desktopX ~]# nmcli con mod "static" +ipv4.addresses 10.10.10.10/16
+IMPORTANT
+The nmcli con mod will save the setting to the configuration files. To activate the changes, the connection needs to be activated or reactivated.
+
+[root@desktopX ~]# nmcli con up "static"
+Summary of nmcli commands
+Basic device and connection commands for nmcli:
+
+Table 10.2. nmcli commands
+
+Command	Use
+nmcli dev status	List all devices.
+nmcli con show	List all connections.
+nmcli con up "<ID>"	Activate a connection.
+nmcli con down "<ID>"	Deactivate a connection. The connection will restart if autoconnect is yes.
+nmcli dev dis <DEV>	Bring down an interface and temporarily disable autoconnect.
+nmcli net off	Disable all managed interfaces.
+nmcli con add ...	Add a new connection.
+nmcli con mod "<ID>" ...	Modify a connection.
+nmcli con del "<ID>"	Delete a connection.
+
+NOTE
+The nmcli command also has an interactive edit mode. For a graphical interface, use nm-connection-editor.
+
+REFERENCES
+nmcli(1), nmcli-examples(5), and nm-settings(5) man pages
+
+Additional information may be available in the section on using the NetworkManager command line tool nmcli in the Red Hat Enterprise Linux Networking Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+
+
+Guided Exercise: Practice: Configuring Networking with nmcli
+In this lab, you will configure network settings using nmcli.
+
+Outcomes:
+
+Convert a system from DHCP to static configuration.
+
+Reset your serverX system.
+
+View network settings using nmcli.
+
+Show all connections.
+
+[student@serverX ~]$ nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0   
+Display all configuration settings for the active connection.
+
+[student@serverX ~]$ nmcli con show "System eth0"
+connection.id:                          System eth0
+connection.uuid:                        5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03
+connection.interface-name:              eth0
+connection.type:                        802-3-ethernet
+connection.autoconnect:                 yes
+connection.timestamp:                   1394813303
+connection.read-only:                   no
+connection.permissions:                 
+...
+IP4.ADDRESS[1]:                         ip = 172.25.X.11/16, gw = 172.25.0.1
+IP4.DNS[1]:                             172.25.254.254
+IP4.DOMAIN[1]:                          example.com
+...
+Show device status.
+
+[student@serverX ~]$ nmcli dev status
+DEVICE  TYPE      STATE      CONNECTION  
+eth0    ethernet  connected  System eth0 
+lo      loopback  unmanaged  --          
+Display the settings for the eth0 device.
+
+[student@serverX ~]$ nmcli dev show eth0
+GENERAL.DEVICE:                         eth0
+GENERAL.TYPE:                           ethernet
+GENERAL.HWADDR:                         52:54:00:00:00:0B
+GENERAL.MTU:                            1500
+GENERAL.STATE:                          100 (connected)
+GENERAL.CONNECTION:                     System eth0
+GENERAL.CON-PATH:                       /org/freedesktop/NetworkManager/ActiveConnection/1
+WIRED-PROPERTIES.CARRIER:               on
+IP4.ADDRESS[1]:                         ip = 172.25.X.11/16, gw = 172.25.0.1
+IP4.DNS[1]:                             172.25.254.254
+IP4.DOMAIN[1]:                          example.com
+IP6.ADDRESS[1]:                         ip = fe80::5054:ff:fe00:b/64, gw = ::
+Create a static connection with the same IPv4 address, network prefix, and default gateway. Name the new connection static-eth0.
+
+WARNING
+Since access to your machine is provided over the primary network connection, setting incorrect values during network configuration may make your machine unreachable. If this happens, use the Reset button located above what used to be your machine's graphical display and try again.
+
+[student@serverX ~]$ sudo nmcli con add con-name "static-eth0" ifname eth0 type ethernet ip4 172.25.X.11/16 gw4 172.25.0.1
+Connection 'static-eth0' (f3e8dd32-3c9d-48f6-9066-551e5b6e612d) successfully added.
+Modify the new connection to add the DNS setting.
+
+[student@serverX ~]$ sudo nmcli con mod "static-eth0" ipv4.dns 172.25.254.254
+Display and activate the new connection.
+
+View all connections.
+
+[student@serverX ~]$ nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+static-eth0  f3e8dd32-3c9d-48f6-9066-551e5b6e612d  802-3-ethernet  --     
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0   
+View the active connection.
+
+[student@serverX ~]$ nmcli con show --active
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0   
+Activate the new connection.
+
+[student@serverX ~]$ sudo nmcli con up "static-eth0"
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/3)
+View the active connection.
+
+[student@serverX ~]$ nmcli con show --active
+NAME         UUID                                  TYPE            DEVICE 
+static-eth0  f3e8dd32-3c9d-48f6-9066-551e5b6e612d  802-3-ethernet  eth0   
+Test the connectivity using the new network addresses.
+
+Verify the IP address.
+
+[student@serverX ~]$ ip addr show eth0
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 52:54:00:00:00:0b brd ff:ff:ff:ff:ff:ff
+    inet 172.25.X.11/16 brd 172.25.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::5054:ff:fe00:b/64 scope link 
+       valid_lft forever preferred_lft forever
+Verify the default gateway.
+
+[student@serverX ~]$ ip route
+default via 172.25.0.1 dev eth0  proto static  metric 1024 
+172.25.0.0/16 dev eth0  proto kernel  scope link  src 172.25.X.11 
+Ping the DNS address.
+
+[student@serverX ~]$ ping -c3 172.25.254.254
+PING 172.25.254.254 (172.25.254.254) 56(84) bytes of data.
+64 bytes from 172.25.254.254: icmp_seq=1 ttl=64 time=0.419 ms
+64 bytes from 172.25.254.254: icmp_seq=2 ttl=64 time=0.598 ms
+64 bytes from 172.25.254.254: icmp_seq=3 ttl=64 time=0.503 ms
+
+--- 172.25.254.254 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1999ms
+rtt min/avg/max/mdev = 0.419/0.506/0.598/0.077 ms
+Configure the original connection so that it does not start at boot and verify that the static connection is used when the system reboots.
+
+Disable the original connection from autostarting at boot.
+
+[student@serverX ~]$ sudo nmcli con mod "System eth0" \
+> connection.autoconnect no
+Reboot the system.
+
+[student@serverX ~]$ reboot
+View the active connection.
+
+[student@serverX ~]$ nmcli con show --active
+NAME         UUID                                  TYPE            DEVICE 
+static-eth0  f3e8dd32-3c9d-48f6-9066-551e5b6e612d  802-3-ethernet  eth0   
+

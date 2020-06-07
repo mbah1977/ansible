@@ -1,0 +1,180 @@
+Monitoring Process Activity
+Manage system workload by utilizing load averages and process statistics.
+
+Objectives
+After completing this section, students should be able to:
+
+Interpret uptime and load averages.
+
+Monitor real-time processes.
+
+Load average
+The Linux kernel calculates a load average metric as an exponential moving average of the load number, a cumulative CPU count of active system resource requests.
+
+Active requests are counted from per-CPU queues for running threads and threads waiting for I/O, as the kernel tracks process resource activity and corresponding process state changes.
+
+Load number is a calculation routine run every five seconds by default, which accumulates and averages the active requests into a single number for all CPUs.
+
+Exponential moving average is a mathematical formula to smooth out trending data highs and lows, increase current activity significance, and decrease aging data quality.
+
+Load average is the load number calculation routine result. Collectively, it refers to the three displayed values of system activity data averaged for the last 1, 5, and 15 minutes.
+
+Understanding the Linux load average calculation
+
+The load average represents the perceived system load over a time period. Linux implements the load average calculation as a representation of expected service wait times, not only for CPU but also for disk and network I/O.
+
+Linux counts not only processes, but threads individually, as separate tasks. CPU request queues for running threads (nr_running) and threads waiting for I/O resources (nr_iowait) reasonably correspond to process states R (Running) and D (Uninterruptable Sleeping). Waiting for I/O includes tasks sleeping for expected disk and network responses.
+
+The load number is a global counter calculation, which is sum-totaled for all CPUs. Since tasks returning from sleep may reschedule to different CPUs, accurate per-CPU counts are difficult, but an accurate cumulative count is assured. Displayed load averages represent all CPUs.
+
+Linux counts each physical CPU core and microprocessor hyperthread as separate execution units, logically represented and referred to as individual CPUs. Each CPU has independent request queues. View /proc/cpuinfo for the kernel representation of system CPUs.
+
+[student@serverX ~]$ grep "model name" /proc/cpuinfo
+model name	: Intel(R) Core(TM) i5 CPU       M 520  @ 2.40GHz
+model name	: Intel(R) Core(TM) i5 CPU       M 520  @ 2.40GHz
+model name	: Intel(R) Core(TM) i5 CPU       M 520  @ 2.40GHz
+model name	: Intel(R) Core(TM) i5 CPU       M 520  @ 2.40GHz
+[student@serverX ~]$ grep "model name" /proc/cpuinfo | wc -l
+4
+Some UNIX systems only considered CPU utilization or run queue length to indicate system load. Since a system with idle CPUs can experience extensive waiting due to busy disk or network resources, I/O consideration is included in the Linux load average. When experiencing high load averages with minimal CPU activity, examine the disk and network activity.
+
+Interpreting displayed load average values
+
+The three values represent the weighted values over the last 1, 5, and 15 minutes. A quick glance can indicate whether system load appears to be increasing or decreasing. Calculate the approximate per-CPU load value to determine whether the system is experiencing significant waiting.
+
+top, uptime, w, and gnome-system-monitor display load average values.
+
+[student@serverX ~]$ uptime
+ 15:29:03 up 14 min,  2 users,  load average: 2.92, 4.48, 5.20
+Divide the displayed load average values by the number of logical CPUs in the system. A value below 1 indicates satisfactory resource utilization and minimal wait times. A value above 1 indicates resource saturation and some amount of service waiting times.
+
+# From /proc/cpuinfo, system has four logical CPUs, so divide by 4:
+#                               load average: 2.92, 4.48, 5.20
+#           divide by number of logical CPUs:    4     4     4
+#                                             ----  ----  ----
+#                       per-CPU load average: 0.73  1.12  1.30
+#
+# This system's load average appears to be decreasing.
+# With a load average of 2.92 on four CPUs, all CPUs were in use ~73% of the time.
+# During the last 5 minutes, the system was overloaded by ~12%.
+# During the last 15 minutes, the system was overloaded by ~30%.
+An idle CPU queue has a load number of 0. Each ready and waiting thread adds a count of 1. With a total queue count of 1, the resource (CPU, disk, or network) is in use, but no requests spend time waiting. Additional requests increment the count, but since many requests can be processed within the time period, resource utilization increases, but not wait times.
+
+Processes sleeping for I/O due to a busy disk or network resource are included in the count and increase the load average. While not an indication of CPU utilization, the queue count still indicates that users and programs are waiting for resource services.
+
+Until resource saturation, a load average will remain below 1, since tasks will seldom be found waiting in queue. Load average only increases when resource saturation causes requests to remain queued and counted by the load calculation routine. When resource utilization approaches 100%, each additional request starts experiencing service wait time.
+
+Real-time process monitoring
+The top program is a dynamic view of the system's processes, displaying a summary header followed by a process or thread list similar to ps information. Unlike the static ps output, top continuously refreshes at a configurable interval, and provides capabilities for column reordering, sorting, and highlighting. User configurations can be saved and made persistent.
+
+Default output columns are recognizable from other resource tools:
+
+The process ID (PID).
+
+User name (USER) is the process owner.
+
+Virtual memory (VIRT) is all memory the process is using, including the resident set, shared libraries, and any mapped or swapped memory pages. (Labeled VSZ in the ps command.)
+
+Resident memory (RES) is the physical memory used by the process, including any resident shared objects. (Labeled RSS in the ps command.)
+
+Process state (S) displays as:
+
+D = Uninterruptable Sleeping
+
+R = Running or Runnable
+
+S = Sleeping
+
+T = Stopped or Traced
+
+Z = Zombie
+
+CPU time (TIME) is the total processing time since the process started. May be toggled to include cumulative time of all previous children.
+
+The process command name (COMMAND).
+
+Table 6.2. Fundamental keystrokes in top
+
+Key	Purpose
+? or h	Help for interactive keystrokes.
+l, t, m	Toggles for load, threads, and memory header lines.
+1	Toggle showing individual CPUs or a summary for all CPUs in header.
+s (1)	Change the refresh (screen) rate, in decimal seconds (e.g., 0.5, 1, 5).
+b	Toggle reverse highlighting for Running processes; default is bold only.
+B	Enables use of bold in display, in the header, and for Running processes.
+H	Toggle threads; show process summary or individual threads.
+u, U	Filter for any user name (effective, real).
+M	Sorts process listing by memory usage, in descending order.
+P	Sorts process listing by processor utilization, in descending order.
+k (1)	Kill a process. When prompted, enter PID, then signal.
+r (1)	Renice a process. When prompted, enter PID, then nice_value.
+W	Write (save) the current display configuration for use at the next top restart.
+q	Quit.
+Note:	(1) Not available if top started in secure mode. See top(1).
+
+REFERENCES
+GNOME System Monitor
+
+yelp help:gnome-system-monitor
+
+ps(1), top(1), uptime(1), and w(1) man pages
+
+
+
+Guided Exercise: Practice: Monitoring Process Activity
+In this lab, students will use the top command to dynamically view, sort, and stop processes.
+
+Outcomes
+
+Practice with managing processes in real time.
+
+Perform the following tasks as student on the serverX machine. Run lab process101 setup on serverX to prepare for this exercise.
+
+[student@serverX ~]$ lab process101 setup
+Open two terminal windows, side by side, to be referred to as left and right. In the right terminal, run the top utility. Size the window to be as tall as possible.
+
+[student@serverX ~]$ top
+In the left terminal, determine the number of logical CPUs on this virtual machine.
+
+[student@serverX ~]$ grep "model name" /proc/cpuinfo | wc -l
+1
+In the left terminal, run a single instance of the process101 executable.
+
+[student@serverX ~]$ process101
+In the right terminal, observe the top display. Use the single keystrokes l, t, and m to toggle the load, threads, and memory header lines. After observing this behavior, ensure that all headers are displaying.
+
+Note the process ID (PID) for process101. View the CPU percentage for the process, which is expected to hover around 25% or 30%.
+
+View the load averages. On a single-CPU virtual machine, for example, the one-minute load average is currently less than a value of 1. The value observed may be affected by resource contention from another virtual machine or the virtual host.
+
+In the left terminal, run a second instance of process101.
+
+[student@serverX ~]$ process101
+In top, note the process ID (PID) for the second process101. View the CPU percentage for the process, also expected to hover around 25% or 30%.
+
+View the one-minute load average again, which may still be less than 1. Wait up to one minute to allow the calculation to adjust to the new workload.
+
+In the left terminal, run a third instance of process101.
+
+[student@serverX ~]$ process101
+In top, note the process ID (PID) for the third process101. View the CPU percentage for the process, again expected to hover around 25% or 30%.
+
+View the one-minute load average again, which now is expected to be above 1. Wait up to one minute to allow the calculation to again adjust to the new workload.
+
+Optional: If this virtual machine has more than one logical CPU, slowly start additional process101 instances until the one-minute load average equals or exceeds the number of logical CPUs. Divide the load average value by the number of CPUs to determine the estimated load average per CPU.
+
+When finished observing the load average values, terminate each of the process101 processes from within top.
+
+Press k. Observe the prompt below the headers and above the columns.
+
+Type the PID for one of the process101 instances. Press Enter.
+
+Press Enter again to use the default SIGTERM signal 15.
+
+Confirm that the selected process is no longer observed in top. If the PID still remains, repeat these terminating steps, substituting SIGKILL signal 9 when prompted.
+
+Repeat the previous step for each remaining process101 instance. Confirm that no process101 instances remain in top.
+
+In the right window, press q to exit top. Close extra terminal windows.
+
+

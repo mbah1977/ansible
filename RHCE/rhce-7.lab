@@ -1,0 +1,40 @@
+Lab: Lab: Installing and Updating Software Packages
+In this lab, you will install and update select software packages.
+
+Outcomes:
+
+New and updated packages are installed on the system.
+
+Reset your serverX system.
+
+Create the file /etc/yum.repos.d/errata.repo, to enable the “Updates” repository found on the content machine. It should access content found at the following URL: http://content.example.com/rhel7.0/x86_64/errata. Do not check GPG signatures.
+
+[updates]
+name=Red Hat Updates
+baseurl=http://content.example.com/rhel7.0/x86_64/errata
+enabled=1
+gpgcheck=0
+Create the file /etc/yum.repos.d/errata.repo with the following content:
+
+Configure serverX to adhere to very specific software requirements. It must have the latest version of the following packages installed. Do not install all updates. Only install updates for the packages listed if they are available.
+
+kernel (existing package with an update)
+
+yum update kernel
+
+xsane-gimp (new package)
+
+yum install xsane-gimp
+
+rht-system (new package)
+
+yum install rht-system
+
+For security reasons, it should not have the wvdial package installed.
+
+yum remove wvdial
+
+When you are ready to check your work, run lab software grade on serverX.
+
+[student@serverX ~]$ lab software grade
+

@@ -1,0 +1,139 @@
+Chapter 3. Users and Groups
+Users and Groups
+Quiz: Practice: User and Group Concepts
+Gaining Superuser Access
+Guided Exercise: Practice: Running Commands as root
+Managing Local User Accounts
+Guided Exercise: Practice: Creating Users Using Command-line Tools
+Managing Local Group Accounts
+Guided Exercise: Practice: Managing Groups Using Command-line Tools
+Managing User Passwords
+Guided Exercise: Practice: Managing User Password Aging
+Using Identity Management Services
+Guided Exercise: Practice: Connecting to a Central LDAP and Kerberos Server
+Lab: Lab: Managing Linux Users and Groups
+Abstract
+
+Overview
+Goal	To manage Linux users and groups and administer local password policies.
+Objectives	
+Explain the role of users and groups on a Linux system and how they are understood by the computer.
+
+Run commands as the superuser to administer a Linux system.
+
+Create, modify, lock, and delete locally defined user accounts.
+
+Create, modify, and delete locally defined group accounts.
+
+Lock accounts manually or by setting a password-aging policy in the shadow password file.
+
+Use centralized identity management services.
+
+Sections	
+Users and Groups (and Practice)
+
+Gaining Superuser Access (and Practice)
+
+Managing Local User Accounts (and Practice)
+
+Managing Local Group Accounts (and Practice)
+
+Managing User Passwords (and Practice)
+
+Using Identity Management Services (and Practice)
+
+Lab	
+Managing Local Linux Users and Groups
+
+Users and Groups
+List the roles of users and groups on a Linux system and view the local configuration files.
+
+Objectives
+After completing this section, students should be able to explain the role of users and groups on a Linux system and how they are understood by the computer.
+
+What is a user?
+Every process (running program) on the system runs as a particular user. Every file is owned by a particular user. Access to files and directories are restricted by user. The user associated with a running process determines the files and directories accessible to that process.
+
+The id command is used to show information about the current logged-in user. Basic information about another user can also be requested by passing in the username of that user as the first argument to the id command.
+
+[student@desktopX ~]$ id
+uid=1000(student) gid=1000(student) groups=1000(student),10(wheel) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+To view the user associated with a file or directory, use the ls -l command. The third column shows the username:
+
+[student@serverX ~]$ ls -l /tmp
+drwx------. 2 gdm     gdm      4096 Jan 24 13:05 orbit-gdm
+drwx------. 2 student student  4096 Jan 25 20:40 orbit-student
+-rw-r--r--. 1 root    root    23574 Jan 24 13:05 postconf
+To view process information, use the ps command. The default is to show only processes in the current shell. Add the a option to view all processes with a terminal. To view the user associated with a process, include the u option. The first column shows the username:
+
+[student@serverX ~]$ ps au
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root       428  0.0  0.7 152768 14400 tty1     Ss+  Feb03   0:04 /usr/bin/Xorg 
+root       511  0.0  0.0 110012   812 ttyS0    Ss+  Feb03   0:00 /sbin/agetty 
+root      1805  0.0  0.1 116040  2580 pts/0    Ss   Feb03   0:00 -bash
+root      2109  0.0  0.1 178468  2200 pts/0    S    Feb03   0:00 su - student
+student   2110  0.0  0.1 116168  2864 pts/0    S    Feb03   0:00 -bash
+student   3690  0.0  0.0 123368  1300 pts/0    R+   11:42   0:00 ps au
+The output of the previous commands displays users by name, but internally the operating system tracks users by a UID number. The mapping of names to numbers is defined in databases of account information. By default, systems use a simple "flat file," the /etc/passwd file, to store information about local users. The format of /etc/passwd follows (seven colon-separated fields):
+
+1username:2password:3UID:4GID:5GECOS:6/home/dir:7shell
+1
+
+username is a mapping of a UID to a name for the benefit of human users.
+
+2
+
+password is where, historically, passwords were kept in an encrypted format. Today, they are stored in a separate file called /etc/shadow.
+
+3
+
+UID is a user ID, a number that identifies the user at the most fundamental level.
+
+4
+
+GID is the user's primary group ID number. Groups will be discussed in a moment.
+
+5
+
+GECOS field is arbitrary text, which usually includes the user's real name.
+
+6
+
+/home/dir is the location of the user's personal data and configuration files.
+
+7
+
+shell is a program that runs as the user logs in. For a regular user, this is normally the program that provides the user's command line prompt.
+
+What is a group?
+Like users, groups have a name and a number (GID). Local groups are defined in /etc/group.
+
+Primary groups
+
+Every user has exactly one primary group.
+
+For local users, the primary group is defined by the GID number of the group listed in the fourth field of /etc/passwd.
+
+Normally, the primary group owns new files created by the user.
+
+Normally, the primary group of a newly created user is a newly created group with the same name as the user. The user is the only member of this User Private Group (UPG).
+
+Supplementary groups
+
+Users may be a member of zero or more supplementary groups.
+
+The users that are supplementary members of local groups are listed in the last field of the group's entry in /etc/group. For local groups, user membership is determined by a comma-separated list of users found in the last field of the group's entry in /etc/group:
+
+groupname:password:GID:list,of,users,in,this,group
+Supplementary group membership is used to help ensure that users have access permissions to files and other resources on the system.
+
+REFERENCES
+id(1), passwd(5), and group(5) man pages
+
+info libc (GNU C Library Reference Manual)
+
+Section 29: Users and groups
+
+(Note that the glibc-devel package must be installed for this info node to be available.)
+
+

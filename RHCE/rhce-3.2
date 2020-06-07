@@ -1,0 +1,187 @@
+Gaining Superuser Access
+Escalate privilege to run commands as the superuser.
+
+Objectives
+After completing this section, students should be able to run commands as the superuser to administer a Linux system.
+
+The root user
+Most operating systems have some sort of superuser, a user that has all power over the system. This user in Red Hat Enterprise Linux is the root user. This user has the power to override normal privileges on the file system, and is used to manage and administer the system. In order to perform tasks such as installing or removing software and to manage system files and directories, a user must escalate privileges to the root user.
+
+Most devices can only be controlled by root, but there are a few exceptions. For instance, removable devices, such as USB devices, are allowed to be controlled by a normal user. Thus, a non-root user is allowed to add and remove files and otherwise manage a removable device, but only root is allowed to manage "fixed" hard drives by default.
+
+This unlimited privilege, however, comes with responsibility. root has unlimited power to damage the system: remove files and directories, remove user accounts, add backdoors, etc. If the root account is compromised, someone else would have administrative control of the system. Throughout this course, administrators will be encouraged to log in as a normal user and escalate privileges to root only when needed.
+
+The root account on Linux is roughly equivalent to the local Administrator account on Windows. In Linux, most system administrators log into an unprivileged user account and use various tools to temporarily gain root privileges.
+
+WARNING
+One common practice on Windows in the past is for the local Administrator user to log in directly to perform system administrator duties. However, on Linux, it is recommended that system administrators should not log in directly as root. Instead, system administrators should log in as a non-root user, and use other mechanisms (su, sudo, or PolicyKit, for example) to temporarily gain superuser privileges.
+
+By logging in as the administrative user, the entire desktop environment unnecessarily runs with administrative privileges. In that situation, any security vulnerability which would normally only compromise the user account has the potential to compromise the entire system.
+
+In recent versions of Microsoft Windows, Administrator disabled by default, and features such as User Account Control (UAC) are used to limit administrative privileges for users until actually needed. In Linux, the PolicyKit system is the nearest equivalent to UAC.
+
+Switching users with su
+The su command allows a user to switch to a different user account. If a username is not specified, the root account is implied. When invoked as a regular user, a prompt will display asking for the password of the account you are switching to; when invoked as root, there is no need to enter the account password.
+
+su [-] <username>
+
+[student@desktopX ~]$ su -
+Password: redhat
+[root@desktopX ~]# 
+The command su username starts a non-login shell, while the command su - username starts a login shell. The main distinction is su - sets up the shell environment as if this were a clean login as that user, while su just starts a shell as that user with the current environment settings.
+
+In most cases, administrators want to run su - to get the user's normal settings. For more information, see the bash(1) man page.
+
+NOTE
+The su command is most frequently used to get a command line interface (shell prompt) which is running as another user, typically root. However, with the -c option, it can be used like the Windows utility runas to run an arbitrary program as another user. See info su for details.
+
+Running commands as root with sudo
+Fundamentally, Linux implements a very coarse-grained permissions model: root can do everything, other users can do nothing (systems-related). The common solution previously discussed is to allow standard users to temporarily “become root” using the su command. The disadvantage is that while acting as root, all the privileges (and responsibilities) of root are granted. Not only can the user restart the web server, but they can also remove the entire /etc directory. Additionally, all users requiring superuser privilege in this manner must know the root password.
+
+The sudo command allows a user to be permitted to run a command as root, or as another user, based on settings in the /etc/sudoers file. Unlike other tools such as su, sudo requires users to enter their own password for authentication, not the password of the account they are trying to access. This allows an administrator to hand out fine-grained permissions to users to delegate system administration tasks, without having to hand out the root password.
+
+For example, when sudo has been configured to allow the user student to run the command usermod as root, student could run the following command to lock a user account:
+
+[student@serverX ~]$ sudo usermod -L username
+[sudo] password for student: password
+One additional benefit to using sudo is that all commands executed using sudo are logged by default to /var/log/secure.
+
+[student@serverX ~]$ sudo tail /var/log/secure
+...
+Feb 19 15:23:36 localhost sudo: student : TTY=pts/0 ; PWD=/home/student ; USER=root ; COMMAND=/sbin/usermod -L student
+Feb 19 15:23:36 localhost usermod[16325]: lock user 'student' password
+Feb 19 15:23:47 localhost sudo: student : TTY=pts/0 ; PWD=/home/student ; USER=root ; COMMAND=/bin/tail /var/log/secure
+In Red Hat Enterprise Linux 7, all members of group wheel can use sudo to run commands as any user, including root. The user will be prompted for their own password. This is a change from Red Hat Enterprise Linux 6 and earlier. Users who were members of group wheel did not get this administrative access by default in RHEL 6 and earlier.
+
+To enable similar behavior on earlier versions of Red Hat Enterprise Linux, use visudo to edit the configuration file and uncomment the line allowing the group wheel to run all commands.
+
+[root@desktopX ~]# cat /etc/sudoers
+...Output omitted...
+## Allows people in group wheel to run all commands
+%wheel        ALL=(ALL)       ALL
+
+## Same thing without a password
+# %wheel  ALL=(ALL)       NOPASSWD: ALL
+...Output omitted...
+WARNING
+RHEL 6 did not grant group wheel any special privileges by default. Sites which have been using this group may be surprised when RHEL 7 automatically grants all members of wheel full sudo privileges. This could lead to unauthorized users getting superuser access to RHEL 7 systems.
+
+Historically, membership in group wheel has been used by Unix-like systems to grant or control superuser access.
+
+Most system administration applications with a GUI use PolicyKit to prompt users for authentication and to manage root access. In Red Hat Enterprise Linux 7, PolicyKit may also prompt members of group wheel for their own password in order to get root privileges when using graphical tools. This is similar to the way in which they can use sudo to get those privileges at the shell prompt. PolicyKit grants these privileges based on its own configuration settings, separate from sudo. Advanced students may be interested in the pkexec(1) and polkit(8) man pages for details on how this system works, but it is beyond the scope of this course.
+
+REFERENCES
+su(1), visudo(8) and sudo(8) man pages
+
+info libc (GNU C Library Reference Manual)
+
+Section 29.2: The Persona of a Process
+
+(Note that the glibc-devel package must be installed for this info node to be available.)
+
+
+
+
+
+
+Guided Exercise: Practice: Running Commands as root
+In this lab, you will practice running commands as root.
+
+Outcomes
+
+Use the su with and without login scripts to switch users. Use sudo to run commands with privilege.
+
+Reset your serverX system.
+
+Log into the GNOME desktop on serverX as student with a password of student.
+
+Open a window with a Bash prompt.
+
+Select Applications → Utilities → Terminal.
+
+Explore characteristics of the current student login environment.
+
+View the user and group information and display the current working directory.
+
+[student@serverX ~]$ id
+uid=1000(student) gid=1000(student) groups=1000(student),10(wheel) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+[student@serverX ~]$ pwd
+/home/student
+View the variables which specify the home directory and the locations searched for executable files.
+
+[student@serverX ~]$ echo $HOME
+/home/student
+[student@serverX ~]$ echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/home/student/.local/bin:/home/student/bin
+Switch to root without the dash and explore characteristics of the new environment.
+
+Become the root user at the shell prompt.
+
+[student@serverX ~]$ su
+Password: redhat
+View the user and group information and display the current working directory. Note the identity changed, but not the current working directory.
+
+[root@serverX student]# id
+uid=0(root) gid=0(root) groups=0(root) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+[root@serverX student]# pwd
+/home/student
+View the variables which specify the home directory and the locations searched for executable files. Look for references to the student and root accounts.
+
+[root@serverX student]# echo $HOME
+/root
+[root@serverX student]# echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/home/student/.local/bin:/home/student/bin
+Exit the shell to return to the student user.
+
+[root@serverX student]# exit
+exit
+Switch to root with the dash and explore characteristics of the new environment.
+
+Become the root user at the shell prompt. Be sure all the login scripts are also executed.
+
+[student@serverX ~]$ su -
+Password: redhat
+View the user and group information and display the current working directory.
+
+[root@serverX ~]# id
+uid=0(root) gid=0(root) groups=0(root) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+[root@serverX ~]# pwd
+/root
+View the variables which specify the home directory and the locations searched for executable files. Look for references to the student and root accounts.
+
+[root@serverX ~]# echo $HOME
+/root
+[root@serverX ~]# echo $PATH
+/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+Exit the shell to return to the student user.
+
+[root@serverX ~]# exit
+logout
+Run several commands as student which require root access.
+
+View the last 5 lines of the /var/log/messages.
+
+[student@serverX ~]$ tail -5 /var/log/messages
+tail: cannot open ‘/var/log/messages’ for reading: Permission denied
+[student@serverX ~]$ sudo tail -5 /var/log/messages
+Feb  3 15:07:22 localhost su: (to root) root on pts/0
+Feb  3 15:10:01 localhost systemd: Starting Session 31 of user root.
+Feb  3 15:10:01 localhost systemd: Started Session 31 of user root.
+Feb  3 15:12:05 localhost su: (to root) root on pts/0
+Feb  3 15:14:47 localhost su: (to student) root on pts/0
+Make a backup of a configuration file in the /etc directory.
+
+[student@serverX ~]$ cp /etc/motd /etc/motdOLD
+cp: cannot create regular file ‘/etc/motdOLD’: Permission denied
+[student@serverX ~]$ sudo cp /etc/motd /etc/motdOLD
+Remove the /etc/motdOLD file that was just created.
+
+[student@serverX ~]$ rm /etc/motdOLD
+rm: remove write-protected regular empty file ‘/etc/motdOLD’? y
+rm: cannot remove ‘/etc/motdOLD’: Permission denied
+[student@serverX ~]$ sudo rm /etc/motdOLD
+Edit a configuration file in the /etc directory.
+
+[student@serverX ~]$ echo "Welcome to class" >> /etc/motd
+-bash: /etc/motd: Permission denied
+[student@serverX ~]$ sudo vim /etc/motd

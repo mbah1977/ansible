@@ -1,0 +1,513 @@
+Adding Partitions, File Systems, and Persistent Mounts
+fdisk can be used to add, modify, and remove partitions on disks with MBR partitioning schemes.
+
+gdisk can be used to add, modify, and remove partitions on disks with GPT partitioning schemes.
+
+File systems are created on disk partitions using mkfs.
+
+To make file system mounts persistent, they must be added to /etc/fstab.
+
+Objectives
+After completing this section, students should be able to:
+
+Create and remove disk partitions on disks with an MBR partitioning scheme using fdisk.
+
+Create and remove disk partitions on disks with a GPT partitioning scheme using gdisk.
+
+Format devices with file systems using mkfs.
+
+Mount file systems into the directory tree.
+
+Disk partitioning
+Disk partitioning allows a hard drive to be divided into multiple logical storage units referred to as partitions. By separating a disk into partitions, system administrators can use different partitions to perform different functions. Some examples of situations where disk partitioning is necessary or beneficial are:
+
+Limit available space to applications or users.
+
+Allow multibooting of different operating systems from the same disk.
+
+Separate operating system and program files from user files.
+
+Create separate area for OS virtual memory swapping.
+
+Limit disk space usage to improve performance of diagnostic tools and backup imaging.
+
+MBR partitioning scheme
+
+Since 1982, the Master Boot Record (MBR) partitioning scheme has dictated how disks should be partitioned on systems running BIOS firmware. This scheme supports a maximum of four primary partitions. On Linux systems, with the use of extended and logical partitions, administrator can create a maximum of 15 partitions. Since partition size data are stored as 32-bit values, disks partitioned with the MBR scheme have a maximum disk and partition size limit of 2 TiB.
+
+With the advent of hard drives with ever-increasing capacity, the 2 TiB disk and partition size limit of the aged MBR partitioning scheme is no longer a theoretical limit, but rather a real-world problem that is being encountered more and more frequently in production environments. As a result, the legacy MBR scheme is in the process of being superseded by the new GUID Partition Table (GPT) for disk partitioning.
+
+GPT partitioning scheme
+
+For systems running Unified Extensible Firmware Interface (UEFI) firmware, GPT is the standard for laying out partition tables on physical hard disks. GPT is part of the UEFI standard and addresses many of the limitations imposed by the old MBR-based scheme. Per UEFI specifications, GPT defaults to supporting up to 128 partitions. Unlike MBR, which uses 32 bits for storing logical block addresses and size information, GPT allocates 64 bits for logical block addresses. This allows GPT to accommodate partitions and disks of up to 8 zebibyte (ZiB), or 8 billion tebibytes.
+
+NOTE
+GPT's 8-ZiB limit is based on a 512-byte block size. With hard drive vendors transitioning to 4,096-byte blocks, this limitation will increase to 64 ZiB.
+
+In addition to addressing the limitations of the MBR partitioning scheme, GPT also offers some additional features and benefits. Per its namesake, GPT uses 128-bit GUIDs to uniquely identify each disk and partition. In contrast to MBR, which has a single point of failure, GPT offers redundancy of its partition table information. The primary GPT resides at the head of the disk, while a backup copy, the secondary GPT, is housed at the end of the disk. In addition, GPT employs the use of CRC checksum to detect errors and corruption in the GPT header and partition table.
+
+Managing MBR partitions with fdisk
+Partition editors are programs which allow administrators to make changes to a disk's partitions, such as creating partitions, deleting partitions, and changing partition types. For disks with the MBR partitioning scheme, the fdisk partition editor can be used to perform these operations.
+
+Creating MBR disk partitions
+
+Creating an MBR-style disk partition involves eight steps:
+
+Specify the disk device to create the partition on.
+
+As the root user, execute the fdisk command and specify the disk device name as an argument. This will start the fdisk command in interactive mode, and will present a command prompt.
+
+[root@serverX ~]# fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help):
+Request a new primary or extended partition.
+
+Enter n to request a new partition and specify whether the partition should be created as a primary or extended partition. The default selection is the primary partition type.
+
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+NOTE
+For situations where more than four partitions are needed on a disk, this limit can be bypassed by creating three primary partitions and one extended partition. This extended partition serves as a container within which multiple logical partitions can be created.
+
+Specify partition number.
+
+This partition number serves as the identification number of the new partition on the disk for use in future partition operations. The default value is the lowest unused partition number.
+
+Partition number (1-4, default 1): 1
+Specify the first sector on the disk that the new partition will start on.
+
+The default value is the first available sector on the disk.
+
+First sector (2048-20971519, default 2048): 2048
+Specify the last sector on the disk that the new partition will end on.
+
+The default value is the last of the available, unallocated sectors contiguous to the new partition's first sector.
+
+Last sector, +sectors or +size{K,M,G} (6144-20971519, default 20971519): 1050623
+In addition to the ending sector number, fdisk can also accept a number representing the desired size of the partition expressed in sectors.
+
+Last sector, +sectors or +size{K,M,G} (6144-20971519, default 20971519): +52488
+The final, and most user-friendly, input option offered by fdisk is to specify the size of the new partition in units of KiB, MiB, or GiB.
+
+Last sector, +sectors or +size{K,M,G} (6144-20971519, default 20971519): +512M
+Once the partition's ending boundary is entered, fdisk will then display a confirmation of the partition creation.
+
+Partition 1 of type Linux and of size 512 MiB is set
+Define partition type.
+
+If the newly created partition should have a type other than Linux, enter the t command to change a partition's type. Enter the hex code for the new partition type. If needed, a table of the hex codes for all partition types can be displayed with the L command. Setting the partition type correctly is crucial, since some tools rely on it to function properly. For example, when the Linux kernel encounters a partition of type 0xfd, Linux RAID, it will attempt to autostart the RAID volume.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 82
+Changed type of partition 'Linux' to 'Linux swap / Solaris'
+Save partition table changes.
+
+Issue the w command to finalize the partition creation request by writing the changes to the disk's partition table and exiting the fdisk program.
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+
+WARNING: Re-reading the partition table failed with error 16: Device or resource
+busy.
+The kernel still uses the old table. The new table will be used at
+the next reboot or after you run partprobe(8) or kpartx(8)
+Syncing disks.
+Initiate a kernel re-read of the new partition table.
+
+Run the partprobe command with the disk device name as an argument to force a re-read of its partition table.
+
+[root@serverX ~]# partprobe /dev/vdb
+NOTE
+The fdisk program queues all partition table edits and writes them to disk only when the administrator issues the w command to write all partition table changes to disk. If the w command is not executed prior to exiting the interactive fdisk session, all requested changes to the partition table will be discarded and the disk's partition table will remain unchanged. This feature is especially useful when erroneous commands are issued to fdisk. To discard the erroneous commands and avoid their unintended consequences, simply exit fdisk without saving the partition table changes.
+
+Removing MBR disk partitions
+
+There are five steps needed to remove a partition from a disk with the MBR partitioning layout using fdisk.
+
+Specify the disk which contains the partition to be removed.
+
+Execute the fdisk command and specify the disk device name as an argument.
+
+[root@serverX ~]# fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help):
+Identify the partition number of the partition to delete.
+
+Enter p to print the partition table and fdisk will display information about the disk and its partitions.
+
+Command (m for help): p
+
+Disk /dev/vdb: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0xd2368130
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/vdb1            2048     1050623      524288   82  Linux swap / Solaris
+Request the partition deletion.
+
+Enter the d command to initiate partition removal and specify the partition number of the partition to be removed.
+
+Command (m for help): d
+Selected partition 1
+Partition 1 is deleted
+Save partition table changes.
+
+Issue the w command to finalize the partition removal request by writing the changes to the disk's partition table.
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+
+WARNING: Re-reading the partition table failed with error 16: Device or resource busy.
+The kernel still uses the old table. The new table will be used at
+the next reboot or after you run partprobe(8) or kpartx(8)
+Syncing disks.
+Initiate a kernel re-read of the new partition table.
+
+Inform the kernel to re-read the partition table with partprobe.
+
+[root@serverX ~]# partprobe /dev/vdb
+Managing GPT partitions with gdisk
+For disks with the GPT partitioning scheme, the gdisk partition editor can be used to manage partitions.
+
+NOTE
+While GPT support has been added to fdisk, it is still considered experimental, so the gdisk command should be used to make partition changes on disks partitioned with the GPT partitioning scheme.
+
+Creating GPT disk partitions
+
+There are eight steps required to create a GPT-style partition.
+
+Specify the disk device to create the partition on.
+
+Execute the gdisk command and specify the disk device name as an argument. This will start the gdisk command in interactive mode, and will present a command prompt.
+
+[root@serverX ~]# gdisk /dev/vdb
+GPT fdisk (gdisk) version 0.8.6
+
+Partition table scan:
+  MBR: not present
+  BSD: not present
+  APM: not present
+  GPT: not present
+
+Creating new GPT entries.
+
+Command (? for help):
+Request a new partition.
+
+Enter n to create a new partition.
+
+Command (? for help): n
+Specify the partition number.
+
+This partition number serves as the identification number of the partition on the disk for use in future partition operations. The default value is the lowest unused partition number.
+
+Partition number (1-128, default 1): 1
+Specify the disk location that the new partition will start from.
+
+gdisk allows for two different input types. The first input type is an absolute disk sector number representing the first sector of the new partition.
+
+First sector (34-20971486, default = 2048) or {+-}size{KMGTP}: 2048
+The second input type indicates the partition's starting sector by its position relative to the first or last sector of the first contiguous block of free sectors on the disk. Using this relative sector position format, input is specified in units of KiB, MiB, GiB, TiB, or PiB.
+
+For example, a value of +512M signifies a sector position that is 512 MiB after the beginning of the next group of contiguous available sectors. On the other hand, a value of -512M denotes a sector positioned 512 MiB before the end of this group of contiguous available sectors.
+
+Specify the last sector on the disk that the new partition will end on.
+
+The default value is the last of the available, unallocated sectors contiguous to the new partition's first sector.
+
+Last sector (2048-20971486, default = 20971486) or {+-}size{KMGTP}: 1050623
+In addition to the absolute ending sector number, gdisk also offers the more user-friendly input option of specifying the end boundary of the new partition in units of KiB, MiB, GiB, TiB, or PiB from the beginning or end of the group of contiguous available sectors. A value of +512M signifies an ending partition position that is 512 MiB after the first sector.
+
+Last sector (2048-20971486, default = 20971486) or {+-}size{KMGTP}: +512M
+A value of -512M indicates an ending partition position that is 512 MiB before the end of the contiguous available sectors.
+
+Last sector (2048-20971486, default = 20971486) or {+-}size{KMGTP}: -512M
+Define partition type.
+
+New partitions created by gdisk default to type Linux file system. If a different partition type is desired, enter the corresponding hex code. If needed, a table of the hex codes for all partition types can be displayed with the L command.
+
+Current type is 'Linux filesystem'
+
+Hex code or GUID (L to show codes, Enter = 8300): 8e00
+Changed type of partition to 'Linux LVM'
+Save partition table changes.
+
+Issue the w command to finalize the partition creation request by writing the changes to the disk's partition table. Enter y when gdisk prompts for a final confirmation.
+
+Command (? for help): w
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): y
+OK; writing new GUID partition table (GPT) to /dev/vdb.
+The operation has completed successfully.
+Initiate a kernel re-read of the new partition table.
+
+Run the partprobe command with the disk device name as an argument to force a re-read of its partition table.
+
+[root@serverX ~]# partprobe /dev/vdb
+NOTE
+The gdisk program queues all partition table edits and writes them to disk only when the administrator issues the w command to write all partition table changes to disk. If the w command is not executed prior to exiting the interactive gdisk session, all requested changes to the partition table will be discarded and the disk's partition table will remain unchanged. This feature is especially useful when erroneous commands are issued to gdisk. To discard the erroneous commands and avoid their unintended consequences, simply exit gdisk without saving the partition table changes.
+
+Removing GPT disk partitions
+
+There are five steps required to remove a partition from a disk with the GPT partitioning scheme using gdisk.
+
+Specify the disk which contains the partition to be removed.
+
+Execute the gdisk command and specify the disk device name as an argument.
+
+[root@serverX ~]# gdisk /dev/vdb
+GPT fdisk (gdisk) version 0.8.6
+
+Partition table scan:
+  MBR: protective
+  BSD: not present
+  APM: not present
+  GPT: present
+
+Found valid GPT with protective MBR; using GPT.
+
+Command (? for help):
+Identify the partition number of the partition to delete.
+
+Enter p to print the partition table. Note the number in the Number field for the partition to be deleted.
+
+Command (? for help): p
+Disk /dev/vdb: 20971520 sectors, 10.0 GiB
+Logical sector size: 512 bytes
+Disk identifier (GUID): 8B181B97-5259-4C8F-8825-1A973B8FA553
+Partition table holds up to 128 entries
+First usable sector is 34, last usable sector is 20971486
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 19922877 sectors (9.5 GiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048         1050623   512.0 MiB   8E00  Linux LVM
+Request the partition deletion.
+
+Enter the d command to initiate partition removal.
+
+Command (? for help): d
+Using 1
+Save partition table changes.
+
+Issue the w command to finalize the partition removal request by writing the changes to the disk's partition table. Enter y when gdisk prompts for a final confirmation.
+
+Command (? for help): w
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): y
+OK; writing new GUID partition table (GPT) to /dev/vdb.
+The operation has completed successfully.
+Initiate a kernel re-read of the new partition table.
+
+Inform the kernel to re-read the partition table with partprobe.
+
+[root@serverX ~]# partprobe /dev/vdb
+Creating file systems
+After a block device has been created, the next step is applying a file system format to it. A file system applies a structure to the block device so that data can be stored and retrieved from it. Red Hat Enterprise Linux supports many different file system types, but two common ones are xfs and ext4. xfs is used by default in anaconda, the installer for Red Hat Enterprise Linux.
+
+The mkfs command can be used to apply a file system to a block device. If no type is specified, an extended type two (ext2) file system will be used, which for many uses is not desirable. To specify the file system type, a -t should be used.
+
+[root@serverX ~]# mkfs -t xfs /dev/vdb1
+meta-data=/dev/vdb1              isize=256    agcount=4, agsize=16384 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=0
+data     =                       bsize=4096   blocks=65536, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0 ftype=0
+log      =internal log           bsize=4096   blocks=853, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+Mounting file systems
+Once the file system format has been applied, the last step to adding a new file system is to attach the file system into the directory structure. When the file system is attached into the directory hierarchy, user space utilities can access or write files on the device.
+
+Manually mounting file systems
+
+Administrators can use the mount command to manually attach the device onto a directory location, or mount point, by specifying the device and the mount point, as well as any options that may be desired, to customize the behavior of the device.
+
+[root@serverX ~]# mount /dev/vdb1 /mnt
+The mount can also be used to view currently mounted file systems, the mount points, and options.
+
+[root@serverX ~]# mount | grep vdb1
+/dev/vdb1 on /mnt type xfs (rw,relatime,seclabel,attr2,inode64,noquota) 
+Manually mounting a file system is an excellent way to verify that a formatted device is accessible or working in the way desired. However, once the system is rebooted, the file system, while it still exists and has intact data, will not be mounted into the directory tree again. If an administrator wants the file system to be persistently mounted, a listing for the file system needs to be added to /etc/fstab.
+
+Persistently mounting file systems
+
+By adding a listing for a device into the /etc/fstab file, administrators can configure a device to be mounted to a mount point at system boot.
+
+/etc/fstab is a white space-delimited file with six fields per line.
+
+[root@serverX ~]# cat /etc/fstab
+#
+# /etc/fstab
+# Created by anaconda on Thu Mar 20 14:52:46 2014
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=7a20315d-ed8b-4e75-a5b6-24ff9e1f9838  /  xfs  defaults  1 1
+The first field specifies the device to be used. In the previous example, the UUID is being used to specify the device. Alternatively, the device file could be used; for example, /dev/vdb1. The UUID is stored in the file system superblock and created when the file system is created.
+
+NOTE
+Using the UUID is preferable because block device identifiers can change in certain scenarios, such as a cloud provider changing the underlying storage layer of a virtual machine. The block device file may change, but the UUID would remain intact in the superblock of the device.
+
+The blkid command can be used to scan the block devices connected to a machine and report on data like the assigned UUID and file system format.
+
+[root@serverX ~]# blkid /dev/vdb1
+/dev/vdb1: UUID="226a7c4f-e309-4cb3-9e76-6ef972dd8600" TYPE="xfs" 
+The second field is the mount point where the device should be attached into the directory hierarchy. The mount point should already exist; if it does not, it can be created with mkdir.
+
+The third field contains the file system type that has been applied to the block device.
+
+The fourth field is the list of options that should be applied to the device when mounted to customize the behavior. This field is required, and there is a set of commonly used options called defaults. Other options are documented in the mount man page.
+
+The last two fields are the dump flag and fsck order. The dump flag is used with the dump command to make a backup of the contents of the device. The fsck order field determines if the fsck should be run at boot time, in the event that the file system was not unmounted cleanly. The value of the fsck order indicates the order in which file systems should have fsck run on them if multiple file systems are required to be checked.
+
+UUID=226a7c4f-e309-4cb3-9e76-6ef972dd8600  /mnt  xfs  defaults  1 2
+NOTE
+Having an incorrect entry in /etc/fstab may render the machine unbootable. To avoid that situation, an administrator should verify that the entry is valid by unmounting the new file system and using mount -a, which reads /etc/fstab, to mount the file system back into place. If the mount -a command returns an error, it should be corrected before rebooting the machine.
+
+REFERENCES
+fdisk(8), gdisk(8), mkfs(8), mount(8), fstab(5) man pages
+
+
+
+
+
+
+Guided Exercise: Practice: Adding Partitions, File Systems, and Persistent Mounts
+In this lab, you will create an MBR partition on a newly allocated disk, format the partition with an ext4 file system, and configure the file system for persistent mounting.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+1 GiB ext4 file system on second disk persistently mounted at /archive.
+
+Reset your serverX system.
+
+Log into serverX.
+
+Switch to root using sudo -i.
+
+You have been asked to archive data to a new directory, /archive, on serverX. You have been allocated a second disk for this purpose. The /archive directory will require 1 GiB of space. To make sure that the /archive directory is always available for use, you will need to configure the newly created file system to be persistently mounted at /archive even after a server reboot.
+
+Once you have completed your work, reboot your serverX machine and verify that the newly created file system is persistently mounted at /archive after the reboot.
+
+NOTE
+The instructions and solutions presented here assume that your secondary harddrive is /dev/vdb. In your environment this might be different, for example /dev/xvdj. Adjust the instructions and solutions as necessary for your environment.
+
+Create a 1 GiB MBR partition on /dev/vdb of type Linux.
+
+Use fdisk to modify the second disk.
+
+[root@serverX ~]# fdisk /dev/vdb
+Display the original partition table, then add a new partition that is 1 GiB in size.
+
+Command (m for help): p
+
+Disk /dev/vdb: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0xfd41a9d3
+
+Device Boot    Start      End   Blocks  Id  System
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-20971519, default 2048): Enter
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-20971519, default 20971519): +1G
+Partition 1 of type Linux and of size 1 GiB is set
+Save the partition table changes.
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+Syncing disks.
+If fdisk issues a warning, then run the partprobe command to make the kernel aware of the partition table change. This will not be necessary if the disk device is currently unused.
+
+[root@serverX ~]# partprobe
+Format the newly created partition with the ext4 file system.
+
+[root@serverX ~]# mkfs -t ext4 /dev/vdb1
+mke2fs 1.42.9 (28-Dec-2013)
+Filesystem label=
+OS type: Linux
+Block size=4096 (log=2)
+Fragment size=4096 (log=2)
+Stride=0 blocks, Stripe width=0 blocks
+65536 inodes, 262144 blocks
+13107 blocks (5.00%) reserved for the super user
+First data block=0
+Maximum filesystem blocks=268435456
+8 block groups
+32768 blocks per group, 32768 fragments per group
+8192 inodes per group
+Superblock backups stored on blocks:
+        32768, 98304, 163840, 229376
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (8192 blocks): done
+Writing superblocks and filesystem accounting information: done
+Configure the newly created file system to persistently mount at /archive.
+
+Create the /archive directory mount point.
+
+[root@serverX ~]# mkdir /archive
+Determine the UUID of the new partition on the second disk.
+
+[root@serverX ~]# blkid /dev/vdb1
+/dev/vdb1: UUID="5fcb234a-cf18-4d0d-96ab-66a4d1ad08f5" TYPE="ext4"
+Add an entry to /etc/fstab.
+
+UUID=5fcb234a-cf18-4d0d-96ab-66a4d1ad08f5 /archive ext4 defaults 0 2
+Test mounting the newly created file system.
+
+Execute the mountcommand to mount the new file system using the new entry added to /etc/fstab.
+
+[root@serverX ~]# mount -a
+Verify that the new file system is mounted at /archive.
+
+[root@serverX ~]# mount | grep -w /archive
+/dev/vdb1 on /archive type ext4 (rw,relatime,seclabel,data=ordered)
+Reboot serverX. After the server has rebooted, log in and verify that /dev/vdb1 is mounted at /archive.
+
+[student@serverX ~]$ mount | grep ^/
+/dev/vda1 on / type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
+/dev/vdb1 on /archive type ext4 (rw,relatime,seclabel,data=ordered)
+

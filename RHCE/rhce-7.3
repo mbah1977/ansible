@@ -1,0 +1,175 @@
+Enabling yum Software Repositories
+Repositories for yum are configured in the /etc/yum.repos.d directory.
+
+Objectives
+After completing this section, students should be able to enable and disable the use of Red Hat or third-party yum repositories.
+
+Enabling Red Hat software repositories
+Registering a system to the subscription management service automatically configures access to software repositories based on the attached subscriptions. To view all available repositories:
+
+[root@serverX ~]# yum repolist all
+Loaded plugins: langpacks
+repo id                                    repo name                                        status
+rhel-7-server-debug-rpms/7Server/x86_64    Red Hat Enterprise Linux 7 Server (Debug RPMs)   disabled
+rhel-7-server-rpms/7Server/x86_64          Red Hat Enterprise Linux 7 Server (RPMs)         enabled: 5,071
+rhel-7-server-source-rpms/7Server/x86_64   Red Hat Enterprise Linux 7 Server (Source RPMs)  disabled
+repolist: 5,071
+Enable and disable repositories with yum-config-manager. This will change the enabled parameter in the /etc/yum.repos.d/redhat.repo file.
+
+[root@serverX ~]# yum-config-manager --enable rhel-7-server-debug-rpms
+Loaded plugins: langpacks
+===================== repo: rhel-7-server-debug-rpms ======================
+[rhel-7-server-debug-rpms]
+async = True
+bandwidth = 0
+base_persistdir = /var/lib/yum/repos/x86_64/7Server
+baseurl = https://cdn.redhat.com/content/dist/rhel/server/7/7Server/x86_64/debug
+cache = 0
+cachedir = /var/cache/yum/x86_64/7Server/rhel-7-server-debug-rpms
+check_config_file_age = True
+cost = 1000
+deltarpm_percentage = 
+enabled = 1
+...
+Enabling third-party software repositories
+Third-party repositories are directories of software package files provided by a non-Red Hat source, which can be accessed by yum from a website, FTP server, or local file system. Yum repositories are used by non-Red Hat distributors of software, or for small collections of local packages. (For example, Adobe provides some of its free software for Linux through a yum repository.) The content.example.com classroom server actually hosts yum repositories for this class.
+
+Put a file in the /etc/yum.repos.d/ directory to enable support for a new third-party repository. Repository configuration files must end in .repo. The repository definition contains the URL of the repository, a name, whether to use GPG to check the package signatures, and if so, the URL pointing to the trusted GPG key.
+
+Using yum-config-manager
+
+If the URL for a yum repository is known, a configuration file can be created with yum-config-manager.
+
+[root@serverX ~]# yum-config-manager --add-repo="http://dl.fedoraproject.org/pub/epel/7/x86_64/"
+Loaded plugins: langpacks
+adding repo from: http://dl.fedoraproject.org/pub/epel/7/x86_64/
+
+[dl.fedoraproject.org_pub_epel_7_x86_64_]
+name=added from: http://dl.fedoraproject.org/pub/epel/7/x86_64/
+baseurl=http://dl.fedoraproject.org/pub/epel/7/x86_64/
+enabled=1
+A file was created in the /etc/yum.repos.d directory with the output shown. This file can now be modified to provide a customized name and the location of the GPG key. Administrators should download the key to a local file rather than allowing yum to retrieve the key from an external source.
+
+[EPEL]
+name=EPEL 7
+baseurl=http://dl.fedoraproject.org/pub/epel/7/x86_64/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+RPM configuration package for the repository
+
+Some repositories provide this configuration file and GPG public key as part of an RPM package that can be downloaded and installed using yum localinstall. One example of this is the volunteer project EPEL (Extra Packages for Enterprise Linux), which provides software not supported by Red Hat but compatible with Red Hat Enterprise Linux.
+
+Installing the Red Hat Enterprise Linux 7 EPEL repo package:
+
+[root@serverX ~]# rpm --import http://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-7
+[root@serverX ~]# yum install http://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-2.noarch.rpm
+Configuration files often list multiple repository references in a single file. Each repository reference begins with a single-word name in square brackets.
+
+[root@serverX ~]# cat /etc/yum.repos.d/epel.repo
+[epel]
+name=Extra Packages for Enterprise Linux 7 - $basearch
+#baseurl=http://download.fedoraproject.org/pub/epel/7/$basearch
+mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=epel-7&arch=$basearch
+failovermethod=priority
+enabled=1
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+
+[epel-debuginfo]
+name=Extra Packages for Enterprise Linux 7 - $basearch - Debug
+#baseurl=http://download.fedoraproject.org/pub/epel/7/$basearch/debug
+mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=epel-debug-7&arch=$basearch
+failovermethod=priority
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+gpgcheck=1
+
+[epel-source]
+name=Extra Packages for Enterprise Linux 7 - $basearch - Source
+#baseurl=http://download.fedoraproject.org/pub/epel/7/SRPMS
+mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=epel-source-7&arch=$basearch
+failovermethod=priority
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+gpgcheck=1
+The enabled=0 parameter can be included so that a repository is defined but not searched by default. Repositories can be enabled and disabled persistently with yum-config-manager or temporarily with --enablerepo=PATTERN and --disablerepo=PATTERN options on yum.
+
+WARNING
+Install the RPM GPG key before installing signed packages. This will verify that the packages belong to a key which has been imported. Otherwise, yum will complain about the missing key. (The --nogpgcheck option can be used to ignore missing GPG keys, but this could cause forged or insecure packages to be installed on the system, potentially compromising its security.)
+
+REFERENCES
+Additional information may be available in the section on configuring yum and yum repositories in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+yum(1), yum.conf(5), and yum-config-manager(1) man pages
+
+
+
+
+
+Guided Exercise: Practice: Enabling Software Repositories
+In this lab, you will configure your server to use a separate yum repository to obtain updates, and update your machine.
+
+Outcomes:
+
+The system will be configured to obtain software updates from a classroom server and the system will be running the latest Linux kernel.
+
+Reset your serverX system.
+
+Configure the system to obtain software from two classroom repositories:
+
+Classroom packages provided at http://content.example.com/rhel7.0/x86_64/rht
+
+Updates provided at http://content.example.com/rhel7.0/x86_64/errata
+
+Use yum-config-manager to add the classroom packages repository.
+
+[root@serverX ~]# yum-config-manager --add-repo="http://content.example.com/rhel7.0/x86_64/rht"
+Loaded plugins: langpacks
+adding repo from: http://content.example.com/rhel7.0/x86_64/rht
+
+[content.example.com_rhel7.0_x86_64_rht]
+name=added from: http://content.example.com/rhel7.0/x86_64/rht
+baseurl=http://content.example.com/rhel7.0/x86_64/rht
+enabled=1
+Create the file /etc/yum.repos.d/errata.repo to enable the “Updates” repository with the following content:
+
+[updates]
+name=Red Hat Updates
+baseurl=http://content.example.com/rhel7.0/x86_64/errata
+enabled=1
+gpgcheck=0
+Use yum-config-manager to disable the classroom packages repository.
+
+[root@serverX ~]# yum-config-manager --disable content.example.com_rhel7.0_x86_64_rht
+Loaded plugins: langpacks
+================= repo: content.example.com_rhel7.0_x86_64_rht =================
+[content.example.com_rhel7.0_x86_64_rht]
+...
+enabled = 0
+...
+Update all relevant software provided using yum update.
+
+[root@serverX ~]# yum update -y
+Verify that there are two versions of the kernel installed. Which version is currently in use?
+
+[root@serverX ~]# yum list kernel
+
+[root@serverX ~]# uname -r
+
+Reboot your serverX, then repeat the previous step. Which version is currently in use?
+
+[root@serverX ~]# yum list kernel
+
+[root@serverX ~]# uname -r
+
+List, then install, the rht-system package.
+
+[root@serverX ~]# yum list rht*
+Loaded plugins: langpacks
+Available Packages
+rht-system.noarch                      1.0.0-2.el7                       updates
+[root@serverX ~]# yum -y install rht-system
+Loaded plugins: langpacks
+Resolving Dependencies
+...

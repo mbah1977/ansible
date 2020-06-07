@@ -1,0 +1,246 @@
+Chapter 6. Process Management
+Killing Processes
+Guided Exercise: Practice: Killing Processes
+Monitoring Process Activity
+Guided Exercise: Practice: Monitoring Process Activity
+Using nice and renice to Influence Process Priority
+Guided Exercise: Practice: Discovering Process Priorities
+Lab: Lab: Managing Priority of Linux Processes
+Abstract
+
+Overview
+Goal	To evaluate and control processes running on a Red Hat Enterprise Linux system.
+Objectives	
+Terminate and control processes using signals.
+
+Monitor resource usage and system load due to process activity.
+
+Set nice levels on new and existing processes.
+
+Sections	
+Killing Processes (and Practice)
+
+Monitoring Process Activity (and Practice)
+
+Using nice and renice to Influence Process Priority (and Practice)
+
+Lab	
+Managing Priority of Linux Processes
+
+Killing Processes
+Use signals to stop, start, and reload processes and process configurations.
+
+Objectives
+After completing this section, students should be able to:
+
+Use commands to kill and communicate with processes.
+
+Define the characteristics of a daemon process.
+
+End user sessions and processes.
+
+Process control using signals
+A signal is a software interrupt delivered to a process. Signals report events to an executing program. Events that generate a signal can be an error, external event (e.g., I/O request or expired timer), or by explicit request (e.g., use of a signal-sending command or by keyboard sequence).
+
+The following table lists the fundamental signals used by system administrators for routine process management. Refer to signals by either their short (HUP) or proper (SIGHUP) name.
+
+Table 6.1. Fundamental process management signals
+
+Signal number	Short name	Definition	Purpose
+1	HUP	Hangup	
+Used to report termination of the controlling process of a terminal. Also used to request process reinitialization (configuration reload) without termination.
+
+2	INT	Keyboard interrupt	
+Causes program termination. Can be blocked or handled. Sent by pressing INTR key combination (Ctrl+c).
+
+3	QUIT	Keyboard quit	
+Similar to SIGINT, but also produces a process dump at termination. Sent by pressing QUIT key combination (Ctrl+\).
+
+9	KILL	Kill, unblockable	
+Causes abrupt program termination. Cannot be blocked, ignored, or handled; always fatal.
+
+15
+default
+
+TERM	Terminate	
+Causes program termination. Unlike SIGKILL, can be blocked, ignored, or handled. The polite way to ask a program to terminate; allows self-cleanup.
+
+18	CONT	Continue	
+Sent to a process to resume if stopped. Cannot be blocked. Even if handled, always resumes the process.
+
+19	STOP	Stop, unblockable	
+Suspends the process. Cannot be blocked or handled.
+
+20	TSTP	Keyboard stop	
+Unlike SIGSTOP, can be blocked, ignored, or handled. Sent by pressing SUSP key combination (Ctrl+z).
+
+
+NOTE
+Signal numbers vary on different Linux hardware platforms, but signal names and meanings are standardized. For command use, it is advised to use signal names instead of numbers. The numbers discussed in this section are for Intel x86 systems.
+
+Each signal has a default action, usually one of the following:
+
+  Term — Cause a program to terminate (exit) at once.
+  Core — Cause a program to save a memory image (core dump), then terminate.
+  Stop — Cause a program to stop executing (suspend) and wait to continue (resume).
+Programs can be prepared for expected event signals by implementing handler routines to ignore, replace, or extend a signal's default action.
+
+Commands for sending signals by explicit request
+
+Users signal their current foreground process by pressing a keyboard control sequence to suspend (Ctrl+z), kill (Ctrl+c), or core dump (Ctrl+\) the process. To signal a background process or processes in a different session requires a signal-sending command.
+
+Signals can be specified either by name (e.g., -HUP or -SIGHUP) or by number (e.g., -1). Users may kill their own processes, but root privilege is required to kill processes owned by others.
+
+The kill command sends a signal to a process by ID. Despite its name, the kill command can be used for sending any signal, not just those for terminating programs.
+
+[student@serverX ~]$ kill PID
+[student@serverX ~]$ kill -signal PID
+[student@serverX ~]$ kill -l
+ 1) SIGHUP      2) SIGINT      3) SIGQUIT     4) SIGILL      5) SIGTRAP
+ 6) SIGABRT     7) SIGBUS      8) SIGFPE      9) SIGKILL    10) SIGUSR1
+11) SIGSEGV    12) SIGUSR2    13) SIGPIPE    14) SIGALRM    15) SIGTERM
+16) SIGSTKFLT  17) SIGCHLD    18) SIGCONT    19) SIGSTOP    20) SIGTSTP
+-- output truncated --
+Use killall to send a signal to one or more processes matching selection criteria, such as a command name, processes owned by a specific user, or all system-wide processes.
+
+[student@serverX ~]$ killall command_pattern
+[student@serverX ~]$ killall -signal command_pattern
+[root@serverX ~]# killall -signal -u username command_pattern
+The pkill command, like killall, can signal multiple processes. pkill uses advanced selection criteria, which can include combinations of:
+
+  Command — Processes with a pattern-matched command name.
+  UID — Processes owned by a Linux user account, effective or real.
+  GID — Processes owned by a Linux group account, effective or real.
+  Parent — Child processes of a specific parent process.
+  Terminal — Processes running on a specific controlling terminal.
+[student@serverX ~]$ pkill command_pattern
+[student@serverX ~]$ pkill -signal command_pattern
+[root@serverX ~]# pkill -G GID command_pattern
+[root@serverX ~]# pkill -P PPID command_pattern
+[root@serverX ~]# pkill -t terminal_name -U UID command_pattern
+Logging users out administratively
+The w command views users currently logged into the system and their cumulative activities. Use the TTY and FROM columns to determine the user's location.
+
+All users have a controlling terminal, listed as pts/N while working in a graphical environment window (pseudo-terminal) or ttyN on a system console, alternate console, or other directly connected terminal device. Remote users display their connecting system name in the FROM column when using the -f option.
+
+[student@serverX ~]$ w -f
+ 12:43:06 up 27 min,  5 users,  load average: 0.03, 0.17, 0.66
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+student  :0       :0               12:20   ?xdm?   1:10   0.16s gdm-session-wor
+student  pts/0    :0               12:20    2.00s  0.08s  0.01s w -f
+root     tty2                      12:26   14:58   0.04s  0.04s -bash
+bob      tty3                      12:28   14:42   0.02s  0.02s -bash
+student  pts/1    desktop2.example.12:41    1:07   0.03s  0.03s -bash
+[student@serverX ~]$ 
+Discover how long a user has been on the system by viewing the session login time. For each session, CPU resources consumed by current jobs, including background tasks and child processes, are in the JCPU column. Current foreground process CPU consumption is in the PCPU column.
+
+Users may be forced off a system for security violations, resource overallocation, or other administrative need. Users are expected to quit unnecessary applications, close unused command shells, and exit login sessions when requested.
+
+When situations occur in which users cannot be contacted or have unresponsive sessions, runaway resource consumption, or improper system access, their sessions may need to be administratively terminated using signals.
+
+IMPORTANT
+Although SIGTERM is the default signal, SIGKILL is a commonly misused administrator favorite. Since the SIGKILL signal cannot be handled or ignored, it is always fatal. However, it forces termination without allowing the killed process to run self-cleanup routines. It is recommended to send SIGTERM first, then retry with SIGKILL only if a process fails to respond.
+
+Processes and sessions can be individually or collectively signaled. To terminate all processes for one user, use the pkill command. Because the initial process in a login session (session leader) is designed to handle session termination requests and ignore unintended keyboard signals, killing all of a user's processes and login shells requires using the SIGKILL signal.
+
+[root@serverX ~]# pgrep -l -u bob
+6964 bash
+6998 sleep
+6999 sleep
+7000 sleep
+[root@serverX ~]# pkill -SIGKILL -u bob
+[root@serverX ~]# pgrep -l -u bob
+[root@serverX ~]# 
+When processes requiring attention are in the same login session, it may not be necessary to kill all of a user's processes. Determine the controlling terminal for the session using the w command, then kill only processes which reference the same terminal ID. Unless SIGKILL is specified, the session leader (here, the bash login shell) successfully handles and survives the termination request, but all other session processes are terminated.
+
+[root@serverX ~]# pgrep -l -u bob
+7391 bash
+7426 sleep
+7427 sleep
+7428 sleep
+[root@serverX ~]# w -h -u bob
+bob      tty3      18:37    5:04   0.03s  0.03s -bash
+[root@serverX ~]# pkill -t tty3
+[root@serverX ~]# pgrep -l -u bob
+7391 bash
+[root@serverX ~]# pkill -SIGKILL -t tty3
+[root@serverX ~]# pgrep -l -u bob
+[root@serverX ~]# 
+The same selective process termination can be applied using parent and child process relationships. Use the pstree command to view a process tree for the system or a single user. Use the parent process's PID to kill all children they have created. This time, the parent bash login shell survives because the signal is directed only at its child processes.
+
+[root@serverX ~]# pstree -p bob
+bash(8391)─┬─sleep(8425)
+           ├─sleep(8426)
+           └─sleep(8427)
+[root@serverX ~]# pkill -P 8391
+[root@serverX ~]# pgrep -l -u bob
+bash(8391)
+[root@serverX ~]# pkill -SIGKILL -P 8391
+[root@serverX ~]# pgrep -l -u bob
+bash(8391)
+[root@serverX ~]# 
+REFERENCES
+info libc signal (GNU C Library Reference Manual)
+
+Section 24: Signal Handling
+
+info libc processes (GNU C Library Reference Manual)
+
+Section 26: Processes
+
+kill(1), killall(1), pgrep(1), pkill(1), pstree(1), signal(7), and w(1) man pages
+
+
+
+
+Guided Exercise: Practice: Killing Processes
+In this lab, students will use keyboard sequences and signals to manage and stop processes.
+
+Outcomes:
+
+Experience with observing the results of starting and stopping multiple shell processes.
+
+Log in as student to serverX. Start in your home directory.
+
+Open two terminal windows, side by side, to be referred to as left and right.
+
+In the left window, start three processes that append text to an output file at one-second intervals. To properly background each process, the complete command set must be contained in parentheses and ended with an ampersand.
+
+[student@serverX ~]$ (while true; do echo -n "game " >> ~/outfile; sleep 1; done) &
+[student@serverX ~]$ (while true; do echo -n "set " >> ~/outfile; sleep 1; done) &
+[student@serverX ~]$ (while true; do echo -n "match " >> ~/outfile; sleep 1; done) & 
+In the right window, use tail to confirm that all three processes are appending to the file. In the left window, view jobs to see all three processes "Running".
+
+[student@serverX ~]$ tail -f ~/outfile
+[student@serverX ~]$ jobs
+[1]   Running                 ( while true; do
+    echo -n "game " >> ~/outfile; sleep 1;
+done ) &
+[2]-  Running                 ( while true; do
+    echo -n "set " >> ~/outfile; sleep 1;
+done ) &
+[3]+  Running                 ( while true; do
+    echo -n "match " >> ~/outfile; sleep 1;
+done ) &
+Suspend the "game" process using signals. Confirm that the "game" process is "Stopped". In the right window, confirm that "game" output is no longer active.
+
+[student@serverX ~]$ kill -SIGSTOP %number
+[student@serverX ~]$ jobs
+Terminate the "set" process using signals. Confirm that the "set" process has disappeared. In the right window, confirm that "set" output is no longer active.
+
+[student@serverX ~]$ kill -SIGTERM %number
+[student@serverX ~]$ jobs
+Resume the "game" process using signals. Confirm that the "game" process is "Running". In the right window, confirm that "game" output is again active.
+
+[student@serverX ~]$ kill -SIGCONT %number
+[student@serverX ~]$ jobs
+Terminate the remaining two jobs. Confirm that no jobs remain and that output has stopped. From the left window, terminate the right window's tail command.
+
+Close extra terminal windows.
+
+[student@serverX ~]$ kill -SIGTERM %number
+[student@serverX ~]$ kill -SIGTERM %number
+[student@serverX ~]$ jobs
+[student@serverX ~]$ pkill -SIGTERM tail
+[student@serverX ~]$ 
+

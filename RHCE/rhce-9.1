@@ -1,0 +1,202 @@
+Chapter 9. Service Management and Boot Troubleshooting
+Identifying Automatically Started System Processes
+Guided Exercise: Practice: Identify the Status of systemd Units
+Controlling System Services
+Guided Exercise: Practice: Using systemctl to Manage Services
+The Red Hat Enterprise Linux Boot Process
+Guided Exercise: Practice: Selecting a Boot Target
+Repairing Common Boot Issues
+Guided Exercise: Practice: Resetting a Lost root Password
+Repairing File System Issues at Boot
+Guided Exercise: Practice: Repairing Boot Problems
+Repairing Boot Loader Issues
+Guided Exercise: Practice: Repairing a Boot Loader Problem
+Lab: Lab: Controlling Services and Daemons
+Abstract
+
+Overview
+Goal	To control and monitor system daemons and troubleshoot the Red Hat Enterprise Linux boot process.
+Objectives	
+List system daemons and network services started by the systemd service and socket units.
+
+Control system daemons and network services using systemctl.
+
+Describe the Red Hat Enterprise Linux boot process.
+
+Repair common boot issues.
+
+Repair file system issues at boot.
+
+Repair boot loader problems.
+
+Sections	
+Identifying Automatically Started System Processes (and Practice)
+
+Controlling System Services (and Practice)
+
+The Red Hat Enterprise Linux Boot Process (and Practice)
+
+Repairing Common Boot Issues (and Practice)
+
+Repairing File System Issues at Boot (and Practice)
+
+Repairing Boot Loader Issues (and Practice)
+
+Lab	
+Controlling Services and Daemons
+
+Identifying Automatically Started System Processes
+Determine the status of system daemons and network services started by systemd.
+
+Objectives
+After completing this section, students should be able to list system daemons and network services started by the systemd service and socket units.
+
+Introduction to systemd
+Viewing service status
+System startup and server processes are managed by the systemd System and Service Manager. This program provides a method for activating system resources, server daemons, and other processes, both at boot time and on a running system.
+
+Daemons are processes that wait or run in the background performing various tasks. Generally, daemons start automatically at boot time and continue to run until shutdown or until they are manually stopped. By convention, the names of many daemon programs end in the letter "d".
+
+To listen for connections, a daemon uses a socket. This is the primary communication channel with local or remote clients. Sockets may be created by daemons or may be separated from the daemon and be created by another process, such as systemd. The socket is passed to the daemon when a connection is established by the client.
+
+A service often refers to one or more daemons, but starting or stopping a service may instead make a one-time change to the state of the system, which does not involve leaving a daemon process running afterward (called oneshot).
+
+A bit of history
+
+For many years, process ID 1 of Linux and UNIX systems has been the init process. This process was responsible for activating other services on the system and is the origin of the term "init system." Frequently used daemons were started on systems at boot time with System V and LSB init scripts. These are shell scripts, and may vary from one distribution to another. Less frequently used daemons were started on demand by another service, such as inetd or xinetd, which listens for client connections. These systems have several limitations, which are addressed with systemd.
+
+In Red Hat Enterprise Linux 7, process ID 1 is systemd, the new init system. A few of the new features provided by systemd include:
+
+Parallelization capabilities, which increase the boot speed of a system.
+
+On-demand starting of daemons without requiring a separate service.
+
+Automatic service dependency management, which can prevent long timeouts, such as by not starting a network service when the network is not available.
+
+A method of tracking related processes together by using Linux control groups.
+
+NOTE
+With systemd, shell-based service scripts are used only for a few legacy services. Therefore, configuration files with shell variables, such as those found in /etc/sysconfig, are being replaced. Those still in use are included as systemd environment files and read as NAME=VALUE pairs. They are no longer sourced as a shell script.
+
+systemctl and systemd units
+
+The systemctl command is used to manage different types of systemd objects, called units. A list of available unit types can be displayed with systemctl -t help.
+
+IMPORTANT
+The systemctl may abbreviate or "ellipsize" unit names, process tree entries, and unit descriptions unless run with the -l option.
+
+Some common unit types are listed below:
+
+Service units have a .service extension and represent system services. This type of unit is used to start frequently accessed daemons, such as a web server.
+
+Socket units have a .socket extension and represent inter-process communication (IPC) sockets. Control of the socket will be passed to a daemon or newly started service when a client connection is made. Socket units are used to delay the start of a service at boot time and to start less frequently used services on demand. These are similar in principle to services which use the xinetd superserver to start on demand.
+
+Path units have a .path extension and are used to delay the activation of a service until a specific file system change occurs. This is commonly used for services which use spool directories, such as a printing system.
+
+Service states
+
+The status of a service can be viewed with systemctl status name.type. If the unit type is not provided, systemctl will show the status of a service unit, if one exists.
+
+[root@serverX ~]# systemctl status sshd.service
+sshd.service - OpenSSH server daemon
+   Loaded: loaded (/usr/lib/systemd/system/sshd.service; enabled)
+   Active: active (running) since Thu 2014-02-27 11:51:39 EST; 7h ago
+ Main PID: 1073 (sshd)
+   CGroup: /system.slice/sshd.service
+           └─1073 /usr/sbin/sshd -D
+
+Feb 27 11:51:39 server0.example.com systemd[1]: Started OpenSSH server daemon.
+Feb 27 11:51:39 server0.example.com sshd[1073]: Could not load host key: /et...y
+Feb 27 11:51:39 server0.example.com sshd[1073]: Server listening on 0.0.0.0 ....
+Feb 27 11:51:39 server0.example.com sshd[1073]: Server listening on :: port 22.
+Feb 27 11:53:21 server0.example.com sshd[1270]: error: Could not load host k...y
+Feb 27 11:53:22 server0.example.com sshd[1270]: Accepted password for root f...2
+Hint: Some lines were ellipsized, use -l to show in full.
+Several keywords indicating the state of the service can be found in the status output:
+
+Keyword:	Description:
+loaded	Unit configuration file has been processed.
+active (running)	Running with one or more continuing processes.
+active (exited)	Successfully completed a one-time configuration.
+active (waiting)	Running but waiting for an event.
+inactive	Not running.
+enabled	Will be started at boot time.
+disabled	Will not be started at boot time.
+static	Can not be enabled, but may be started by an enabled unit automatically.
+NOTE
+The systemctl status NAME command replaces the service NAME status command used in previous versions of Red Hat Enterprise Linux.
+
+Listing unit files with systemctl
+In this example, please follow along with the next steps while your instructor demonstrates obtaining status information of services.
+
+NOTE
+Notice that the systemctl command will automatically paginate the output with less.
+
+Query the state of all units to verify a system startup.
+
+[root@serverX ~]# systemctl
+Query the state of only the service units.
+
+[root@serverX ~]# systemctl --type=service
+Investigate any units which are in a failed or maintenance state. Optionally, add the -l option to show the full output.
+
+[root@serverX ~]# systemctl status rngd.service -l
+The status argument may also be used to determine if a particular unit is active and show if the unit is enabled to start at boot time. Alternate commands can also easily show the active and enabled states:
+
+[root@serverX ~]# systemctl is-active sshd
+[root@serverX ~]# systemctl is-enabled sshd
+List the active state of all loaded units. Optionally, limit the type of unit. The --all option will add inactive units.
+
+[root@serverX ~]# systemctl list-units --type=service
+[root@serverX ~]# systemctl list-units --type=service --all
+View the enabled and disabled settings for all units. Optionally, limit the type of unit.
+
+[root@serverX ~]# systemctl list-unit-files --type=service
+View only failed services.
+
+[root@serverX ~]# systemctl --failed --type=service
+REFERENCES
+systemd(1), systemd.unit(5), systemd.service(5), systemd.socket(5), and systemctl(1) man pages
+
+Additional information may be available in the chapter on managing services with systemd in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+
+
+Guided Exercise: Practice: Identify the Status of systemd Units
+In this lab, you will identify installed and running services on the system.
+
+Outcomes:
+
+A list of active and enabled services on the system.
+
+Reset your serverX system.
+
+List all service units on the system.
+
+[student@serverX ~]$ sudo systemctl list-units --type=service
+List all socket units, active and inactive, on the system.
+
+[student@serverX ~]$ sudo systemctl list-units --type=socket --all
+Explore the status of the chronyd service. This service is used for network time synchronization (NTP).
+
+Display the status of the chronyd service. Note the process ID of any active daemons.
+
+[student@serverX ~]$ sudo systemctl status chronyd
+Confirm that the listed daemons are running.
+
+[student@serverX ~]$ ps -p PID
+Explore the status of the sshd service. This service is used for secure encrypted communication between systems.
+
+Determine if the sshd service is enabled to start at system boot.
+
+[student@serverX ~]$ sudo systemctl is-enabled sshd
+Determine if the sshd service is active without displaying all of the status information.
+
+[student@serverX ~]$ sudo systemctl is-active sshd
+Display the status of the sshd service.
+
+[student@serverX ~]$ sudo systemctl status sshd
+List the enabled or disabled states of all service units.
+
+[student@serverX ~]$ sudo systemctl list-unit-files --type=service
+

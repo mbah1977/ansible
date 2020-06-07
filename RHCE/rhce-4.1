@@ -1,0 +1,181 @@
+
+Chapter 4. File Permissions
+Managing File System Permissions from the Command Line
+Guided Exercise: Practice: Managing File Security from the Command Line
+Managing Default Permissions and File Access
+Guided Exercise: Practice: Controlling New File Permissions and Ownership
+POSIX Access Control Lists (ACLs)
+Quiz: Practice: Interpret ACLs
+Securing Files with ACLs
+Guided Exercise: Practice: Using ACLs to Grant and Limit Access
+Abstract
+
+Overview
+Goal	To control access to files and directories using permissions and access control lists (acls).
+Objectives	
+Change the permissions and ownership of files using command-line tools.
+
+Configure a directory in which newly created files are automatically writable by members of the group which owns the directory, using special permissions and default umask settings.
+
+Describe POSIX access control lists.
+
+Manage POSIX access control lists.
+
+Sections	
+Managing File System Permissions from the Command Line (and Practice)
+
+Managing Default Permissions and File Access (and Practice)
+
+POSIX Access Control Lists (ACLs) (and Practice)
+
+Securing Files with ACLs (and Practice)
+
+Managing File System Permissions from the Command Line
+Modify ownership and permissions of files and directories using chmod and chown.
+
+Objectives
+After completing this section, students should be able to change the permissions and ownership of files using command-line tools.
+
+Changing file/directory permissions
+The command used to change permissions from the command line is chmod, short for "change mode" (permissions are also called the mode of a file). The chmod command takes a permission instruction followed by a list of files or directories to change. The permission instruction can be issued either symbolically (the symbolic method) or numerically (the numeric method).
+
+Symbolic method keywords:
+
+chmod WhoWhatWhich file|directory
+Who is u, g, o, a (for user, group, other, all)
+
+What is +, -, = (for add, remove, set exactly)
+
+Which is r, w, x (for read, write, execute)
+
+The symbolic method of changing file permissions uses letters to represent the different groups of permissions: u for user, g for group, o for other, and a for all.
+
+With the symbolic method, it is not necessary to set a complete new group of permissions. Instead, it is possible to change one or more of the existing permissions. In order to accomplish this, use three symbols: + to add permissions to a set, - to remove permissions from a set, and = to replace the entire set for a group of permissions.
+
+The permissions themselves are represented by a single letter: r for read, w for write, and x for execute. When using chmod to change permissions with the symbolic method, using a capital X as the permission flag will add execute permission only if the file is a directory or already has execute set for user, group, or other.
+
+Numeric method:
+
+chmod ### file|directory
+Each digit represents an access level: user, group, other.
+
+# is sum of r=4, w=2, and x=1.
+
+Using the numeric method, permissions are represented by a three-digit (or four, when setting advanced permissions) octal number. A single octal digit can represent the numbers 0-7, exactly the number of possibilities for a three-bit number.
+
+To convert between symbolic and numeric representation of permissions, we need to know how the mapping is done. In the three-digit octal (numeric) representation, each digit stands for one group of permissions, from left to right: user, group, and other. In each of these groups, start with 0. If the read permission is present, add 4. Add 2 if write is present, and 1 for execute.
+
+Numeric permissions are often used by advanced administrators since they are shorter to type and pronounce, while still giving full control over all permissions.
+
+Examine the permissions -rwxr-x---. For the user, rwx is calculated as 4+2+1=7. For the group, r-x is calculated as 4+0+1=5, and for other users, --- is represented with 0. Putting these three together, the numeric representation of those permissions is 750.
+
+This calculation can also be performed in the opposite direction. Look at the permissions 640. For the user permissions, 6 represents read (4) and write (2), which displays as rw-. For the group part, 4 only includes read (4) and displays as r--. The 0 for other provides no permissions (---) and the final set of symbolic permissions for this file is -rw-r-----.
+
+Examples
+
+Remove read and write permission for group and other on file1:
+
+[student@desktopX ~]$ chmod go-rw file1
+Add execute permission for everyone on file2:
+
+[student@desktopX ~]$ chmod a+x file2
+Set read, write, and execute permission for user, read, and execute for group, and no permission for other on sampledir:
+
+[student@desktopX ~]$ chmod 750 sampledir
+NOTE
+The chmod command supports the -R option to recursively set permissions on the files in an entire directory tree. When using the -R option, it can be useful to set permissions symbolically using the X flag. This will allow the execute (search) permission to be set on directories so that their contents can be accessed, without changing permissions on most files. But be cautious. If a file has any execute permission set, X will set the specified execute permission on that file as well. For example, the following command will recursively set read and write access on demodir and all its children for their group owner, but will only apply group execute permissions to directories and files which already have execute set for user, group, and/or other.
+
+[student@desktopX ~]# chmod -R g+rwX demodir
+Changing file/directory user or group ownership
+A newly created file is owned by the user who creates the file. By default, the new file has a group ownership which is the primary group of the user creating the file. Since Red Hat Enterprise Linux uses user private groups, this group is often a group with only that user as a member. To grant access based on group membership, the owner or the group of a file may need to be changed.
+
+File ownership can be changed with the chown command (change owner). For example, to grant ownership of the file foofile to student, the following command could be used:
+
+[root@desktopX ~]# chown student foofile
+chown can be used with the -R option to recursively change the ownership of an entire directory tree. The following command would grant ownership of foodir and all files and subdirectories within it to student:
+
+[root@desktopX ~]# chown -R student foodir
+The chown command can also be used to change group ownership of a file by preceding the group name with a colon (:). For example, the following command will change the group foodir to admins:
+
+[root@desktopX ~]# chown :admins foodir
+The chown command can also be used to change both owner and group at the same time by using the syntax owner:group. For example, to change the ownership of foodir to visitor and the group to guests, use:
+
+[root@desktopX ~]# chown visitor:guests foodir
+Only root can change the ownership of a file. Group ownership, however, can be set by root or the file's owner. root can grant ownership to any group, while non-root users can grant ownership only to groups they belong to.
+
+NOTE
+Instead of using chown, some users change the group ownership by using the chgrp command; this command works exactly the same as changing ownership with chown, including the use of -R to affect entire directory trees.
+
+REFERENCES
+ls(1), chmod(1), chown(1), and chgrp(1) man pages
+
+
+Guided Exercise: Practice: Managing File Security from the Command Line
+In this lab, you will create a collaborative directory for pre-existing users.
+
+Outcomes
+
+A directory accessible by all members of the ateam group and a file created by Andy that can be modified by Alice.
+
+Reset your serverX system.
+
+Log into the GNOME desktop on serverX as student with a password of student.
+
+Open a window with a Bash prompt.
+
+Select Applications → Utilities → Terminal.
+
+Become the root user at the shell prompt.
+
+[student@serverX ~]$ su -
+Password: redhat
+Run lab permissions setup which will create a shared group, ateam, with two new users, andy and alice. The password for these accounts is password
+
+[root@serverX ~]# lab permissions setup
+Create a directory in /home called ateam-text.
+
+[root@serverX ~]# mkdir /home/ateam-text
+Change the group ownership of the ateam-text directory to ateam.
+
+[root@serverX ~]# chown :ateam /home/ateam-text
+Ensure the permissions of ateam-text allows group members to create and delete files.
+
+[root@serverX ~]# chmod g+w /home/ateam-text
+Ensure the permissions of ateam-text forbids others from accessing its files.
+
+[root@serverX ~]# chmod 770 /home/ateam-text
+[root@serverX ~]$ ls -ld /home/ateam-text
+drwxrwx---.  2 root ateam 6 Jan 23 12:50 /home/ateam-text
+Exit the root shell and switch to the user andy with a password of password.
+
+[root@serverX ~]# exit
+[student@serverX ~]$ su - andy
+Password: password
+Navigate to the /home/ateam-text folder (remember to open a terminal window first).
+
+[andy@serverX ~]$ cd /home/ateam-text
+Create an empty file called andyfile3.
+
+[andy@serverX ateam-text]$ touch andyfile3
+Record the default user and group ownership of the new file and its permissions.
+
+[andy@serverX ateam-text]$ ls -l andyfile3
+-rw-rw-r--.  1 andy andy 0 Jan 23 12:59 andyfile3
+Change the group ownership of the new file to ateam and record the new ownership and permissions.
+
+[andy@serverX ateam-text]$ chown :ateam andyfile3
+[andy@serverX ateam-text]$ ls -l andyfile3
+-rw-rw-r--.  1 andy ateam 0 Jan 23 12:59 andyfile3
+Exit the shell and switch to the user alice with a password of password.
+
+[andy@serverX ateam-text]$ exit
+[student@serverX ~]$ su - alice
+Password: password
+Navigate to the /home/ateam-text folder.
+
+[alice@serverX ~]$ cd /home/ateam-text
+Determine alice's privileges to access and/or modify andyfile3.
+
+[alice@serverX ateam-text]$ echo "text" >> andyfile3
+[alice@serverX ateam-text]$ cat andyfile3
+text

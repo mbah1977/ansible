@@ -1,0 +1,298 @@
+Securing Files with ACLs
+How to use setfacl -m acl_spec to add or modify.
+
+How to use setfacl -x acl_spec to delete.
+
+Default ACLs can be set on a directory; preface the acl_spec with d:. Include execute permission to ensure access to new subdirectories.
+
+How to use -R for recursive, -b to delete all ACLs, -k to delete all default ACLs.
+
+The acl_spec has the pattern type:name:perms.
+
+type can be u, g, o, or m.
+
+name can be a username, uid, group-name, or gid. An empty name implies file owner or group owner.
+
+perms are r, w, x, or X. "-" means unset.
+
+Objectives
+After completing this section, students should be able to:
+
+Change regular ACL file permissions using setfacl.
+
+Control default ACL file permissions for new files and directories.
+
+Changing ACL file permissions
+Use setfacl to add, modify, or remove standard ACLs on files and directories.
+
+ACLs use the normal file system representation of permissions, "r" for read permission, "w" for write permission, and "x" for execute permission. A "-" (dash) indicates that the relevant permission is absent. When (recursively) setting ACLs, an uppercase "X" can be used to indicate that execute permission should only be set on directories and not regular files, unless the file already has the relevant execute permission. This is the same behavior as chmod.
+
+Adding or modifying an ACL
+
+ACLs can be set via the command line using -m, or passed in via a file using -M (use "-" (dash) instead of a file name for stdin). These two options are the "modify" options; they add new ACL entries or replace specific existing ACL entries on a file or directory. Any other existing ACL entries on the file or directory remain untouched.
+
+NOTE
+Use the --set or --set-file options to completely replace the ACL settings on a file.
+
+When first defining an ACL on a file, if the add operation does not include settings for the file owner, group-owner, or other permissions, then they will be set based on the current standard file permissions (these are also known as the base ACLs and cannot be deleted), and a new mask value will be calculated and added as well.
+
+To add or modify a user or named user ACL:
+
+[student@serverX ~]$ setfacl -m u:name:rX file
+If name is left blank, then it applies to the file owner, otherwise name can be a username or UID value. In this example, the permissions granted would be read-only, and if already set, execute (unless file was a directory, in which case the directory would get the execute permission set to allow directory search).
+
+ACL file owner and standard file owner permissions are equivalent; consequently, using chmod on the file owner permissions is equivalent to using setfacl on the file owner permissions. chmod has no effect on named users.
+
+To add or modify a group or named group ACL:
+
+[student@serverX ~]$ setfacl -m g:name:rw file
+This follows the same pattern for adding or modifying a user ACL. If name is left blank, then it applies to the group-owner. Otherwise, specify a group name or GID value for a named group. The permissions would be read and write in this example.
+
+chmod has no effect on any group permissions for files with ACL settings, but it updates the ACL mask.
+
+To add or modify the other ACL:
+
+[student@serverX ~]$ setfacl -m o::- file
+other only accepts permission settings. It is common for the permission to be set to "-" (dash), which specifies that other users have NO permissions, but any of the standard permissions can be specified.
+
+ACL other and standard other permissions are equivalent, so using chmod on the other permissions is equivalent to using setfacl on the other permissions.
+
+Add multiple entries via the same command, and comma-separate each of the entries:
+
+[student@serverX ~]$ setfacl -m u::rwx,g:sodor:rX,o::- file
+This will set the file owner to read, write, and execute, set the named group sodor to read-only and conditional execute, and restrict all other users to NO permissions. The group-owner will maintain their existing file or ACL permissions and other "named" entries will remain unchanged.
+
+Using getfacl as input
+
+The output from getfacl can be used as input to setfacl:
+
+[student@serverX ~]$ getfacl file-A | setfacl --set-file=- file-B
+--set-file accepts input from a file or stdin, and the "-" (dash) specifies the use of stdin. In this case, file-B will have the same ACL settings as file-A.
+
+Setting an explicit ACL mask
+
+An ACL mask can be explicitly set on a file or directory to limit the maximum effective permissions for named users, the group-owner, and named groups. This restricts any existing permissions that exceed the mask, but does nothing to permissions that are less permissive than the mask.
+
+[student@serverX ~]$ setfacl -m m::r file
+This would add a mask value that restricted any named users, the group-owner, and any named groups to read-only permission, regardless of their existing settings. The file owner and other users are not impacted by the mask setting.
+
+getfacl will show an "effective" comment beside entries that are being restricted by a mask setting.
+
+IMPORTANT
+By default, the ACL mask is recalculated each time one of the impacted ACL settings (named users, group-owner, or named groups) is modified or deleted, potentially resetting a previous explicit mask setting.
+
+To avoid the mask recalculation, use -n or include a mask setting (-m m::perms) with any setfacl operation that modifies mask-affected ACL settings.
+
+Recursive ACL modifications
+
+When setting an ACL on a directory, it is common to want to apply the ACL recursively to the directory structure and files. Use the -R option to do this. The "X" (capital X) permission is often used with recursion, so that files with the execute permission set retain the setting and directories get the execute permission set to allow directory search. It is considered good practice to also use the uppercase X when non-recursively setting ACLs, as it prevents an administrator from accidentally adding execute permissions to a regular file.
+
+[student@serverX ~]$ setfacl -R -m u:name:rX directory
+This would add the user name to the directory and all existing files and subdirectories, granting read-only and conditional execute.
+
+Deleting an ACL
+
+Deleting specific ACL entries follows the same basic format as the modify operation, except the ":perms" should not be specified.
+
+[student@serverX ~]$ setfacl -x u:name,g:name file
+This would only remove the named user and the named group from the list of file or directory ACLs. Any other existing ACLs remain active.
+
+It is possible to use the delete (-x) and modify (-m) operations in the same setfacl operation.
+
+The mask can only be deleted if there are no other ACLs set (excluding the base ACLs which cannot be deleted), so it must be deleted last. The file will no longer have ACLs and ls -l will not show the "+" symbol next to the permissions string. Alternatively, to delete ALL ACLs on a file or directory (including default ACLs on directories), use:
+
+[student@serverX ~]$ setfacl -b file
+Controlling default ACL file permissions
+A directory can have default ACLs set on it that are automatically inherited by all new files and new subdirectories. There can be default ACL permissions set for each of the standard ACL settings, including a default mask.
+
+A directory still requires standard ACLs for access control because default ACLs do not implement access control for the directory; they only provide ACL permission inheritance support.
+
+An example:
+
+[student@serverX ~]$ setfacl -m d:u:name:rx directory
+This adds a default named user (d:u:name) with read-only permission and execute permission on subdirectories.
+
+The setfacl command for adding a default ACL for each of the ACL types is exactly the same as for standard ACLs, but prefaced with d:. Alternatively, use the -d option on the command line.
+
+IMPORTANT
+When setting default ACLs on a directory, ensure that users will be able to access the contents of new subdirectories created in it by including the execute permission on the default ACL.
+
+Users will not automatically get the execute permission set on newly created regular files because unlike new directories, the ACL mask of a new regular file is rw-.
+
+NOTE
+New files and new subdirectories continue to get their owner UID and primary group GID values set from the creating user, except when the parent directory setgid flag is enabled, in which case the primary group GID will be the same as the parent directory GID.
+
+Deleting default ACLs
+
+Deleting a default ACL is also the same as deleting a standard ACL; again, preface with d:, or use the -d option.
+
+[student@serverX ~]$ setfacl -x d:u:name directory
+This removes the default ACL that was added in the previous example.
+
+To delete all default ACLs on a directory, use setfacl -k /directory. To delete ALL ACLs on a directory, use setfacl -b /directory.
+
+REFERENCES
+acl(5), setfacl(1) man pages
+
+
+
+Guided Exercise: Practice: Using ACLs to Grant and Limit Access
+In this lab, you will add a named group access control list (ACL) and a named user ACL to an existing share folder and its content. You will set up default ACLs to ensure future files and directories get the correct permissions.
+
+Resources:
+Files:	/shares/steamies/*, /shares/steamies/display_engines.sh
+Machines:	serverX
+Outcomes:
+
+Members of the sodor group will have the same access permissions as the controller group on the steamies directory, except james, who has no access.
+
+Existing files and directories will be updated to reflect the new sodor and james ACL permissions.
+
+New files and directories will automatically get the correct ACL and file permissions.
+
+Reset your serverX system.
+
+Log into and set up your server system.
+
+[student@serverX ~]$ lab acl setup
+Open a terminal.
+
+Switch to root using sudo -i.
+
+Student is a controller for the Sodor Island Rail network. There is a properly configured share directory located at /shares/steamies that hosts files detailing rostering, steam engines, etc.
+
+Currently, only members of the controller group have access to this directory, but it has been decided that members of the sodor group would benefit from full access to this directory.
+
+James, a member of the sodor group, has caused chaos and confusion on many occasions, so he is to be denied access to the directory, at least until he shows that he is a really useful engine.
+
+Your task is to add appropriate ACLs to the directory and its contents, so that members of the sodor group have full access, but deny user james any access. Make sure that future files and directories stored in /shares/steamies get appropriate ACLs applied.
+
+Important information:
+
+controller group: student
+
+sodor group: thomas, james
+
+There is a subdirectory called engines and numerous files to test the ACLs. Also, there is an executable script you can test.
+
+Thomas and James have their passwords set to redhat.
+
+All changes should occur to directory steamies and its files; do not adjust the shares directory.
+
+Add the named ACLs to the steamies directory and all of its content.
+
+Use setfacl to recursively update the steamies directory, granting the sodor group read, write, and conditional execute permissions.
+
+[root@serverX ~]# setfacl -Rm g:sodor:rwX /shares/steamies
+-R recursive, -m modify/add, :rwX read/write/eXecute (but only on directories and existing executables)
+
+Use setfacl to recursively update the steamies directory, denying the user james from the sodor group any access.
+
+[root@serverX ~]# setfacl -Rm u:james:- /shares/steamies
+-R recursive, -m modify/add, :- no permissions
+
+Add the named ACLs as default ACLs to support future file and directory additions.
+
+Use setfacl to add a default access rule for the sodor group. Grant read, write, and execute permissions on the steamies directory.
+
+[root@serverX ~]# setfacl -m d:g:sodor:rwx /shares/steamies
+-m modify/add, d:g default group, :rwx read/write/execute (needed for proper subdirectory creation and access)
+
+Use setfacl to add a default access rule for the user james. Deny all access to the steamies directory.
+
+[root@serverX ~]# setfacl -m d:u:james:- /shares/steamies
+-m modify/add, d:u default user, :- no permissions
+
+Verify your ACL changes.
+
+Thomas should be able to read any file, create a new directory with a new file in it, and execute the display_engines.sh script.
+
+James should not be able to read, write, or execute any file; this includes being unable to list the directory contents.
+
+Use sudo -i -u user to switch to your test users. Use exit or Ctrl+D to leave the test user shell.
+
+[root@serverX ~]# exit
+[student@serverX ~]$ sudo -i -u thomas
+[thomas@serverX ~]$ cd /shares/steamies/
+Use cat to check that Thomas can read a file.
+
+[thomas@serverX steamies]$ cat roster.txt
+James - Shunting at Brendam docks
+Percy - Overnight mail run
+Henry - Flying Kipper run
+Thomas - Annie and Clarabel, Knapford line
+Use display_engines.sh to check that Thomas can execute a script.
+
+[thomas@serverX steamies]$ ./display_engines.sh
+They're two, they're four, they're six, they're eight ...
+Edward wants to help and share
+...
+Toby, well let's say, he's square
+Use mkdir to create a directory as Thomas.
+
+Use echo to create a file in the new directory as Thomas.
+
+Switch back to student when you are finished.
+
+[thomas@serverX steamies]$ mkdir tidmouth
+[thomas@serverX steamies]$ echo "toot toot" > tidmouth/whistle.txt
+[thomas@serverX steamies]$ exit
+Use cd to try and change into the directory as James, and also try ls to list the directory. Both commands should fail with Permission denied.
+
+You could try one or more of the commands Thomas issued, but as James, to further verify his lack of access. Try prefixing each file with the full path, /shares/steamies, because you cannot cd into the directory.
+
+Switch back to student when you are finished testing james.
+
+[student@serverX ~]$ sudo -i -u james
+[james@serverX ~]$ cd /shares/steamies/
+-bash: cd: /shares/steamies/: Permission denied
+[james@serverX ~]$ ls /shares/steamies/
+ls: cannot open directory /shares/steamies: Permission denied
+[james@serverX ~]$ cat /shares/steamies/roster.txt
+cat: /shares/steamies/roster.txt: Permission denied
+[james@serverX ~]$ exit
+Use getfacl to see all the ACLs on /shares/steamies and the ACLs on /shares/steamies/tidmouth.
+
+NOTE
+Use newgrp controller to switch student to the controller group.
+
+The lab acl setup script adds controller as a supplementary group to student; however, unless you have restarted the shell prior to this step, then the current shell does not yet recognize the new membership and getfacl on tidmouth will get Permission denied.
+
+[student@serverX ~]$ newgrp controller
+[student@serverX ~]$ getfacl /shares/steamies
+getfacl: Removing leading '/' from absolute path names
+# file: shares/steamies/
+# owner: root
+# group: controller
+# flags: -s-
+user::rwx
+user:james:---
+group::rwx
+group:sodor:rwx
+mask::rwx
+other::---
+default:user::rwx
+default:user:james:---
+default:group::rwx
+default:group:sodor:rwx
+default:mask::rwx
+default:other::---
+
+[student@serverX ~]$ getfacl /shares/steamies/tidmouth
+getfacl: Removing leading '/' from absolute path names
+# file: shares/steamies/tidmouth
+# owner: thomas
+# group: controller
+# flags: -s-
+user::rwx
+user:james:---
+group::rwx
+group:sodor:rwx
+mask::rwx
+other::---
+default:user::rwx
+default:user:james:---
+default:group::rwx
+default:group:sodor:rwx
+default:mask::rwx
+default:other::---

@@ -1,0 +1,303 @@
+iExtending Logical Volumes
+Extend a volume group (VG) using pvcreate and vgextend; use vgdisplay to check the results.
+
+Reduce a VG using pvmove and vgreduce.
+
+Extend a logical volume (LV) using lvextend.
+
+Use xfs_growfs to resize xfs file systems.
+
+Use resize2fs to resize ext4 file systems.
+
+Objectives
+After completing this section, students should be able to:
+
+Extend and reduce a volume group.
+
+Extend a LV with an XFS file system.
+
+Extend an LV with an ext4 file system.
+
+Extending and reducing a volume group
+A volume group can have more disk space added to it by adding additional physical volumes. This is called extending the volume group. The new physical extents provided by the additional physical volumes can then be assigned to logical volumes.
+
+Unused physical volumes can be removed from a volume group. This is called reducing the volume group. A tool called pvmove can be used to move data from extents on one physical volume to extents on other physical volumes in the volume group. In this way, a new disk can be added to an existing volume group, data can be moved from an older or slower disk to a new disk, and the old disk removed from the volume group. This can be done while the logical volumes in the volume group are in use.
+
+IMPORTANT
+The following examples use device vdb and its partitions to illustrate LVM commands. In practice, these examples would need to use the correct devices for the disk and disk partitions that are being used by the system.
+
+Extending a volume group
+
+There are potentially four steps needed to extend a volume group:
+
+Prepare the physical device.
+
+As with creating a new volume group, a new partition must be created and prepared for use as an LVM physical volume.
+
+Use fdisk, gdisk, or parted to create a new partition for use with LVM. Always set the partition type to Linux LVM on LVM partitions; use 0x8e for MBR-style partitions. If necessary, use partprobe to register the new partition with the kernel.
+
+Alternatively, use a whole disk, a RAID array, or a SAN disk.
+
+A physical device only needs to be prepared if there are none prepared already and a new physical volume is required to extend the volume group.
+
+[root@serverX ~]# fdisk /dev/vdb
+Use m for help, p to print the existing partition table, n to create a new partition, t to change the partition type, w to write the changes, and q to quit.
+
+Create the physical volume.
+
+pvcreate is used to label the partition (or other physical device) for use with LVM as a physical volume. A header to store LVM configuration data is written directly to the PV. A PV is divided in to physical extents of a fixed size; for example, 4MiB blocks. Use the device name as the argument to pvcreate.
+
+[root@serverX ~]# pvcreate /dev/vdb2
+This will label device /dev/vdb2 as a PV, ready for allocation into the volume group.
+
+A PV only needs to be created if there are no PVs free to extend the VG.
+
+Extend the volume group.
+
+vgextend is used to add the new physical volume to the volume group. Use the VG name and PV device name as arguments to vgextend.
+
+[root@serverX ~]# vgextend vg-alpha /dev/vdb2
+This will extend the vg-alpha VG by the size of the /dev/vdb2 PV.
+
+Verify the new space is available.
+
+Use vgdisplay to confirm the additional physical extents are available. Check the Free PE / Size in the output. It should not be zero.
+
+[root@serverX ~]# vgdisplay vg-alpha
+  --- Volume group --- 
+  VG Name               vg-alpha
+...
+  Free  PE / Size       178 / 712.00 MiB
+...
+Reducing a volume group
+
+There are only two steps needed to reduce a volume group:
+
+Move the physical extents.
+
+pvmove is used to relocate any physical extents used on the physical volume to other PVs in the VG. This is only possible if there are enough free extents in the VG and if all of those come from other PVs. Use the PV device name for which the PEs will be moved as the argument to the command.
+
+[root@serverX ~]# pvmove /dev/vdb2
+This will move the PEs from /dev/vdb2 to other PVs with free PEs in the same VG.
+
+WARNING
+Before using pvmove, it is recommended to back up data stored on all logical volumes in the volume group. An unexpected power loss during the operation may leave the volume group in an inconsistent state. This could cause loss of data on logical volumes in the volume group.
+
+Reduce the volume group.
+
+vgreduce is used to remove the physical volume from the volume group. Use the VG name and PV device name as arguments to the command.
+
+[root@serverX ~]# vgreduce vg-alpha /dev/vdb2
+The /dev/vdb2 PV is now removed from the vg-alpha VG and can added to another VG. Alternatively, pvremove can be used to stop using the device as a PV permanently.
+
+Extend a logical volume and XFS file system
+One benefit of logical volumes is the ability to increase their size without experiencing downtime. Free physical extents in a volume group can be added to a logical volume to extend its capacity, which can then be used to extend the file system it contains.
+
+Extending a logical volume
+
+There are three steps needed to extend a logical volume:
+
+Verify the volume group has space available.
+
+vgdisplay is used to verify that there are sufficient physical extents available for use.
+
+[root@serverX ~]# vgdisplay vg-alpha
+  --- Volume group --- 
+  VG Name               vg-alpha
+...
+  Free  PE / Size       178 / 712.00 MiB
+...
+Check the Free PE / Size in the output. It should report a value equal to or more than the additional space required. If there is insufficient space available, then extend the volume group by at least the required space. See "Extending and Reducing a Volume Group."
+
+Extend the logical volume.
+
+lvextend extends the logical volume to a new size. Add the LV device name as the last argument to the command.
+
+[root@serverX ~]# lvextend -L +300M /dev/vg-alpha/hercules
+This will increase the size of logical volume hercules by 300MiB. Notice the "+" in front of the size, which means add this value to the existing size; otherwise, the value defines the final, exact size of the LV.
+
+Like lvcreate, there are multiple ways to specify the size: -l generally expects physical extent values, while -L expects sizes in bytes or larger named values, such as mebibytes and gibibytes.
+
+Some examples:
+
+lvextend -l 128: Resize the logical volume to exactly 128 extents in size.
+
+lvextend -l +128: Add 128 extents to the current size of the logical volume.
+
+lvextend -L 128M: Resize the logical volume to exactly 128MiB.
+
+lvextend -L +128M: Add 128MiB to the current size of the logical volume.
+
+lvextend -l +50%FREE: Add 50 percent of the current free space in the VG to the LV.
+
+Extend the file system.
+
+xfs_growfs /mountpoint expands the file system to occupy the extended LV. xfs_growfs requires the file system be mounted while it is being run; it can continue to be used during the resize operation.
+
+[root@serverX ~]# xfs_growfs /mnt/hercules
+NOTE
+A common mistake is to run lvextend, but forget to run xfs_growfs. An alternative to running the two steps consecutively is to include -r as an option with the lvextend command. This resizes the file system after the LV is extended, using fsadm(8). It works with a number of different file systems.
+
+It is a good idea to verify the new size of the mounted file system:
+
+df -h /mountpoint.
+
+Extend a logical volume and ext4 file system
+Extending a logical volume
+
+The steps for extending an ext4-based logical volume are essentially the same as for an xfs-based LV, except the step that resizes the file system. Review "Extend a Logical Volume and XFS File System" for more details.
+
+Verify the volume group has space available.
+
+vgdisplay vgname is used to verify that there are sufficient physical extents available for use.
+
+Extend the logical volume.
+
+lvextend -l +extents /dev/vgname/lvname extends the logical volume /dev/vgname/lvname by the extents value.
+
+Extend the file system.
+
+resize2fs /dev/vgname/lvname expands the file system to occupy the new extended LV. Just like xfs_growfs, the file system can be mounted and in use while it is being run. Optionally, include the -p option to see the progress of the resize operation.
+
+[root@serverX ~]# resize2fs /dev/vg-alpha/hercules
+NOTE
+The primary difference between xfs_growfs and resize2fs is the argument passed to identify the file system. xfs_growfs takes the mount point and resize2fs takes the logical volume name.
+
+REFERENCES
+lvm(8), pvcreate(8), pvmove(8), vgdisplay(8), vgextend(8), vgreduce(8), vgdisplay(8), vgextend(8), vgreduce(8), lvextend(8), fdisk(8), gdisk(8), parted(8), partprobe(8), xfs_growfs(8), and resize2fs(8) man pages
+
+Red Hat Training + Certification logo
+
+
+
+
+Guided Exercise: Practice: Extending a Logical Volume
+In this lab, you will extend the logical volume added in the previous practice exercise.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+A resized logical volume, 700MiB total, called storage in the volume group shazam, mounted at /storage. Resizing done while the file system is still mounted and in use. The volume group extended to include an additional physical volume of 512MiB, giving a total VG size of 1GiB.
+
+Complete Practice: Adding a Logical Volume
+
+Check for Space in the Volume Group
+
+Use vgdisplay to check if the VG has sufficient free space to extend the LV to a total size of 700MiB.
+
+[root@serverX ~]# vgdisplay shazam
+  --- Volume group ---
+  VG Name               shazam
+  System ID             
+  Format                lvm2
+...
+  VG Size               504.00 MiB
+  PE Size               4.00 MiB
+  Total PE              126
+  Alloc PE / Size       100 / 400.00 MiB
+  Free  PE / Size       26 / 104.00 MiB
+  VG UUID               OBBAtU-2nBS-4SW1-khmF-yJzi-z7bD-DpCrAV
+There is only 104MiB available (26 PEs x 4MiB extents) and we need at least 300MiB to have 700MiB in total. We need to extend the VG.
+
+For later comparison, use df to check current disk free space:
+
+[root@serverX ~]# df -h /storage
+Filesystem                  Size  Used Avail Use% Mounted on
+/dev/mapper/shazam-storage  397M   21M  377M   6% /storage
+Create the Physical Resources
+
+Use fdisk to create an additional partition of 512MiB and set it to type Linux LVM.
+
+[root@serverX ~]# fdisk /dev/vdb
+Note: The following steps omit some output.
+
+Add a new primary partition of 512MiB.
+
+Command (m for help): n
+Partition type:
+   p   primary (2 primary, 0 extended, 2 free)
+   e   extended
+Select (default p): Enter
+Using default response p
+Partition number (3,4, default 3): Enter
+First sector (1050624-20971519, default 1050624): Enter
+Using default value 1050624
+Last sector, +sectors or +size{K,M,G} (1050624-20971519, default 20971519): +512M
+Partition 3 of type Linux and of size 512 MiB is set
+Change the partition type to Linux LVM - 0x8e.
+
+Command (m for help): t
+Partition number (1-3, default 3): Enter
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'
+Write the changes to the partition table and quit.
+
+Command (m for help): w
+The partition table has been altered!
+Use partprobe to register the new partitions with the kernel.
+
+[root@serverX ~]# partprobe
+Create the Physical Volume
+
+Use pvcreate to add the new partition as a PV.
+
+[root@serverX ~]# pvcreate /dev/vdb3
+  Physical volume "/dev/vdb3" successfully created
+Extend the Volume Group
+
+Use vgextend to extend the VG named shazam, using the new /dev/vdb3 PV.
+
+[root@serverX ~]# vgextend shazam /dev/vdb3
+  Volume group "shazam" successfully extended
+Use vgdisplay to check the shazam VG free space again. There should be plenty of free space now.
+
+[root@serverX ~]# vgdisplay shazam
+  --- Volume group ---
+  VG Name               shazam
+  System ID             
+  Format                lvm2
+...
+  VG Size               1012.00 MiB
+  PE Size               4.00 MiB
+  Total PE              253
+  Alloc PE / Size       100 / 400.00 MiB
+  Free  PE / Size       153 / 612.00 MiB
+  VG UUID               OBBAtU-2nBS-4SW1-khmF-yJzi-z7bD-DpCrAV
+There is now 612MiB available (153 PEs x 4MiB extents); perfect.
+
+Extend the Logical Volume
+
+Use lvextend to extend the existing LV to 700MiB.
+
+[root@serverX ~]# lvextend -L 700M /dev/shazam/storage
+  Extending logical volume storage to 700.00 MiB
+  Logical volume storage successfully resized
+NOTE
+In our example, we specified the exact size to make the final LV, but we could also have used:
+
+-L +300M to add the new space using size in MiB.
+
+-l 175 to specify the total number of extents (175 PEs x 4MiB).
+
+-l +75 to add the additional extents needed.
+
+Resize the File System
+
+Use xfs_growfs to extend the XFS file system to the remainder of the free space on the LV.
+
+[root@serverX ~]# xfs_growfs /storage
+meta-data=/dev/mapper/shazamstorage  isize=256    agcount=4, agsize=25600 blks
+...
+Verify Content Availability and New File System Size
+
+Use df and ls | wc to review the new file system size and verify the existing files are still present.
+
+[root@serverX ~]# df -h /storage
+Filesystem                  Size  Used Avail Use% Mounted on
+/dev/mapper/shazam-storage  684M   21M  663M   6% /storage
+[root@serverX ~]# ls /storage | wc -l
+47
+The files are still there and the file system is about the size we expect.
+
+Red Hat Training + Certification logo

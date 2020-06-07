@@ -1,0 +1,226 @@
+Chapter 10. Network Configuration
+Validating Network Configuration
+Guided Exercise: Practice: Examining Network Configuration
+Configuring Networking with nmcli
+Guided Exercise: Practice: Configuring Networking with nmcli
+Editing Network Configuration Files
+Guided Exercise: Practice: Editing Network Configuration Files
+Configuring Host Names and Name Resolution
+Guided Exercise: Practice: Configuring Host Names and Name Resolution
+Lab: Lab: Managing Red Hat Enterprise Linux Networking
+Abstract
+
+Overview
+Goal	To configure basic IPv4 networking on Red Hat Enterprise Linux systems.
+Objectives	
+Test and review current network configuration with basic utilities.
+
+Manage network settings and devices with nmcli and NetworkManager.
+
+Modify network settings by editing the configuration files.
+
+Configure and test system hostname and name resolution.
+
+Sections	
+Validating Network Configuration (and Practice)
+
+Configuring Networking with nmcli (and Practice)
+
+Editing Network Configuration Files (and Practice)
+
+Configuring Host Names and Name Resolution
+
+Lab	
+Managing Red Hat Enterprise Linux Networking
+
+Validating Network Configuration
+Use basic utilities to determine current network configuration.
+
+Objectives
+After completing this section, students should be able to test and review current network configuration with basic utilities.
+
+Displaying IP addresses
+The /sbin/ip command is used to show device and address information.
+
+[student@desktopX ~]$ ip addr show eth0
+2: eth0: <BROADCAST,MULTICAST,1UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    2link/ether 52:54:00:00:00:0a brd ff:ff:ff:ff:ff:ff
+    3inet 172.25.0.10/24 brd 4172.25.0.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    5inet6 fe80::5054:ff:fe00:b/64 scope link 
+       valid_lft forever preferred_lft forever
+1
+
+An active interface has the status of UP.
+
+2
+
+The link line specifies the hardware (MAC) address of the device.
+
+3
+
+The inet line shows the IPv4 address and prefix.
+
+4
+
+The broadcast address, scope, and device name are also on this line.
+
+5
+
+The inet6 line shows IPv6 information.
+
+The ip command may also be used to show statistics about network performance. The received (RX) and transmitted (TX) packets, errors, and dropped counters can be used to identify network issues caused by congestion, low memory, and overruns.
+
+[student@desktopX ~]$ ip -s link show eth0
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+link/ether 52:54:00:00:00:0a brd ff:ff:ff:ff:ff:ff
+    RX: bytes  packets  errors  dropped overrun mcast   
+    269850     2931     0       0       0       0      
+    TX: bytes  packets  errors  dropped carrier collsns 
+    300556     3250     0       0       0       0      
+Troubleshooting routing
+The /sbin/ip command is also used to show routing information.
+
+[student@desktopX ~]$ ip route
+default via 172.25.0.254 dev eth0  proto static  metric 1024 
+172.25.X.0/24 dev eth0  proto kernel  scope link  src 172.25.X.10
+10.0.0.0/8 dev eth1  proto kernel  scope link  src 10.0.0.11 
+All packets destined for the 10.0.0.0/8 network will be sent directly to the destination through the device eth1. All packets destined for the 172.25.X.0/24 network will be sent directly to the destination through the device eth0. All other packets will be sent to the default router located at 172.25.X.254, and also through device eth0.
+
+The ping command is used to test connectivity. The command will continue to run until Ctrl+C is pressed unless options are given to limit the number of packets sent.
+
+[student@desktopX ~]$ ping -c3 172.25.X.254
+To trace the path to a remote host, use either traceroute or tracepath. Both commands can be used to trace a path with UDP packets; however, many networks block UDP and ICMP traffic. The traceroute command has options to trace the path with UDP (default), ICMP (-I), or TCP (-T) packets, but may not be installed by default.
+
+[student@desktopX ~]$ tracepath access.redhat.com
+...
+ 4:  71-32-28-145.rcmt.qwest.net                          48.853ms asymm  5 
+ 5:  dcp-brdr-04.inet.qwest.net                          100.732ms asymm  7 
+ 6:  206.111.0.153.ptr.us.xo.net                          96.245ms asymm  7 
+ 7:  207.88.14.162.ptr.us.xo.net                          85.270ms asymm  8 
+ 8:  ae1d0.cir1.atlanta6-ga.us.xo.net                     64.160ms asymm  7 
+ 9:  216.156.108.98.ptr.us.xo.net                        108.652ms 
+10:  bu-ether13.atlngamq46w-bcr00.tbone.rr.com           107.286ms asymm 12 
+...
+Each line in the output of tracepath represents a router or hop that the packet passes through between the source and the final destination. Additional information is provided as available, including the round trip timing (RTT) and any changes in the maximum transmission unit (MTU) size.
+
+Troubleshooting ports and services
+TCP services use sockets as end points for communication and are made up of an IP address, protocol, and port number. Services typically listen on standard ports while clients use a random available port. Well-known names for standard ports are listed in the /etc/services file.
+
+The ss command is used to display socket statistics. The ss command is meant to replace to the older tool netstat, included in the net-tools package, which may be more familiar to some system administrators but which may not always be installed.
+
+[student@desktopX ~]$ ss -ta
+State      Recv-Q Send-Q      Local Address:Port          Peer Address:Port   
+LISTEN     0      128                     *:sunrpc                   *:*       
+LISTEN     0      128                   1*:ssh                      *:*       
+LISTEN     0      100           2127.0.0.1:smtp                     *:*       
+LISTEN     0      128                     *:36889                    *:*       
+ESTAB      0      0           3172.25.X.10:ssh         172.25.254.254:59392   
+LISTEN     0      128                    :::sunrpc                  :::*       
+LISTEN     0      128                  4:::ssh                     :::*       
+LISTEN     0      100                 5::1:smtp                    :::*       
+LISTEN     0      128                    :::34946                   :::*       
+1
+
+The port used for SSH is listening on all IPv4 addresses. The "*" is used to represent "all" when referencing IPv4 addresses or ports.
+
+2
+
+The port used for SMTP is listening on the 127.0.0.1 IPv4 loopback interface.
+
+3
+
+The established SSH connection is on the 172.25.X.10 interface and originates from a system with an address of 172.25.254.254.
+
+4
+
+The port used for SSH is listening on all IPv6 addresses. The "::" syntax is used to represent all IPv6 interfaces.
+
+5
+
+The port used for SMTP is listening on the ::1 IPv6 loopback interface.
+
+Table 10.1. Options for ss and netstat
+
+Option	Description
+-n	Show numbers instead of names for interfaces and ports.
+-t	Show TCP sockets.
+-u	Show UDP sockets.
+-l	Show only listening sockets.
+-a	Show all (listening and established) sockets.
+-p	Show the process using the sockets.
+
+REFERENCES
+ip-link(8), ip-address(8), ip-route(8), ip(8), ping(8), tracepath(8), traceroute(8), ss(8), and netstat(8) man pages
+
+Additional information may be available in the chapter on configuring networking in the Red Hat Enterprise Linux Networking Guide for Red Hat Enterprise Linux 7, which can be found at http://docs.redhat.com/
+
+
+
+
+Guided Exercise: Practice: Examining Network Configuration
+In this lab, you will examine the network configuration of the current system.
+
+Outcomes:
+
+Identify the current network interfaces and basic network addresses.
+
+Reset your serverX system.
+
+Display the current IP address and netmask for all interfaces.
+
+[student@serverX ~]$ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 52:54:00:00:00:0b brd ff:ff:ff:ff:ff:ff
+    inet 172.25.X.11/24 brd 172.25.X.255 scope global dynamic eth0
+       valid_lft 12704sec preferred_lft 12704sec
+    inet6 fe80::5054:ff:fe00:b/64 scope link 
+       valid_lft forever preferred_lft forever
+Display the statistics for the eth0 interface.
+
+[student@serverX ~]$ ip -s link show eth0
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT qlen 1000
+    link/ether 52:54:00:00:00:0b brd ff:ff:ff:ff:ff:ff
+    RX: bytes  packets  errors  dropped overrun mcast   
+    418398     4588     0       0       0       0      
+    TX: bytes  packets  errors  dropped carrier collsns 
+    360733     1730     0       0       0       0      
+Display the routing information.
+
+[student@serverX ~]$ ip route
+default via 172.25.0.1 dev eth0  proto static  metric 1024 
+172.25.0.0/16 dev eth0  proto kernel  scope link  src 172.25.X.11 
+Verify that the router is accessible.
+
+[student@serverX ~]$ ping -c3 172.25.0.1
+PING 172.25.0.1 (172.25.0.1) 56(84) bytes of data.
+64 bytes from 172.25.0.1: icmp_seq=1 ttl=64 time=0.489 ms
+64 bytes from 172.25.0.1: icmp_seq=2 ttl=64 time=0.510 ms
+64 bytes from 172.25.0.1: icmp_seq=3 ttl=64 time=0.458 ms
+
+--- 172.25.0.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1999ms
+rtt min/avg/max/mdev = 0.458/0.485/0.510/0.033 ms
+Show all the hops between the local system and classroom.example.com.
+
+[student@serverX ~]$ tracepath classroom.example.com
+ 1:  classroom.example.com                                 0.522ms !H
+     Resume: pmtu 65535 
+Display the listening TCP sockets on the local system.
+
+[student@serverX ~]$ ss -lt
+State      Recv-Q Send-Q      Local Address:Port          Peer Address:Port   
+LISTEN     0      128                     *:55630                    *:*       
+LISTEN     0      128                     *:sunrpc                   *:*       
+LISTEN     0      128                     *:ssh                      *:*       
+LISTEN     0      100             127.0.0.1:smtp                     *:*       
+LISTEN     0      128                    :::sunrpc                  :::*       
+LISTEN     0      128                    :::ssh                     :::*       
+LISTEN     0      128                    :::33079                   :::*       
+LISTEN     0      100                   ::1:smtp                    :::*

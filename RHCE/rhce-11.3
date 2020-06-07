@@ -1,0 +1,118 @@
+Reviewing systemd Journal Entries
+The systemd journal provides advanced capabilities to query for events.
+
+Objectives
+After completing this section, students should be able to find and interpret log entries in the systemd journal to troubleshoot problems or review system status.
+
+Finding events with journalctl
+The systemd journal stores logging data in a structured, indexed binary file. This data includes extra information about the log event. For syslog events, this can include the facility and priority of the original message, for example.
+
+IMPORTANT
+In Red Hat Enterprise Linux 7, the systemd journal is stored in /run/log by default, and its contents are cleared after a reboot. This setting can be changed by the system administrator and is discussed elsewhere in this course.
+
+The journalctl command shows the full system journal, starting with the oldest log entry, when run as root user:
+
+[root@serverX ~]# journalctl
+Feb 13 10:01:01 server1 run-parts(/etc/cron.hourly)[8678]: starting 0yum-hourly.cron
+Feb 13 10:01:01 server1 run-parts(/etc/cron.hourly)[8682]: finished 0yum-hourly.cron
+Feb 13 10:10:01 server1 systemd[1]: Starting Session 725 of user root.
+Feb 13 10:10:01 server1 systemd[1]: Started Session 725 of user root.
+Feb 13 10:10:01 server1 CROND[8687]: (root) CMD (/usr/lib64/sa/sa1 1 1)
+The journalctl command highlights in bold text messages of priority notice or warning, and messages of priority error and higher are highlighted in red.
+
+The key to successfully using the journal for troubleshooting and auditing is to limit the journal searches to only show relevant output. In the following paragraphs, various different strategies to reduce the output of journal queries will be introduced.
+
+By default, journalctl -n shows the last 10 log entries. It takes an optional parameter for how many of the last log entries should be displayed. To display the last 5 log entries, run:
+
+[root@serverX ~]# journalctl -n 5
+When troubleshooting problems, it is useful to filter the output of the journal by priority of the journal entries. The journalctl -p takes either the name or the number of the known priority levels and shows the given levels and all higher-level entries. The priority levels known to journalctl are debug, info, notice, warning, err, crit, alert, and emerg.
+
+To filter the output of the journalctl command to only list any log entry of priority err or above, run:
+
+[root@serverX ~]# journalctl -p err
+Similar to the tail -f command, journalctl -f outputs the last 10 lines of the journal and continues to output new journal entries as they get written to the journal.
+
+[root@serverX ~]# journalctl -f
+When looking for specific events, it is useful to limit the output to a specific time frame. The journalctl command has two options to limit the output to a specific time range, the --since and --until options. Both options take a time parameter in the format YYYY-MM-DD hh:mm:ss. If the date is omitted, the command assumes the date is today, and if the time part is omitted, the whole day starting at 00:00:00 is assumed. Both options take yesterday, today, and tomorrow as valid parameters in addition to the date and time field.
+
+Output all journal entries that got recorded today:
+
+[root@serverX ~]# journalctl --since today
+Output the journal entries from 10th February 2014 20:30:00 to 13th February 2014 12:00:00:
+
+[root@serverX ~]# journalctl --since "2014-02-10 20:30:00" --until "2014-02-13 12:00:00"
+In addition to the visible content of the journal, there are fields attached to the log entries that can only be seen when verbose output is turned on. All of the displayed extra fields can be used to filter the output of a journal query. This is useful to reduce the output of complex searches for certain events in the journal.
+
+[root@serverX ~]# journalctl -o verbose
+Thu 2014-02-13 02:06:00.409345 EST [s=0b47abbf995149c191a8e539e18c3f9c;
+i=d28;b=1ea26e84667848af9a4a2904a76ff9a5;m=4d6878ff5a;t=4f244525daa67;
+x=880bc65783036719]
+    PRIORITY=6
+    _UID=0
+    _GID=0
+    _BOOT_ID=1ea26e84667848af9a4a2904a76ff9a5
+    _MACHINE_ID=4513ad59a3b442ffa4b7ea88343fa55f
+    _CAP_EFFECTIVE=0000001fffffffff
+    _TRANSPORT=syslog
+    SYSLOG_FACILITY=10
+    SYSLOG_IDENTIFIER=sshd
+    _COMM=sshd
+    _EXE=/usr/sbin/sshd
+    _SYSTEMD_CGROUP=/system.slice/sshd.service
+    _SYSTEMD_UNIT=sshd.service
+    _SELINUX_CONTEXT=system_u:system_r:sshd_t:s0-s0:c0.c1023
+    _HOSTNAME=serverX
+    _CMDLINE=sshd: root [priv]   
+    SYSLOG_PID=6833
+    _PID=6833
+    MESSAGE=Failed password for root from 172.25.X.10 port 59371 ssh2
+    _SOURCE_REALTIME_TIMESTAMP=1392275160409345
+Among the more useful options to search for lines relevant to a particular process or event are:
+
+_COMM The name of the command
+
+_EXE The path to the executable for the process
+
+_PID The PID of the process
+
+_UID The UID of the user running the process
+
+_SYSTEMD_UNIT The systemd unit that started the process
+
+More than one of these can be combined. For example, the following query shows all journal entries related to processes started by the systemd unit file sshd.service, which also have PID 1182:
+
+[root@serverX ~]# journalctl _SYSTEMD_UNIT=sshd.service _PID=1182
+NOTE
+For a list of commonly used journal fields, consult the systemd.journal-fields(7) man page.
+
+REFERENCES
+journalctl(1) and systemd.journal-fields(7) man pages
+
+Additional information may be available in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+
+
+
+Guided Exercise: Practice: Finding Events With journalctl
+In this lab, you will filter the systemd journal for specific criteria.
+
+Outcomes:
+
+Students will practice displaying the systemd journal output matching different criteria.
+
+Output only systemd journal messages that originate from the systemd process that always runs with process id 1 on serverX.
+
+[root@serverX ~]# journalctl _PID=1
+Display all systemd journal messages that originate from a system service started with user id 81 on serverX.
+
+[root@serverX ~]# journalctl _UID=81
+Output the journal messages with priority warning and above on serverX.
+
+[root@serverX ~]# journalctl -p warning
+Create a journalctl query to show all log events recorded in the previous 10 minutes on serverX. The command assumes a current time of 9:15:00.
+
+[root@serverX ~]# journalctl --since 9:05:00 --until 9:15:00
+Display only the events originating from the sshd service with the system unit file sshd.service recorded since 9:00:00 this morning on serverX.
+
+[root@serverX ~]# journalctl --since 9:00:00 _SYSTEMD_UNIT="sshd.service"
+

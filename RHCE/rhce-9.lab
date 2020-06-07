@@ -1,0 +1,29 @@
+Lab: Lab: Controlling Services and Daemons
+In this lab, you will manage a service unit that is already installed on the system.
+
+Outcomes:
+
+The psacct service is enabled and running on the system, and the rsyslog service is disabled and no longer running on the system.
+
+Reset your serverX system.
+
+Start the psacct service.
+
+[student@serverX ~]$ sudo systemctl start psacct
+[student@serverX ~]$ sudo systemctl status psacct
+Configure the psacct service so that it starts at system boot.
+
+[student@serverX ~]$ sudo systemctl enable psacct
+[student@serverX ~]$ sudo systemctl status psacct
+Stop the rsyslog service.
+
+[student@serverX ~]$ sudo systemctl stop rsyslog
+[student@serverX ~]$ sudo systemctl status rsyslog
+Configure the rsyslog service so that it does not start at system boot.
+
+[student@serverX ~]$ sudo systemctl disable rsyslog
+[student@serverX ~]$ sudo systemctl status rsyslog
+Reboot the system, then run lab services grade to verify the configuration.
+
+[student@serverX ~]$ lab services grade
+

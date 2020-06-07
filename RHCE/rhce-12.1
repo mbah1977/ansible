@@ -1,0 +1,432 @@
+Chapter 12. Logical Volume Management
+Managing Logical Volumes
+Guided Exercise: Practice: Adding a Logical Volume
+Extending Logical Volumes
+Guided Exercise: Practice: Extending a Logical Volume
+Lab: Lab: Managing Logical Volume Management (LVM) Storage
+Abstract
+
+Overview
+Goal	To create and manage logical volumes from the command line.
+Objectives	
+Manage logical volumes.
+
+Extend logical volumes.
+
+Sections	
+Managing Logical Volumes (and Practice)
+
+Extending Logical Volumes (and Practice)
+
+Lab	
+Managing Logical Volume Management (LVM) Storage
+
+Managing Logical Volumes
+pvcreate, pvremove, and pvdisplay create, remove, and list physical volumes (PV).
+
+vgcreate, vgremove, and vgdisplay create, remove, and list volume groups (VG).
+
+lvcreate, lvremove, and lvdisplay create, remove, and list logical volumes (LV).
+
+Adding logical volumes is done in the order PV, VG, and LV.
+
+Removing logical volumes is done in the order LV, VG, and PV.
+
+Objectives
+After completing this section, students should be able to:
+
+Implement LVM storage.
+
+Display LVM component information.
+
+Implementing LVM storage
+LVM comes with a comprehensive set of command-line tools for implementing and managing LVM storage. These command-line tools can be used in scripts, making them suitable for automation.
+
+IMPORTANT
+The following examples use device vda and its partitions to illustrate LVM commands. In practice, these examples would need to use the correct devices for the disk and disk partitions that are being used by the system.
+
+Creating a logical volume
+
+There are five steps needed to create a usable logical volume:
+
+Prepare the physical device.
+
+Use fdisk, gdisk or parted to create a new partition for use with LVM. Always set the partition type to Linux LVM on LVM partitions; use 0x8e for MBR-style partitions. If necessary, use partprobe to register the new partition with the kernel.
+
+Alternatively, use a whole disk, a RAID array, or a SAN disk.
+
+A physical device only needs to be prepared if there are none prepared already and a new physical volume is required to create or extend a volume group.
+
+[root@serverX ~]# fdisk /dev/vda
+Use m for help, p to print the existing partition table, n to create a new partition, t to change the partition type, w to write the changes, and q to quit.
+
+Create a physical volume.
+
+pvcreate is used to label the partition (or other physical device) for use with LVM as a physical volume. A header to store LVM configuration data is written directly to the PV. A PV is divided into physical extents (PE) of a fixed size; for example, 4MiB blocks. Label multiple devices at the same time by using space-delimited device names as arguments to pvcreate.
+
+[root@serverX ~]# pvcreate /dev/vda2 /dev/vdb1
+This will label devices /dev/vda2 and /dev/vdb1 as PVs, ready for allocation into a volume group.
+
+A PV only needs to be created if there are no PVs free to create or extend a VG.
+
+Create a volume group.
+
+vgcreate is used to create a pool of one or more physical volumes, called a volume group. The size of the VG is determined by the total number of physical extents in the pool. A VG is responsible for hosting one or more logical volumes by allocating free PEs to a LV; therefore, it must have sufficient free PEs available at the time the LV is created.
+
+As arguments to vgcreate, define a VG name and list one or more PVs to allocate to the VG.
+
+[root@serverX ~]# vgcreate vg-alpha /dev/vda2 /dev/vdb1
+This will create a VG called vg-alpha that is the combined size, in PE units, of the two PVs /dev/vda2 and /dev/vdb1.
+
+A VG only needs to be created when there is none in existence. Additional VGs may be created for administrative reasons to manage the use of PVs and LVs. Otherwise, existing VGs can be extended to accommodate new LVs when needed.
+
+Create a logical volume.
+
+lvcreate creates a new logical volume from the available physical extents in a volume group. Use these arguments to lvcreate as a minimum: use the -n option to set the LV name, the -L option to set the LV size in bytes, and identify the VG name that the LV is to be created in.
+
+[root@serverX ~]# lvcreate -n hercules -L 2G vg-alpha
+This will create a LV called hercules, 2GiB in size, in the VG vg-alpha. There must be sufficient free physical extents to allocate 2GiB, and if necessary, it will be rounded to a factor of the PE unit size.
+
+There are multiple ways to specify the size: -L expects sizes in bytes, or larger named values, such as mebibytes (binary megabytes, 1048576 bytes) and gibibytes (binary gigabytes). The -l option expects sizes measured as a number of physical extents.
+
+Some examples:
+
+lvcreate -L 128M: Size the logical volume to exactly 128MiB.
+
+lvcreate -l 128 : Size the logical volume to exactly 128 extents in size. The total number of bytes depends on the size of the physical extent block on the underlying physical volume.
+
+IMPORTANT
+Different tools will display the logical volume name using either the traditional name, /dev/vgname/lvname, or the kernel device mapper name, /dev/mapper/vgname-lvname.
+
+Add the file system.
+
+Use mkfs to create an xfs file system on the new logical volume. Alternatively, create a file system based on your preferred file system; for example, ext4.
+
+[root@serverX ~]# mkfs -t xfs /dev/vg-alpha/hercules
+To make the file system available across reboots:
+
+Use mkdir to create a mount point directory.
+
+[root@serverX ~]# mkdir /mnt/hercules
+Add an entry to the /etc/fstab file:
+
+/dev/vg-alpha/hercules  /mnt/hercules  xfs  defaults 1 2
+Run mount -a to mount all the file systems in /etc/fstab, including the entry just added.
+
+[root@serverX ~]# mount -a
+Removing a logical volume
+
+There are four steps needed to remove all logical volume components:
+
+Prepare the file system.
+
+Move all data that must be kept to another file system, then use umount to unmount the file system. Do not forget to remove any /etc/fstab entries associated with this file system.
+
+[root@serverX ~]# umount /mnt/hercules
+WARNING
+Removing a logical volume will destroy any data stored on the logical volume. Back up or move your data BEFORE you remove the logical volume.
+
+Remove the logical volume.
+
+lvremove is used to remove a logical volume that is no longer needed. Use the device name as the argument.
+
+[root@serverX ~]# lvremove /dev/vg-alpha/hercules
+The LV file system must be unmounted before running this command. It will ask for confirmation before removing the LV.
+
+The LV's physical extents will be freed and made available for assignment to existing or new LVs in the volume group.
+
+Remove the volume group.
+
+vgremove is used to remove a volume group that is no longer needed. Use the VG name as the argument.
+
+[root@serverX ~]# vgremove vg-alpha
+The VG's physical volumes will be freed and made available for assignment to existing or new VGs on the system.
+
+Remove the physical volumes.
+
+pvremove is used to remove physical volumes that are no longer needed. Use a space-delimited list of PV devices to remove more than one at a time. The PV metadata is wiped from the partition (or disk). The partition is now free for reallocation or reformatting.
+
+[root@serverX ~]# pvremove /dev/vda2 /dev/vdb1
+Reviewing LVM status information
+Physical volumes
+
+Use pvdisplay to display information about physical volumes. If no arguments are specified with the command, it will list information about all PVs on the system. If the argument is a specific device name, then display information will be limited to that specific PV.
+
+[root@serverX ~]# pvdisplay /dev/vda2
+  --- Physical volume ---
+  PV Name               /dev/vda2                        1
+  VG Name               vg-alpha                         2
+  PV Size               256.00 MiB / not usable 4.00 MiB 3
+  Allocatable           yes
+  PE Size               4.00 MiB                         4
+  Total PE              63
+  Free PE               26                               5
+  Allocated PE          37
+  PV UUID               JWzDpn-LG3e-n2oi-9Etd-VT2H-PMem-1ZXwP1
+1
+
+PV Name maps to the device name.
+
+2
+
+VG Name shows the volume group where the PV is allocated.
+
+3
+
+PV Size shows the physical size of the PV, including any unusable space.
+
+4
+
+PE Size is the physical extent size, which is the smallest size a logical volume can be allocated.
+
+It is also the multiplying factor when calculating the size of any value reported in PE units, such as Free PE; for example: 26 PEs x 4MiB (the PE Size) gives 104MiB of free space. A logical volume size will be rounded to a factor of PE units.
+
+LVM sets the PE size automatically, although it is possible to specify it.
+
+5
+
+Free PE shows how many PE units are available for allocation to new logical volumes.
+
+Volume groups
+
+Use vgdisplay to display information about volume groups. If no argument is specified for the command, then it will display information about all VGs. Using the VG name as an argument will limit the display information to that specific VG.
+
+[root@serverX ~]# vgdisplay vg-alpha
+  --- Volume group --- 
+  VG Name               vg-alpha        1
+  System ID             
+  Format                lvm2
+  Metadata Areas        3  
+  Metadata Sequence No  4    
+  VG Access             read/write 
+  VG Status             resizable   
+  MAX LV                0            
+  Cur LV                1
+  Open LV               1
+  Max PV                0
+  Cur PV                3
+  Act PV                3
+  VG Size               1012.00 MiB      2 
+  PE Size               4.00 MiB
+  Total PE              253              3
+  Alloc PE / Size       175 / 700.00 MiB
+  Free  PE / Size       78 / 312.00 MiB  4
+  VG UUID               3snNw3-CF71-CcYG-Llk1-p6EY-rHEv-xfUSez
+1
+
+VG Name is the name of this volume group.
+
+2
+
+VG Size is the total size of the storage pool available for logical volume allocation.
+
+3
+
+Total PE is the total size expressed in PE units.
+
+4
+
+Free PE / Size shows how much space is free in the VG for allocating to new LVs or to extend existing LVs.
+
+Logical volumes
+
+Use lvdisplay to display information about logical volumes. Again, no argument with the command will display information about all LVs, and using the LV device name as an argument will display information about that specific device.
+
+[root@serverX ~]# lvdisplay /dev/vg-alpha/hercules
+  --- Logical volume ---
+  LV Path                /dev/vg-alpha/hercules 1
+  LV Name                hercules
+  VG Name                vg-alpha               2
+  LV UUID                5IyRea-W8Zw-xLHk-3h2a-IuVN-YaeZ-i3IRrN
+  LV Write Access        read/write
+  LV Creation host, time server1.example.com 2014-02-19 00:26:48 -0500
+  LV Status              available
+  # open                 1
+  LV Size                700 MiB                3
+  Current LE             175                    4
+  Segments               3
+  Allocation             inherit
+  Read ahead sectors     auto
+  - current set to       8192
+  Block device           252:0
+1
+
+LV Path shows the device name of this logical volume.
+
+Some tools may report the device name as /dev/mapper/vgname-lvname; both represent the same LV.
+
+2
+
+VG Name shows the volume group the LV is allocated from.
+
+3
+
+LV Size shows the total size of the LV. Use file system tools to check free space and used space for storage of data.
+
+4
+
+Current LE shows the number of logical extents used by this LV. A LE usually maps to a physical extent in the VG, and therefore the physical volume.
+
+REFERENCES
+lvm(8), pvcreate(8), vgcreate(8), lvcreate(8), pvremove(8), vgremove(8), lvremove(8), pvdisplay(8), vgdisplay(8), lvdisplay(8), fdisk(8), gdisk(8), parted(8), partprobe(8), and mkfs(8) man page
+
+
+
+
+Guided Exercise: Practice: Adding a Logical Volume
+In this lab, you will add a physical volume, volume group, logical volume, and an XFS file system. You will persistently mount the logical volume file system.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+A 400MiB logical volume called storage in the volume group shazam, mounted at /storage. The volume group consists of two physical volumes, each 256MiB in size.
+
+Reset your serverX system.
+
+Log into serverX.
+
+Open a terminal.
+
+Switch to root (sudo -i).
+
+Create the Physical Resources
+
+Use fdisk to create two partitions of 256MiB apiece and set them to type Linux LVM.
+
+[root@serverX ~]# fdisk /dev/vdb
+Note: The following steps omit some output.
+
+Add a new primary partition of 256MiB.
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): Enter
+Using default response p
+Partition number (1-4, default 1): Enter
+First sector (2048-20971519, default 2048): Enter
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-20971519, default 20971519): +256M
+Change the partition type to Linux LVM - 0x8e.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'
+Repeat the previous two steps to add a second primary partition of the same size in the next available partition space.
+
+Write the changes to the partition table and quit.
+
+Command (m for help): w
+The partition table has been altered!
+Use partprobe to register the new partitions with the kernel.
+
+[root@serverX ~]# partprobe
+Create the Physical Volumes
+
+Use pvcreate to add the two new partitions as PVs.
+
+[root@serverX ~]# pvcreate /dev/vdb1 /dev/vdb2
+  Physical volume "/dev/vdb1" successfully created
+  Physical volume "/dev/vdb2" successfully created
+Create the Volume Group
+
+Use vgcreate to create a new VG named shazam built from the two PVs.
+
+[root@serverX ~]# vgcreate shazam /dev/vdb1 /dev/vdb2
+  Volume group "shazam" successfully created
+Create the Logical Volume
+
+Use lvcreate to create a 400MiB LV named storage from the shazam VG.
+
+[root@serverX ~]# lvcreate -n storage -L 400M shazam
+  Logical volume "storage" created
+This will create a device called /dev/shazam/storage, currently without a file system on it.
+
+Add a Persistent File System
+
+Use mkfs to place an xfs file system on the storage LV; use the LV device name.
+
+[root@serverX ~]# mkfs -t xfs /dev/shazam/storage
+meta-data=/dev/shazam/storage    isize=256    agcount=4, agsize=25600 blks
+...
+Use mkdir to create a mount point at /storage.
+
+[root@serverX ~]# mkdir /storage
+Use vim to add the following line to the bottom of /etc/fstab on serverX:
+
+/dev/shazam/storage    /storage    xfs  defaults  1 2
+Use mount to verify the /etc/fstab entry and mount the new storage LV device.
+
+[root@serverX ~]# mount -a
+Test and Review Your Work
+
+As a final test, copy some files onto /storage and verify how many were copied.
+
+[root@serverX ~]# cp -a /etc/*.conf /storage
+[root@serverX ~]# ls /storage | wc -l
+47
+We will check that we still have the same number of files in the next practice exercise.
+
+fdisk -l /dev/vdb will show you the partitions that exist on /dev/vdb.
+
+[root@serverX ~]# fdisk -l /dev/vdb
+Check the /dev/vdb1 and /dev/vdb2 entries, and notice the Id and System columns showing 8e and Linux LVM, respectively.
+
+pvdisplay will show you information about each of the physical volumes. Optionally, include the device name to limit details to a specific PV.
+
+[root@serverX ~]# pvdisplay /dev/vdb2
+  --- Physical volume ---
+  PV Name               /dev/vdb2
+  VG Name               shazam
+  PV Size               256.00 MiB / not usable 4.00 MiB
+  Allocatable           yes 
+  PE Size               4.00 MiB
+  Total PE              63
+  Free PE               26
+  Allocated PE          37
+  PV UUID               N64t6x-URdJ-fVU3-FQ67-zU6g-So7w-hvXMcM
+This shows that our PV is allocated to VG shazam, is 256MiB in size (although 4MiB is not usable), and our physical extent size (PE Size) is 4MiB (the smallest allocatable LV size).
+
+There are 63 PEs, of which 26 PEs are free for allocation to LVs in the future and 37 PEs are currently allocated to LVs. These translate to MiB values as follows:
+
+Total 252MiB (63 PEs x 4MiB); remember, 4MiB are unusable.
+
+Free 104MiB (26 PEs x 4MiB)
+
+Allocated 148MiB (37 PEs x 4MiB)
+
+vgdisplay vgname will show you information about the volume group named vgname.
+
+[root@serverX ~]# vgdisplay shazam
+Check the following values:
+
+VG Size is 504.00MiB.
+
+Total PE is 126.
+
+Alloc PE / Size is 100 / 400.00MiB.
+
+Free PE / Size is 26 / 104.00MiB.
+
+lvdisplay /dev/vgname/lvname will show you information about the logical volume named lvname.
+
+[root@serverX ~]# lvdisplay /dev/shazam/storage
+Notice the LV Path, LV Name, VG Name, LV Status, LV Size, and Current LE (logical extents, which map to physical extents).
+
+mount will show all the devices that are mounted and any mount options. It should include /dev/shazam/storage.
+
+NOTE
+Reminder: Many tools will report the device mapper name instead, /dev/mapper/shazam-storage; it is the same logical volume.
+
+[root@serverX ~]# mount
+You should see (probably on the last line) /dev/mapper/shazam-storage mounted on /storage and the associated mount information.
+
+df -h will show human-readable disk free space. Optionally, include the mount point to limit details to that file system.
+
+[root@serverX ~]# df -h /storage
+Filesystem                  Size  Used Avail Use% Mounted on
+/dev/mapper/shazam-storage  397M   21M  377M   6% /storage
+Allowing for file system metadata, these values are what we would expect.s

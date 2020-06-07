@@ -1,0 +1,142 @@
+
+Chapter 7. Updating Software Packages
+Attaching Systems to Subscriptions for Software Updates
+Quiz: Practice: Red Hat Subscription Management
+Managing Software Updates with yum
+Guided Exercise: Practice: Installing and Updating Software with yum
+Enabling yum Software Repositories
+Guided Exercise: Practice: Enabling Software Repositories
+Lab: Lab: Installing and Updating Software Packages
+Abstract
+
+Overview
+Goal	To download, install, update, and manage software packages from Red Hat and YUM package repositories.
+Objectives	
+Register systems with your Red Hat account and entitle them to software updates for installed products.
+
+Find, install, and update software packages using the yum command.
+
+Enable and disable use of Red Hat or third-party YUM repositories.
+
+Sections	
+Attaching Systems to Subscriptions for Software Updates (and Practice)
+
+Managing Software Updates with yum (and Practice)
+
+Enabling yum Software Repositories (and Practice)
+
+Lab	
+Installing and Updating Software Packages
+
+Attaching Systems to Subscriptions for Software Updates
+Registering systems allows access to software updates for installed products.
+
+Objectives
+Register systems with your Red Hat account and entitle them to software updates for installed products.
+
+Red Hat Subscription Management
+Red Hat Subscription Management provides tools that can be used to entitle machines to product subscriptions, allowing administrators to get updates to software packages and track information about support contracts and subscriptions used by the systems. Standard tools such as PackageKit and yum can obtain software packages and updates through a content distribution network provided by Red Hat.
+
+There are four basic tasks performed with Red Hat Subscription Management tools:
+
+Register a system to associate that system to a Red Hat account. This allows Subscription Manager to uniquely inventory the system. When no longer in use, a system may be unregistered.
+
+Subscribe a system to entitle it to updates for selected Red Hat products. Subscriptions have specific levels of support, expiration dates, and default repositories. The tools can be used to either auto-attach or select a specific entitlement. As needs change, subscriptions may be removed.
+
+Enable repositories to provide software packages. Multiple repositories are enabled by default with each subscription, but other repositories such as updates or source code can be enabled or disabled as needed.
+
+Review and track entitlements which are available or consumed. Subscription information can be viewed locally on a specific system or, for an account, in either the Red Hat Customer Portal Subscriptions page or the Subscription Asset Manager (SAM).
+
+Register a system
+
+To register a system with the subscription management service, launch subscription-manager-gui by selecting Applications → System Tools → Red Hat Subscription Manager from the main GNOME menu. Enter the password for root when prompted to authenticate. This will display the following Subscription Manager window.
+
+
+Figure 7.1: The main window of Red Hat Subscription Manager
+To register the system, click the Register button in the top-right corner of the Subscription Manager window. This will bring up the following dialog:
+
+
+Figure 7.2: The service location dialog of Red Hat Subscription Manager
+This dialog box registers a system with a subscription server. The default (subscription.rhn.redhat.com) will register the server to Red Hat's "hosted" content distribution network.
+
+
+Figure 7.3: The account information dialog of Red Hat Subscription Manager
+Click Next, then authenticate using the Red Hat account to which the system should be registered.
+
+By default, Subscription Manager will try to find the best subscription for this system out of all available subscriptions. If more than one subscription is available, or a specific subscription is required, check the Manually attach subscriptions after registration checkbox. With this option checked, Subscription Manager will only register the system and not automatically assign any subscriptions.
+
+Click the Register button to complete the registration.
+
+Assigning subscriptions
+
+To assign subscriptions to a system, navigate to the All Available Subscriptions tab in the main window of Subscription Manager, then click the Update button to retrieve a list of available subscriptions.
+
+
+Figure 7.4: All Available Subscriptions tab of Red Hat Subscription Manager
+From this list, select one or more subscriptions to assign to this system, then click the Attach button.
+
+If there is more than one contract for a specific subscription, a new dialog will open up, asking you to select which contract to use. Note that there are different contracts for Physical and Virtual systems.
+
+
+Figure 7.5: Contract selection dialog of Red Hat Subscription Manager
+After a subscription has been assigned, close the Subscription Manager window. The system is now properly subscribed and ready to receive updates and/or install new software from Red Hat.
+
+Automating registrations and subscriptions
+Use subscription-manager(8) to register a system without using a graphical environment. The subscription-manager command can automatically attach a system to the best-matched compatible subscriptions for the system.
+
+Register a system to a Red Hat account:
+
+[root:@serverX ~]# subscription-manager register --username=yourusername --password=yourpassword
+View available subscriptions:
+
+[root:@serverX ~]# subscription-manager list --available | less
+Auto-attach a subscription:
+
+[root:@serverX ~]# subscription-manager attach --auto
+View consumed subscriptions:
+
+[root:@serverX ~]# subscription-manager list --consumed
+Unregister a system:
+
+[root:@serverX ~]# subscription-manager unregister
+NOTE
+subscription-manager can also be used in conjunction with activation keys, allowing registration and assignment of predefined subscriptions, without using a username or password. This method of registration can be very useful for automated installations and deployments. Activation keys are usually issued by an on-premise subscription management service, such as Subscription Asset Manager, and will not be discussed in detail in this course.
+
+Entitlement certificates
+An entitlement is a subscription that's been attached to a system. Digital certificates are used to store current information about entitlements on the local system. Once registered, the entitlement certificates are stored in /etc/pki and its subdirectories.
+
+/etc/pki/product contains certificates which indicate Red Hat products installed on the system.
+
+/etc/pki/consumer contains certificates which indicate the Red Hat account to which the system is registered.
+
+/etc/pki/entitlement contains certificates which indicate which subscriptions are attached to the system.
+
+The certificates can be inspected with the rct utility directly, but normally the subscription-manager tools are a more user-friendly way to examine the subscriptions that are attached to the system.
+
+IMPORTANT
+Older versions of Red Hat Enterprise Linux originally supported a different subscription management method, RHN Classic. RHN Classic is not supported by Red Hat Enterprise Linux 7.
+
+The method covered in this section, Red Hat Subscription Management, is the only one used by RHEL 7, and is the default method used by RHEL 6 after RHEL 6.3, and RHEL 5 after RHEL 5.9. RHEL 4 only supports the old method. More information on both methods is available in the references at the end of this section.
+
+REFERENCES
+subscription-manager-gui(8), subscription-manager(8), and rct(8) man pages
+
+Get started with Red Hat Subscription Management
+
+Red Hat Subscription Management: Migrating from RHN and Satellite
+
+
+
+Quiz: Practice: Red Hat Subscription Management
+Match the following items to their counterparts in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+Description	Task
+Determine the number of available subscriptions	Review and track
+Enable a system to use selected Red Hat products	Subscribe
+Attach a system to a Red Hat account	Register
+Provide software packages	Enable repositories
+

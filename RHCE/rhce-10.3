@@ -1,0 +1,101 @@
+Editing Network Configuration Files
+Modify network configuration files.
+
+Objectives
+After completing this section, students should be able to modify network settings by editing the configuration files.
+
+Modifying network configuration
+It is also possible to configure the network by editing interface configuration files. Interface configuration files control the software interfaces for individual network devices. These files are usually named /etc/sysconfig/network-scripts/ifcfg-<name>, where <name> refers to the name of the device or connection that the configuration file controls. The following are standard variables found in the file used for static or dynamic configuration.
+
+Table 10.3. Configuration Options for ifcfg File
+
+Static	Dynamic	Either
+BOOTPROTO=none
+
+IPADDR0=172.25.X.10
+
+PREFIX0=24
+
+GATEWAY0=172.25.X.254
+
+DEFROUTE=yes
+
+DNS1=172.25.254.254
+
+BOOTPROTO=dhcp
+
+DEVICE=eth0
+
+NAME="System eth0"
+
+ONBOOT=yes
+
+UUID=f3e8dd32-3...
+
+USERCTL=yes
+
+
+In the static settings, variables for IP address, prefix, and gateway have a number at the end. This allows multiple sets of values to be assigned to the interface. The DNS variable also has a number which is used to specify the order of lookup when multiple servers are specified.
+
+After modifying the configuration files, run nmcli con reload to make NetworkManager read the configuration changes. The interface still needs to be restarted for changes to take effect.
+
+[root@serverX ~]# nmcli con reload
+[root@serverX ~]# nmcli con down "System eth0"
+[root@serverX ~]# nmcli con up "System eth0"
+REFERENCES
+nmcli(1) man page
+
+Additional information may be available in the chapter on configuring networking in the Red Hat Enterprise Linux Networking Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+
+Guided Exercise: Practice: Editing Network Configuration Files
+In this lab, you will edit network configuration files.
+
+Outcomes:
+
+An additional network address added to each system.
+
+Reset your serverX and desktopX systems.
+
+As the root user, edit the /etc/sysconfig/network-scripts/ifcfg-eth0 on serverX to add an additional address of 10.0.X.1/24.
+
+Append an entry to the file to specify the IPv4 address.
+
+[root@serverX ~]# echo "IPADDR1=10.0.X.1" >> /etc/sysconfig/network-scripts/ifcfg-eth0
+Append an entry to the file to specify the network prefix.
+
+[root@serverX ~]# echo "PREFIX1=24" >> /etc/sysconfig/network-scripts/ifcfg-eth0
+Activate the new address.
+
+Reload the configuration changes.
+
+[root@serverX ~]# nmcli con reload
+Restart the connection with the new settings.
+
+[root@serverX ~]# nmcli con up "System eth0"
+As the root user, edit the /etc/sysconfig/network-scripts/ifcfg-eth0 on desktopX to add an additional address of 10.0.X.2/24 and load the new configuration.
+
+Modify the file to add the IPv4 and network prefix.
+
+[root@desktopX ~]# echo "IPADDR1=10.0.X.2" >> /etc/sysconfig/network-scripts/ifcfg-eth0
+[root@desktopX ~]# echo "PREFIX1=24" >> /etc/sysconfig/network-scripts/ifcfg-eth0
+Reload the configuration changes.
+
+[root@desktopX ~]# nmcli con reload
+Bring up the connection with the new settings.
+
+[root@desktopX ~]# nmcli con up "System eth0"
+Test the connectivity using the new network addresses.
+
+On serverX, verify the IP address.
+
+[root@serverX ~]# ip addr
+On serverX, ping the new address of desktopX.
+
+[root@serverX ~]# ping 10.0.X.2
+On desktopX, verify the IP address.
+
+[root@desktopX ~]# ip addr
+On desktopX, ping the new address of serverX.
+
+[root@desktopX ~]# ping 10.0.X.1

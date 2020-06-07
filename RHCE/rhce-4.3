@@ -1,0 +1,219 @@
+POSIX Access Control Lists (ACLs)
+ACLs provide fine-grained access control to files and directories.
+
+The file system must be mounted with ACL support enabled; XFS has built-in ACL support.
+
+ls -l indicates the presence of ACL settings with the "+" character. The group permissions show the mask settings.
+
+getfacl file displays the ACLs on a file or directory; directory ACLs include default ACLs.
+
+An ACL mask defines the maximum permissions named users, the group-owner, and named groups can have.
+
+ACL permission precedence is user, named users, groups, and then others.
+
+Objectives
+After completing this section, students should be able to:
+
+Describe ACLs and file system mount options.
+
+View and interpret ACLs with ls and getfacl, describe the ACL mask and ACL permission precedence.
+
+Access control list concepts
+Standard Linux file permissions are satisfactory for most situations, but they have limitations. Permissions restricting access to a file are limited to the file owner, membership of a single group, or everyone else. It may not be appropriate for the process (a running program) to be a member of the file's owning group, and even less desirable to grant permission to everyone.
+
+ACLs allow fine-grained permissions to be allocated to a file. Named users or named groups, as well as users and groups identified by a UID or GUID, can be granted permissions, in addition to the standard file owner, group-owner, and other file permissions. The same permission flags apply: r - read, w - write, and x - execute (on files, search for directories).
+
+The file owner can set ACLs on individual files or directories. New files and subdirectories can automatically inherit ACL settings from the parent directory default ACLs, if they are set. Similar to normal file access rules, the parent directory hierarchy will need at least the other execute permission set to enable named users and named groups to have access.
+
+File system mount option
+
+The file system needs to be mounted with ACL support enabled. XFS file systems have built-in ACL support. Ext4 file systems created on Red Hat Enterprise Linux 7 have the acl option enabled by default, but ext4 file systems created after installation in earlier versions of Red Hat Enterprise Linux may need the acl option included with the mount request, or set in the superblock.
+
+Viewing and interpreting ACL permissions
+The ls -l command only outputs minimal ACL setting details:
+
+[student@serverX steamies]$ ls -l roster.txt
+-rwxrw----+ 1 student controller 130 Mar 19 23:56 roster.txt
+The "+" at the end of the 10-character permission string indicates that there are ACL settings associated with this file. Interpret the user, group, and other "rwx" flags as:
+
+user: Shows the user ACL settings, which are the same as the standard user file settings; rwx.
+
+group: Shows the current ACL mask settings, not the group-owner settings; rw.
+
+other: Shows the other ACL settings, which are the same as the standard other file settings; no access.
+
+IMPORTANT
+Changing group permissions on a file with an ACL by using chmod does not change the group-owner permissions, but does change the ACL mask. Use setfacl -m g::perms file if the intent is to update the file's group-owner permissions.
+
+View file ACLs
+
+To display ACL settings on a file, use getfacl file:
+
+[student@serverX steamies]$ getfacl roster.txt
+# file: roster.txt
+# owner: student
+# group: controller
+user::rwx
+user:james:---
+user:1005:rwx       #effective:rw-
+group::rwx          #effective:rw-
+group:sodor:r--
+group:2210:rwx      #effective:rw-
+mask::rw-
+other::---
+Take a look at each section of the previous example:
+
+Opening comment entries:
+
+# file: roster.txt
+# owner: student
+# group: controller
+The first three lines are comments that identify the file name, owner (student), and group-owner (controller). If there are any additional file flags—for example, setuid or setgid—then a fourth comment line will appear showing which flags are set.
+
+User entries:
+
+user::rwx                           1
+user:james:---                      2
+user:1005:rwx       #effective:rw-  3
+1
+
+File owner permissions. student has rwx.
+
+2
+
+Named user permissions. One entry for each named user associated with this file. james has NO permissions.
+
+3
+
+Named user permissions. UID 1005 has rwx, but the mask limits the effective permissions to rw only.
+
+Group entries:
+
+group::rwx          #effective:rw-  1
+group:sodor:r--                     2
+group:2210:rwx      #effective:rw-  3
+1
+
+Group-owner permissions. controller has rwx, but the mask limits the effective permissions to rw only.
+
+2
+
+Named group permissions. One entry for each named group associated with this file. sodor has r only.
+
+3
+
+Named group permissions. GID 2210 has rwx, but the mask limits the effective permissions to rw only.
+
+Mask entry:
+
+mask::rw-
+Mask settings show the maximum permissions possible for all named users, the group-owner and named groups. UID 1005, controller, and GID 2210 cannot execute this file, even though each entry has the execute permission set.
+
+Other entry:
+
+other::---
+Other or "world" permissions. All other UIDs and GIDs have NO permissions.
+
+View directory ACLs
+
+To display ACL settings on a directory, use getfacl /directory:
+
+[student@serverX steamies]$ getfacl .
+# file: .
+# owner: student
+# group: controller
+# flags: -s-
+user::rwx
+user:james:---
+user:1005:rwx
+group::rwx
+group:sodor:r-x
+group:2210:rwx
+mask::rwx
+other::---
+default:user::rwx
+default:user:james:---
+default:group::rwx
+default:group:sodor:r-x
+default:mask::rwx
+default:other::---
+Take a look at each section of the previous example:
+
+Opening comment entries:
+
+# file: .
+# owner: student
+# group: controller
+# flags: -s-
+The first three lines are comments that identify the directory name, owner (student), and group-owner (controller). If there are any additional directory flags (setuid, setgid, sticky), then a fourth comment line will appear showing the set flags—in this case, setgid.
+
+Standard ACL entries:
+
+user::rwx
+user:james:---
+user:1005:rwx
+group::rwx
+group:sodor:r-x
+group:2210:rwx
+mask::rwx
+other::---
+The ACL permissions on this directory are the same as the file example earlier, but apply to the directory. The key difference is the inclusion of the execute permission on these entries (when appropriate) to allow directory search permission.
+
+Default user entries:
+
+default:user::rwx                   1
+default:user:james:---              2
+1
+
+Default file owner ACL permissions. The file owner will get rwx, read/write on new files and execute on new subdirectories.
+
+2
+
+Default named user ACL permissions. One entry for each named user who will automatically get default ACLs applied to new files or subdirectories. james will always default to NO permissions.
+
+Default group entries:
+
+default:group::rwx                  1
+default:group:sodor:r-x             2
+1
+
+Default group-owner ACL permissions. The file group-owner will get rwx, read/write on new files and execute on new subdirectories.
+
+2
+
+Default named group ACL permissions. One entry for each named group which will automatically get default ACLs. sodor will get rx, read-only on new files, and execute on new subdirectories.
+
+Default ACL mask entry:
+
+default:mask::rwx
+Default mask settings show the initial maximum permissions possible for all new files or directories created that have named user ACLs, the group-owner ACL, or named group ACLs: read and write for new files and execute permission on new subdirectories, new files never get execute permission.
+
+Default other entry:
+
+default:other::---
+Default other or "world" permissions. All other UIDs and GIDs have NO permissions to new files or new subdirectories.
+
+The default entries in the previous example do not include the named user (UID 1005) and named group (GID 2210); consequently, they will not automatically get initial ACL entries added for them to any new files or new subdirectories. This effectively limits them to files and subdirectories that they already have ACLs on, or if the relevant file owner adds the ACL later using setfacl. They can still create their own files and subdirectories.
+
+NOTE
+The output from getfacl can be used as input to setfacl. Use getfacl -R /directory to generate output for the directory and its content. This output can be saved and used for recovery by passing the output to setfacl --set-file=file to do a mass update.
+
+The ACL mask
+
+The ACL mask defines the maximum permissions that can be granted to named users, the group-owner, and named groups. It does not restrict the permissions of the file owner or other users. All files and directories that implement ACLs will have an ACL mask.
+
+The mask can be viewed with getfacl and explicitly set with setfacl. It will be calculated and added automatically if it is not explicitly set, but it could also be inherited from a parent directory default mask setting. By default, the mask is recalculated whenever any of the affected ACLs is added, modified, or deleted.
+
+ACL permission precedence
+
+When determining whether a process (a running program) can access a file, file permissions and ACLs are applied as follows:
+
+If the process is running as the user that owns the file, then the file's user ACL permissions apply.
+
+If the process is running as a user that is listed in a named user ACL entry, then the named user ACL permissions apply (as long as it is permitted by the mask).
+
+If the process is running as a group that matches the group-owner of the file, or as a group with an explicit named group ACL entry, then the matching ACL permissions apply (as long as it is permitted by the mask).
+
+Otherwise, the file's other ACL permissions apply.
+
+REFERENCES

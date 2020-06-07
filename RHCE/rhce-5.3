@@ -1,0 +1,133 @@
+Changing SELinux Contexts
+The semanage fcontext command is used to manage SELinux policy rules that determine the default context for files and directories.
+
+restorecon applies the context defined by the SELinux policy to files and directories.
+
+Although the chcon command can change the SELinux context files, it shouldn't be used because the change may not persist.
+
+Objectives
+After completing this section, students should be able to:
+
+Set the SELinux security context of files in the policy.
+
+Restore the SELinux security context of files.
+
+Display and manage SELinux file contexts
+Initial SELinux context
+Typically, the SELinux context of a file's parent directory determines its initial SELinux context. The context of the parent directory is assigned to the newly created file. This works for commands like vim, cp, and touch. However, if a file is created elsewhere and the permissions are preserved (as with mv or cp -a), the original SELinux context will be unchanged.
+
+[root@serverX ~]# ls -Zd /var/www/html/
+drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 /var/www/html/
+[root@serverX ~]# touch /var/www/html/index.html
+[root@serverX ~]# ls -Z /var/www/html/index.html
+-rw-r--r--. root root unconfined_u:object_r:httpd_sys_content_t:s0 /var/www/html/index.html
+Changing the SELinux context of a file
+There are two commands that are used to change the SELinux context of files: chcon and restorecon. The chcon command changes the context of the file to the context specified as an argument to the command. Often the -t option is used to specify only the type component of the context.
+
+The restorecon command is the preferred method for changing the SELinux context of a file or directory. Unlike chcon, the context is not explicitly specified when using this command. It uses rules in the SELinux policy to determine what the context of the file should be.
+
+NOTE
+chcon should not be used to change the SELinux context of files. Mistakes can be made when specifying the context explicitly. File contexts will be changed back to their default context if the system's file systems are relabeled at boot time.
+
+[root@serverX ~]# mkdir /virtual
+[root@serverX ~]# ls -Zd /virtual
+drwxr-xr-x. root root unconfined_u:object_r:default_t:s0 /virtual
+[root@serverX ~]# chcon -t httpd_sys_content_t /virtual
+[root@serverX ~]# ls -Zd /virtual
+drwxr-xr-x. root root unconfined_u:object_r:httpd_sys_content_t:s0 /virtual
+[root@serverX ~]# restorecon -v /virtual
+restorecon reset /virtual context unconfined_u:object_r:httpd_sys_content_t:s0->
+unconfined_u:object_r:default_t:s0
+[root@serverX ~]# ls -Zd /virtual
+drwxr-xr-x. root root unconfined_u:object_r:default_t:s0 /virtual
+Defining SELinux default file context rules
+The semanage fcontext command can be used to display or modify the rules that the restorecon command uses to set default file contexts. It uses extended regular expressions to specify the path and file names. The most common extended regular expression used in fcontext rules is (/.*)?, which means “optionally, match a / followed by any number of characters”. It matches the directory listed before the expression and everything in that directory recursively.
+
+The restorecon command is part of the policycoreutil package, and semanage is part of the policycoreutil-python package.
+
+[root@serverX ~]# touch /tmp/file1 /tmp/file2
+[root@serverX ~]# ls -Z /tmp/file*
+-rw-r--r--. root root unconfined_u:object_r:user_tmp_t:s0 /tmp/file1
+-rw-r--r--. root root unconfined_u:object_r:user_tmp_t:s0 /tmp/file2
+[root@serverX ~]# mv /tmp/file1 /var/www/html/
+[root@serverX ~]# cp /tmp/file2 /var/www/html/
+[root@serverX ~]# ls -Z /var/www/html/file*
+-rw-r--r--. root root unconfined_u:object_r:user_tmp_t:s0 /var/www/html/file1
+-rw-r--r--. root root unconfined_u:object_r:httpd_sys_content_t:s0 /var/www/
+html/file2
+[root@serverX ~]# semanage fcontext -l
+...
+/var/www(/.*)?       all files    system_u:object_r:httpd_sys_content_t:s0
+...
+[root@serverX ~]# restorecon -Rv /var/www/
+restorecon reset /var/www/html/file1 context unconfined_u:object_r:user_tmp_t:s0
+-> system_u:object_r:httpd_sys_content_t:s0
+[root@serverX ~]# ls -Z /var/www/html/file*
+-rw-r--r--. root root system_u:object_r:httpd_sys_content_t:s0
+   /var/www/html/file1
+-rw-r--r--. root root unconfined_u:object_r:httpd_sys_content_t:s0
+   /var/www/html/file2
+The following example shows how to use semanage to add a context for a new directory.
+
+[root@serverX ~]# mkdir /virtual
+[root@serverX ~]# touch /virtual/index.html
+[root@serverX ~]# ls -Zd /virtual/
+drwxr-xr-x. root root unconfined_u:object_r:default_t:s0 /virtual/
+[root@serverX ~]# ls -Z /virtual/
+-rw-r--r--. root root unconfined_u:object_r:default_t:s0 index.html
+[root@serverX ~]# semanage fcontext -a -t httpd_sys_content_t '/virtual(/.*)?'
+[root@serverX ~]# restorecon -RFvv /virtual
+[root@serverX ~]# ls -Zd /virtual/
+drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 /virtual/
+[root@serverX ~]# ls -Z /virtual/
+-rw-r--r--. root root system_u:object_r:httpd_sys_content_t:s0 index.html
+REFERENCES
+chcon(1), restorecon(8), and semanage(8) man pages
+
+
+
+Guided Exercise: Practice: Changing SELinux Contexts
+In this lab, you will persistently change the SELinux context of a directory and its contents.
+
+Resources
+Files:	/etc/httpd/conf/httpd.conf
+Machines:	serverX
+Outcomes:
+
+You will have a web server that publishes web content from a non-standard document root.
+
+You should have a working RHEL 7 system with SELinux in enforcing mode.
+
+Log in as root on serverX. Use yum to install the Apache web server.
+
+[root@serverX ~]# yum install -y httpd
+Configure Apache to use a document root in a non-standard location.
+
+Create the new document root, /custom.
+
+[root@serverX ~]# mkdir /custom
+Create the index.html with some recognizable content.
+
+[root@serverX ~]# echo 'This is serverX.' > /custom/index.html
+Configure Apache to use the new location. You need to replace the two occurrences of “/var/www/html” with “/custom” in the Apache configuration file, /etc/httpd/conf/httpd.conf.
+
+[root@serverX ~]# vi /etc/httpd/conf/httpd.conf
+[root@serverX ~]# grep custom /etc/httpd/conf/httpd.conf
+DocumentRoot "/custom"
+<Directory "/custom">
+Start the Apache web service.
+
+[root@serverX ~]# systemctl start httpd
+Open a web browser on serverX and try to view the following URL: http://localhost/index.html. You will get an error message that says you do not have permission to access the file.
+
+Define a SELinux file context rule that sets the context type to httpd_sys_content_t for /custom and all the files below it.
+
+[root@serverX ~]# semanage fcontext -a -t httpd_sys_content_t '/custom(/.*)?'
+Use restorecon to change their contexts.
+
+[root@serverX ~]# restorecon -Rv /custom
+restorecon reset /custom context unconfined_u:object_r:default_t:s0->unconfined_u:object_r:httpd_sys_content_t:s0
+restorecon reset /custom/index.html context unconfined_u:object_r:default_t:s0->unconfined_u:object_r:httpd_sys_content_t:s0
+Try to view http://localhost/index.html again. You should see the message “This is serverX.” displayed.
+
+

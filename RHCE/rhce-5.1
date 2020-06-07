@@ -1,0 +1,145 @@
+
+Chapter 5. SELinux Permissions
+Enabling and Monitoring Security Enhanced Linux (SELinux)
+Quiz: Practice: SELinux Concepts
+Changing SELinux Modes
+Guided Exercise: Practice: Changing SELinux Modes
+Changing SELinux Contexts
+Guided Exercise: Practice: Changing SELinux Contexts
+Changing SELinux Booleans
+Guided Exercise: Practice: Changing SELinux Booleans
+Troubleshooting SELinux
+Guided Exercise: Practice: Troubleshooting SELinux
+Lab: Lab: Managing SELinux Security
+Abstract
+
+Overview
+Goal	To manage the Security Enhanced Linux (SELinux) behavior of a system to keep it secure in case of a network service compromise.
+Objectives	
+Explain the basics of SELinux permissions.
+
+Change SELinux modes with setenforce.
+
+Change file contexts with semanage and restorecon.
+
+Manage SELinux booleans with setsebool.
+
+Examine logs and use sealert to troubleshoot SELinux violations.
+
+Sections	
+Enabling and Monitoring SELinux (and Practice)
+
+Changing SELinux Modes (and Practice)
+
+Changing SELinux Contexts (and Practice)
+
+Changing SELinux Booleans (and Practice)
+
+Troubleshooting SELinux (and Practice)
+
+Lab	
+Managing SELinux Security
+
+Enabling and Monitoring Security Enhanced Linux (SELinux)
+getenforce displays the current SELinux mode, which determines whether SELinux rules are applied.
+
+The -Z option to ls and ps displays SELinux context labels on files and processes.
+
+getsebool -a displays all SELinux Booleans and their current value.
+
+Objectives
+After completing this section, students should be able to:
+
+Explain the basics of SELinux permissions and context transitions.
+
+Display the current SELinux mode.
+
+Correctly interpret the SELinux context of a file.
+
+Correctly interpret the SELinux context of a process.
+
+Identify current SELinux Boolean settings.
+
+Basic SELinux security concepts
+Basic SELinux security concepts
+Security Enhanced Linux (SELinux) is an additional layer of system security. A primary goal of SELinux is to protect user data from system services that have been compromised. Most Linux administrators are familiar with the standard user/group/other permission security model. This is a user and group-based model known as discretionary access control. SELinux provides an additional layer of security that is object-based and controlled by more sophisticated rules, known as mandatory access control.
+
+
+Figure 5.1: Apache service without SELinux protection
+To allow remote anonymous access to a web server, firewall ports must be opened. However, this gives malicious people an opportunity to crack the system through a security exploit, and if they compromise the web server process, gain its permissions: the permissions of the apache user and the apache group. That user/group has read access to things like the document root (/var/www/html), as well as write access to /tmp, /var/tmp, and any other files/directories that are world-writable.
+
+
+Figure 5.2: Apache service with SELinux protection
+SELinux is a set of security rules that determine which process can access which files, directories, and ports. Every file, process, directory, and port has a special security label called a SELinux context. A context is a name that is used by the SELinux policy to determine whether a process can access a file, directory, or port. By default, the policy does not allow any interaction unless an explicit rule grants access. If there is no allow rule, no access is allowed.
+
+SELinux labels have several contexts: user, role, type, and sensitivity. The targeted policy, which is the default policy enabled in Red Hat Enterprise Linux, bases its rules on the third context: the type context. Type context names usually end with _t. The type context for the web server is httpd_t. The type context for files and directories normally found in /var/www/html is httpd_sys_content_t. The type contexts for files and directories normally found in /tmp and /var/tmp is tmp_t. The type context for web server ports is http_port_t.
+
+There is a policy rule that permits Apache (the web server process running as httpd_t) to access files and directories with a context normally found in /var/www/html and other web server directories (httpd_sys_content_t). There is no allow rule in the policy for files normally found in /tmp and /var/tmp, so access is not permitted. With SELinux, a malicious user could not access the /tmp directory. SELinux has rules for remote file systems such as NFS and CIFS, although all files on these file systems are labeled with the same context.
+
+Many commands that deal with files have an option (usually -Z) to display or set SELinux contexts. For instance, ps, ls, cp, and mkdir all use the -Z option to display or set SELinux contexts.
+
+[root@serverX ~]# ps axZ
+LABEL                             PID TTY      STAT   TIME COMMAND
+system_u:system_r:init_t:s0         1 ?        Ss     0:09 /usr/lib/systemd/...
+system_u:system_r:kernel_t:s0       2 ?        S      0:00 [kthreadd]
+system_u:system_r:kernel_t:s0       3 ?        S      0:00 [ksoftirqd/0]
+[... Output omitted ...]
+[root@serverX ~]# systemctl start httpd
+[root@serverX ~]# ps -ZC httpd
+LABEL                             PID TTY          TIME CMD
+system_u:system_r:httpd_t:s0     1608 ?        00:00:05 httpd
+system_u:system_r:httpd_t:s0     1609 ?        00:00:00 httpd
+[... Output omitted ...]
+[root@serverX ~]# ls -Z /home
+drwx------. root    root    system_u:object_r:lost_found_t:s0 lost+found
+drwx------. student student unconfined_u:object_r:user_home_dir_t:s0 student
+drwx------. visitor visitor unconfined_u:object_r:user_home_dir_t:s0 visitor
+[root@serverX ~]# ls -Z /var/www
+drwxr-xr-x. root root system_u:object_r:httpd_sys_script_exec_t:s0 cgi-bin
+drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 error
+drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 html
+drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 icons
+SELinux modes
+For troubleshooting purposes, SELinux protection can be temporarily disabled using SELinux modes.
+
+
+Figure 5.3: SELinux enforcing mode
+In enforcing mode, SELinux actively denies access to the web server attempting to read files with tmp_t type context. In enforcing mode, SELinux both logs and protects.
+
+
+Figure 5.4: SELinux permissive mode
+Permissive mode is often used to troubleshoot issues. In permissive mode, SELinux allows all interactions, even if there is no explicit rule, and it logs those interactions it would have denied in enforcing mode. This mode can be used to temporarily allow access to content that SELinux is restricting. No reboot is required to go from enforcing to permissive or back again.
+
+A third mode, disabled, completely disables SELinux. A system reboot is required to disable SELinux entirely, or to get from disabled mode to enforcing or permissive mode.
+
+IMPORTANT
+It is better to use permissive mode than to turn off SELinux entirely. One reason for this is that even in permissive mode, the kernel will automatically maintain SELinux file system labels as needed, avoiding the need for an expensive relabeling of the file system when the system is rebooted with SELinux enabled.
+
+To display the current SELinux mode in effect, use the getenforce command.
+
+[root@serverX ~]# getenforce
+Enforcing
+SELinux Booleans
+SELinux Booleans are switches that change the behavior of the SELinux policy. SELinux Booleans are rules that can be enabled or disabled. They can be used by security administrators to tune the policy to make selective adjustments.
+
+The getsebool command is used to display SELinux Booleans and their current value. The -a option causes this command to list all of the Booleans.
+
+[root@serverX ~]# getsebool -a
+abrt_anon_write --> off
+allow_console_login --> on
+allow_corosync_rw_tmpfs --> off
+[... Output omitted ...]
+NOTE
+Many Boolean names have changed from Red Hat Enterprise Linux 6 to Red Hat Enterprise Linux 7.
+
+REFERENCES
+selinux(8), getenforce(8), ls(1), ps(1), and getsebool(8) man pages
+
+
+Quize
+Policy rules are obeyed and violations logged	= enforing mode
+Label on processes, files, and ports that determine access	= context
+A reboot is required to transition to this mode	 = disabled mode
+Switch that enables/disables a set of policy rules =	boolean
+Policy rule violations only produce log messages = permissive moode
+

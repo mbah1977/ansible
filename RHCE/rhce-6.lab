@@ -1,0 +1,34 @@
+
+Lab: Lab: Managing Priority of Linux Processes
+In this lab, you will search for processes with high CPU consumption and adjust their nice levels.
+
+Resources
+Files:	/usr/local/bin/lab nice
+Machines:	desktopX
+Outcomes:
+
+The nice level of the top CPU consumers adjusted to play well with others.
+
+Reset your desktopX system.
+
+Log into and set up your desktopX system.
+
+[student@desktopX ~]$ lab nice setup
+Using either top or ps, identify the two top CPU consumers on your desktopX system. If gnome-shell is among the top two, ignore it and take the next highest process. Make sure to note the process IDs of these two processes.
+
+Either run top and note the two top processes, or run the following:
+
+[student@desktopX ~]$ ps aux --sort=pcpu
+When using the ps version, the top CPU consumers will be on the bottom, with their PID listed in the second column.
+
+From the command line, set the nice level of the processes you found in the previous step to 10.
+
+[student@desktopX ~]$ sudo renice -n 10 <PROCESSPID1> <PROCESSPID2>
+Make sure to replace <PROCESSPID1> and <PROCESSPID2> with the process IDs you identified in the previous step.
+
+Grade your work by running the following command:
+
+[student@desktopX ~]$ lab nice grade
+Important cleanup: When you have successfully graded your work, clean up by running the following command:
+
+[student@desktopX ~]$ lab nice clean

@@ -1,0 +1,134 @@
+Lab: Lab: Managing Linux Users and Groups
+In this lab, you will work on desktopX to define a group of local user accounts and configure the machine to use network-defined user accounts. You will define a default password policy, create a supplementary group of three new users, and modify the password policy of one user.
+
+Outcomes
+
+A new group on desktopX called consultants, including three new user accounts for Sam Spade, Betty Boop, and Dick Tracy.
+
+All new local accounts should require that passwords be changed at first login and every 30 days thereafter.
+
+The new consultant accounts should expire at the end of the 90-day contract, and Betty Boop must change her password every 15 days.
+
+desktopX is a client to the IPA server running on serverX and can use the accounts defined in IPA to authenticate.
+
+Reset your serverX system.
+
+Log into your serverX system. Please note: this step will take approximately 15 minutes.
+
+[student@serverX ~]$ lab ipaclient setup
+Reset your desktopX system while the setup on serverX is running.
+
+Wait for your serverX system to complete before continuing.
+
+The relevant configuration information for the existing IPA server is:
+
+Name	Value
+Realm	SERVERX.EXAMPLE.COM, where X is your station number.
+Domain	serverX.example.com, where X is your station number. Note that your desktopX machine is not a part of this DNS domain.
+Administrative user	admin
+Password	redhat123
+A user has already been configured for you to test with. The username is ipauser, and the password is password. Due to the password policy, this password will need to be changed on first login. Change this password to redhat123.
+
+Central home directories have not yet been configured, so for now, configure the system to automatically create a new local home directory when a user first logs in.
+
+When you have completed your work, run lab combined-users grade on your desktopX machine to verify your work.
+
+Ensure that newly created, local users have passwords which must be changed every 30 days.
+
+[student@desktopX ~]$ sudo vi /etc/login.defs
+[student@desktopX ~]$ cat /etc/login.defs
+...Output omitted...
+PASS_MAX_DAYS	30
+PASS_MIN_DAYS	0
+PASS_MIN_LEN	5
+PASS_WARN_AGE	7
+...Output omitted...
+Create a new group named consultants with a GID of 900.
+
+[student@desktopX ~]$ sudo groupadd -g 900 consultants
+[student@desktopX ~]$ tail -5 /etc/group 
+stapdev:x:158:
+pesign:x:989:
+tcpdump:x:72:
+slocate:x:21:
+consultants:x:900:
+Create three new users: sspade, bboop, and dtracy, with a password of default and add them to the supplementary group consultants. The primary group should remain as the user private group.
+
+[student@desktopX ~]$ sudo useradd -G consultants sspade
+[student@desktopX ~]$ sudo useradd -G consultants bboop
+[student@desktopX ~]$ sudo useradd -G consultants dtracy
+[student@desktopX ~]$ tail -5 /etc/group     
+slocate:x:21:
+consultants:x:900:sspade,bboop,dtracy
+sspade:x:1001:
+bboop:x:1002:
+dtracy:x:1003:
+[student@desktopX ~]$ sudo passwd sspade
+Changing password for user sspade.
+New password: default
+BAD PASSWORD: The password is shorter than 8 characters
+Retype new password: default
+passwd: all authentication tokens updated successfully.
+[student@desktopX ~]$ sudo passwd bboop
+[student@desktopX ~]$ sudo passwd dtracy
+Determine the date 90 days in the future and set each of the three new user accounts to expire on that date.
+
+[student@desktopX ~]$ sudo chage -E $(date +%Y-%m-%d -d +90days) sspade
+[student@desktopX ~]$ sudo chage -E $(date +%Y-%m-%d -d +90days) bboop
+[student@desktopX ~]$ sudo chage -E $(date +%Y-%m-%d -d +90days) dtracy
+Change the password policy for the bboop account to require a new password every 15 days.
+
+[student@desktopX ~]$ sudo chage -M 15 bboop
+[student@desktopX ~]$ chage -l bboop
+Last password change                                    : Feb 04, 2014
+Password expires                                        : Feb 19, 2014
+Password inactive                                       : never
+Account expires                                         : May 05, 2014
+Minimum number of days between password change          : 0
+Maximum number of days between password change          : 15
+Number of days of warning before password expires       : 7
+Additionally, force all users to change their password on first login.
+
+[student@desktopX ~]$ sudo chage -d 0 sspade
+[student@desktopX ~]$ sudo chage -d 0 bboop
+[student@desktopX ~]$ sudo chage -d 0 dtracy
+Install the ipa-client package on your desktopX machine.
+
+[student@desktopX ~]$ sudo yum -y install ipa-client
+Configure your system, using ipa-client-install, to use the IPA server setup for the serverX.example.com DNS domain. Home directories should automatically be created, and NTP should not be configured during this process.
+
+[student@desktopX ~]$ sudo ipa-client-install --domain=serverX.example.com --no-ntp --mkhomedir
+Discovery was successful!
+Hostname: desktopX.example.com
+Realm: SERVERX.example.com
+DNS Domain: serverX.example.com
+IPA Server: serverX.example.com
+BaseDN: dc=serverX,dc=example.com
+
+Continue to configure the system with these values? [no]: yes
+User authorized to enroll computers: admin
+Password for admin@SERVERX.EXAMPLE.COM: redhat123
+...
+Client configuration complete.
+Verify that you can now successfully log into desktopX as the user ipauser by using ssh. The initial password is password, but this should be changed to redhat123. Due to the password change requirement, you will have to log in twice.
+
+[student@desktopX ~]$ ssh ipauser@desktopX.example.com
+ipauser@desktopX.example.com's password: password
+Password expired. Change your password now.
+Creating home directory for ipauser.
+WARNING: Your password has expired.
+You must change your password now and login again!
+Changing password for user ipauser.
+Current password: password
+New password: redhat123
+Retype new password: redhat123
+passwd: all authentication tokens updated successfully.
+Connection to desktopX.example.com closed.
+[student@desktopX ~]$ ssh ipauser@desktopX.example.com
+ipauser@desktopX.example.com's password: redhat123
+Last login: Wed Feb 26 05:19:15 2014 from desktopX.example.com
+-sh-4.2$ logout
+When you finish, run the lab combined-users grade evaluation script to confirm you have done everything correctly.
+
+[student@desktopX ~]$ lab combined-users grade
+

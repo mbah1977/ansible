@@ -1,0 +1,139 @@
+Chapter 13. Scheduled Processes
+Scheduling System cron Jobs
+Guided Exercise: Practice: Scheduling System cron Jobs
+Managing Temporary Files
+Guided Exercise: Practice: Managing Temporary Files
+Abstract
+
+Overview
+Goal	Schedule tasks to automatically execute in the future.
+Objectives	
+Schedule recurring jobs with cron.
+
+Manage temporary files.
+
+Sections	
+Scheduling Recurring Jobs with cron (and Practice)
+
+Managing Temporary Files (and Practice)
+
+Scheduling System cron Jobs
+System crontabs have an extra column: Username.
+
+System crontab files in /etc/crontab and /etc/cron.d/*.
+
+Scripts controlled by /etc/anacrontab in /etc/cron.{hourly,daily,weekly,monthly}/.
+
+Objectives
+After completing this section, students should be able to:
+
+Schedule recurring system tasks.
+
+System cron jobs
+Apart from user cron jobs, there are also system cron jobs.
+
+System cron jobs are not defined using the crontab command, but are instead configured in a set of configuration files. The main difference in these configuration files is an extra field, located between the Day-of-Week field and the Command field, specifying under which user a job should be run.
+
+The /etc/crontab has a useful syntax diagram in the included comments.
+
+ # For details see man 4 crontabs
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name  command to be executed
+System cron jobs are defined in two locations: /etc/crontab and /etc/cron.d/*. Packages that install cron jobs should do so by placing a file in /etc/cron.d/, but administrators can also use this location to more easily group related jobs into a single file, or to push jobs using a configuration management system.
+
+There are also predefined jobs that run every hour, day, week, and month. These jobs will execute all scripts placed in /etc/cron.hourly/, /etc/cron.daily/, /etc/cron.weekly/, and /etc/cron.monthly/ respectively. Please note that these directories contain executable scripts, and not cron configuration files.
+
+NOTE
+Make sure to make any scripts you place in these directories executable. If a script is not made executable (e.g., with chmod +x), it will not be run.
+
+The /etc/cron.hourly/* scripts are executed using the run-parts command, from a job defined in /etc/cron.d/0hourly. The daily, weekly, and monthly jobs are also executed using the run-parts command, but from a different configuration file: /etc/anacrontab.
+
+In the past, /etc/anacrontab was handled by a separate daemon (anacron), but in Red Hat Enterprise Linux 7, the file is parsed by the regular crond daemon. The purpose of this file is to make sure that important jobs will always be run, and not skipped accidentally because the system was turned off or hibernating when the job should have been executed.
+
+The syntax of /etc/anacrontab is different from the other cron configuration files. It contains exactly four fields per line:
+
+Period in days
+
+Once per how many days this job should be run.
+
+Delay in minutes
+
+The amount of time the cron daemon should wait before starting this job.
+
+Job identifier
+
+This is the name of the file in /var/spool/anacron/ that will be used to check if this job has run. When cron starts a job from /etc/anacrontab, it will update the timestamp on this file. The same timestamp is used to check when a job has last run in the past.
+
+Command
+
+The command to be executed
+
+/etc/anacrontab also contains environment variable declarations using the syntax NAME=value. Of special interest is START_HOURS_RANGE: Jobs will not be started outside of this range.
+
+REFERENCES
+crond(8), crontab(1), and crontab(5), anacron(8), and anacrontab(5) man pageos
+
+
+
+Guided Exercise: Practice: Scheduling System cron Jobs
+In this lab, you will work with recurring system jobs.
+
+Resources
+Files:	
+/etc/crontab
+
+/etc/cron.d/*
+
+/etc/cron.{hourly,daily,weekly,monthly}/*
+
+Machines:	desktopX
+Outcomes
+
+A daily job to count the number of active users, and an updated cron job to gather system performance data.
+
+Log into your desktopX system as student, then elevate your privileges to root.
+
+[student@desktopX ~]$ su -
+Password: redhat
+Create a new daily cron job that logs a message to the system log with the number of currently active users (w -h | wc -l). You can use the logger command to send messages to the system log.
+
+Open a new file in /etc/cron.daily in an editor, e.g., /etc/cron.daily/usercount.
+
+[root@desktopX ~]# vim /etc/cron.daily/usercount
+Write the script that logs the number of active users to the system log.
+
+Insert the following in your editor:
+
+#!/bin/bash
+  USERCOUNT=$(w -h | wc -l)
+  logger "There are currently ${USERCOUNT} active users"
+Make the script executable:
+
+[root@desktopX ~]# chmod +x /etc/cron.daily/usercount
+The sysstat package, when installed, has a cron job that runs every 10 minutes, collecting data using a command called sa1. Make sure this package is installed, then change this job to run every five minutes.
+
+Make sure the sysstat package is installed.
+
+[root@desktopX ~]# yum -y install sysstat
+Find out in which file the sysstat package has configured the cron jobs. Cron jobs are generally configured in files marked as a configuration file for the package manager.
+
+[root@desktopX ~]# rpm -qc sysstat
+/etc/cron.d/sysstat looks promising.
+
+Open /etc/cron.d/sysstat in an editor.
+
+[root@desktopX ~]# vim /etc/cron.d/sysstat
+Change */10 on the sa1 line to */5.
+
+Save your changes and exit.
+
+Monitor the files in /var/log/sa to see when their sizes and timestamps change.
+
+[root@desktopX ~]# watch ls -l /var/log/sa

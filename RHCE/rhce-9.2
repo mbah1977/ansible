@@ -1,0 +1,139 @@
+Controlling System Services
+Start, stop, and enable services using systemctl.
+
+Objectives
+After completing this section, students should be able to control system daemons and network services using systemctl.
+
+Starting and stopping system daemons on a running system
+Controlling system daemons
+Changes to a configuration file or other updates to a service may require that the service be restarted. A service that is no longer used may be stopped before removing the software. A service that is not frequently used may be manually started by an administrator only when it is needed.
+
+In this example, please follow along with the next steps while your instructor demonstrates managing services on a running system.
+
+View the status of a service.
+
+[root@serverX ~]# systemctl status sshd.service
+Verify that the process is running.
+
+[root@serverX ~]# ps -up PID
+Stop the service and verify the status.
+
+[root@serverX ~]# systemctl stop sshd.service
+[root@serverX ~]# systemctl status sshd.service
+Start the service and view the status. The process ID has changed.
+
+[root@serverX ~]# systemctl start sshd.service
+[root@serverX ~]# systemctl status sshd.service
+Stop, then start, the service in a single command.
+
+[root@serverX ~]# systemctl restart sshd.service
+[root@serverX ~]# systemctl status sshd.service
+Issue instructions for a service to read and reload its configuration file without a complete stop and start. The process ID will not change.
+
+[root@serverX ~]# systemctl reload sshd.service
+[root@serverX ~]# systemctl status sshd.service
+Unit dependencies
+
+Services may be started as dependencies of other services. If a socket unit is enabled and the service unit with the same name is not, the service will automatically be started when a request is made on the network socket. Services may also be triggered by path units when a file system condition is met. For example, a file placed into the print spool directory will cause the cups print service to be started if it is not running.
+
+[root@serverX ~]# systemctl stop cups.service
+Warning: Stopping cups, but it can still be activated by:
+  cups.path
+  cups.socket
+To completely stop printing services on a system, stop all three units. Disabling the service will disable the dependencies.
+
+The systemctl list-dependencies UNIT command can be used to print out a tree of what other units must be started if the specified unit is started. Depending on the exact dependency, the other unit may need to be running before or after the specified unit starts. The --reverse option to this command will show what units need to have the specified unit started in order to run.
+
+Masking services
+
+At times, a system may have conflicting services installed. For example, there are multiple methods to manage networks (network and NetworkManager) and firewalls (iptables and firewalld). To prevent an administrator from accidentally starting a service, that service may be masked. Masking will create a link in the configuration directories so that if the service is started, nothing will happen.
+
+[root@serverX ~]# systemctl mask network
+ln -s '/dev/null' '/etc/systemd/system/network.service'
+[root@serverX ~]# systemctl unmask network
+rm '/etc/systemd/system/network.service'
+IMPORTANT
+A disabled service will not be started automatically at boot or by other unit files, but can be started manually. A masked service can not be started manually or automatically.
+
+Enabling system daemons to start or stop at boot
+Starting a service on a running system does not guarantee that the service will be started when the system reboots. Similarly, stopping a service on a running system will not keep it from starting again when the system reboots. Services are started at boot time when links are created in the appropriate systemd configuration directories. These links are created and removed with systemctl commands.
+
+In this example, please follow along with the next steps while your instructor demonstrates enabling and disabling services.
+
+View the status of a service.
+
+[root@serverX ~]# systemctl status sshd.service
+Disable the service and verify the status. Note that disabling a service does not stop the service.
+
+[root@serverX ~]# systemctl disable sshd.service
+[root@serverX ~]# systemctl status sshd.service
+Enable the service and verify the status.
+
+[root@serverX ~]# systemctl enable sshd.service
+[root@serverX ~]# systemctl is-enabled sshd.service
+Summary of systemctl commands
+Services can be started and stopped on a running system and enabled or disabled for automatic start at boot time.
+
+Task:	Command:
+View detailed information about a unit state.	systemctl status UNIT
+Stop a service on a running system.	systemctl stop UNIT
+Start a service on a running system.	systemctl start UNIT
+Restart a service on a running system.	systemctl restart UNIT
+Reload configuration file of a running service.	systemctl reload UNIT
+Completely disable a service from being started, both manually and at boot.	systemctl mask UNIT
+Make a masked service available.	systemctl unmask UNIT
+Configure a service to start at boot time.	systemctl enable UNIT
+Disable a service from starting at boot time.	systemctl disable UNIT
+List units which are required and wanted by the specified unit.	systemctl list-dependencies UNIT
+REFERENCES
+systemd(1), systemd.unit(5), systemd.service(5), systemd.socket(5), and systemctl(1) man pages
+
+Additional information may be available in the chapter on managing services with systemd in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation/
+
+
+
+
+
+Guided Exercise: Practice: Using systemctl to Manage Services
+In this lab, you will manage a service unit that is already installed on the system.
+
+Outcomes:
+
+The chronyd service is disabled and no longer running on the system.
+
+Reset your serverX system.
+
+Observe the results of systemctl restart and systemctl reload commands.
+
+Display the status of the sshd service. Note the process ID of the daemon.
+
+[student@serverX ~]$ sudo systemctl status sshd
+Restart the sshd service and view the status. The process ID of the daemon has changed.
+
+[student@serverX ~]$ sudo systemctl restart sshd
+[student@serverX ~]$ sudo systemctl status sshd
+Reload the sshd service and view the status. The process ID of the daemon has not changed and connections have not been interrupted.
+
+[student@serverX ~]$ sudo systemctl reload sshd
+[student@serverX ~]$ sudo systemctl status sshd
+Verify that the chronyd service is running.
+
+[student@serverX ~]$ sudo systemctl status chronyd
+Stop the chronyd service and view the status.
+
+[student@serverX ~]$ sudo systemctl stop chronyd
+[student@serverX ~]$ sudo systemctl status chronyd
+Determine if the chronyd service is enabled to start at system boot.
+
+[student@serverX ~]$ sudo systemctl is-enabled chronyd
+Reboot the system, then view the status of the chronyd service.
+
+[student@serverX ~]$ sudo systemctl status chronyd
+Disable the chronyd service so that it does not start at system boot, then view the status of the service.
+
+[student@serverX ~]$ sudo systemctl disable chronyd
+[student@serverX ~]$ sudo systemctl status chronyd
+Reboot the system, then view the status of the chronyd service.
+
+[student@serverX ~]$ sudo systemctl status chronyd
+

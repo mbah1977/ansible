@@ -1,0 +1,37 @@
+Lab: Lab: Managing Red Hat Enterprise Linux Networking
+In this lab, you will configure basic IPv4 networking on Red Hat Enterprise Linux systems.
+
+Outcomes:
+
+The primary interface has two static IPv4 addresses configured.
+
+Reset your desktopX system.
+
+Create a new connection with a static network connection using the settings in the table. Be sure to replace the X with the correct number for your systems.
+
+Parameter	Setting
+Connection name	lab
+IP address	172.25.X.10/16
+Gateway address	172.25.0.1
+DNS address	172.25.254.254
+[root@desktopX ~]# nmcli con add con-name lab ifname eth0 type ethernet ip4 172.25.X.10/16 gw4 172.25.0.1
+[root@desktopX ~]# nmcli con mod "lab" ipv4.dns 172.25.254.254
+Configure the new connection to be autostarted. Other connections should not start automatically.
+
+[root@desktopX ~]# nmcli con mod "lab" connection.autoconnect yes
+[root@desktopX ~]# nmcli con mod "System eth0" connection.autoconnect no
+	
+Modify the new connection so that it also uses the address 10.0.X.1/24.
+
+[root@desktopX ~]# nmcli con mod "lab" +ipv4.addresses 10.0.X.1/24
+[root@desktopX ~]# echo "IPADDR1=10.0.X.1" >> /etc/sysconfig/network-scripts/ifcfg-lab
+[root@desktopX ~]# echo "PREFIX1=24" >> /etc/sysconfig/network-scripts/ifcfg-lab
+Or alternately:
+
+Configure the hosts file so that 10.0.X.1 can be referenced as "private".
+
+[root@desktopX ~]# echo "10.0.X.1  private" >> /etc/hosts
+	
+Reboot the system, then run lab network grade to verify settings.
+
+[root@desktopX ~]# lab network grade

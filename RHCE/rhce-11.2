@@ -1,0 +1,187 @@
+Reviewing Syslog Files
+The system log files are maintained by rsyslog.
+
+Objectives
+After completing this section, students should be able to interpret entries in relevant syslog files to troubleshoot problems or review system status.
+
+Syslog files
+Many programs use the syslog protocol to log events to the system. Each log message is categorized by a facility (the type of message) and a priority (the severity of the message). The facilities which are available are documented by the rsyslog.conf(5) man page.
+
+The eight priorities are also standardized and ranked as follows:
+
+Table 11.2. Overview of syslog priorities
+
+Code	Priority	Severity
+0
+
+emerg
+
+System is unusable.
+
+1
+
+alert
+
+Action must be taken immediately.
+
+2
+
+crit
+
+Critical condition.
+
+3
+
+err
+
+Non-critical error condition.
+
+4
+
+warning
+
+Warning condition.
+
+5
+
+notice
+
+Normal but significant event.
+
+6
+
+info
+
+Informational event.
+
+7
+
+debug
+
+Debugging-level message.
+
+
+The rsyslogd service uses the facility and priority of log messages to determine how to handle them. This is configured by the file /etc/rsyslog.conf and by *.conf files in /etc/rsyslog.d. Programs and administrators can change rsyslogd configuration in a way that will not be overwritten by updates to rsyslog by putting customized files with a .conf suffix in the /etc/rsyslog.d directory.
+
+The #### RULES #### section of /etc/rsyslog.conf contains directives that define where log messages are saved. The left side of each line indicates the facility and severity of the log message the directive matches. The rsyslog.conf file can contain the character * as a wild card in the facility and severity field, where it either stands for all facilities or all severities. The right side of each line indicates what file to save the log message in. Log messages are normally saved in files in the /var/log directory.
+
+NOTE
+Log files are maintained by the rsyslog service, and the /var/log directory contains a variety of log files specific to certain services. For example, the Apache Web Server or Samba write their own log files into a corresponding subdirectory of the /var/log directory.
+
+A message handled by rsyslog can appear in multiple different log files. To prevent that, the severity field can be set to none, which means that none of the messages directed to this facility are added to the specified log file.
+
+Instead of logging syslog messages to a file, they can be printed to the terminals of all logged-in users. In the default rsyslog.conf file, this is done for all messages that have "emerg" priority.
+
+Sample rules section of rsyslog.conf
+#### RULES ####
+
+# Log all kernel messages to the console.
+# Logging much else clutters up the screen.
+#kern.*                                                 /dev/console
+
+# Log anything (except mail) of level info or higher.
+# Don't log private authentication messages!
+*.info;mail.none;authpriv.none;cron.none                /var/log/messages
+
+# The authpriv file has restricted access.
+authpriv.*                                              /var/log/secure
+
+# Log all the mail messages in one place.
+mail.*                                                  -/var/log/maillog
+
+
+# Log cron stuff
+cron.*                                                  /var/log/cron
+
+# Everybody gets emergency messages
+*.emerg                                                 :omusrmsg:*
+
+# Save news errors of level crit and higher in a special file.
+uucp,news.crit                                          /var/log/spooler
+
+# Save boot messages also to boot.log
+local7.*                                                /var/log/boot.log
+NOTE
+The rsyslog.conf file is documented by the rsyslog.conf(5) man page and by extensive HTML documentation in /usr/share/doc/rsyslog-*/manual.html contained in the rsyslog-doc, which is available from the Red Hat Enterprise Linux 7 software channel, but not included on the installation medium.
+
+Log file rotation
+Logs are "rotated" by the logrotate utility to keep them from filling up the file system containing /var/log/. When a log file is rotated, it is renamed with an extension indicating the date on which it was rotated: the old /var/log/messages file may become /var/log/messages-20141030 if it is rotated on October 30, 2014. Once the old log file is rotated, a new log file is created and the service that writes to it is notified.
+
+After a certain number of rotations, typically after four weeks, the old log file is discarded to free disk space. A cron job runs the logrotate program daily to see if any logs need to be rotated. Most log files are rotated weekly, but logrotate rotates some faster, or slower, or when they reach a certain size.
+
+Configuration of logrotate is not covered in this course. For more information, see the logrotate(8) man page.
+
+Analyze a syslog entry
+The system logs written by rsyslog start with the oldest message on top and the newest message at the end of the log file. All log entries in log files managed by rsyslog are recorded in a standard format. The following example will explain the anatomy of a log file message in the /var/log/secure log file:
+
+1Feb 11 20:11:48 2localhost 3sshd[1433]: 4Failed password for student from 172.25.0.10 port 59344 ssh2
+1
+
+The time stamp when the log entry was recorded.
+
+2
+
+The host from which the log message was sent.
+
+3
+
+The program or process that sent the log message.
+
+4
+
+The actual message sent.
+
+Monitor a log file with tail
+It is especially helpful for reproducing problems and issues to monitor one or more log files for events. The tail -f /path/to/file command outputs the last 10 lines of the file specified and continues to output new lines as they get written to the monitored file.
+
+To monitor for failed login attempts on one terminal, run ssh as user root while a user tries to log in to the serverX machine:
+
+[root@serverX ~]$ tail -f /var/log/secure
+...
+Feb 10 09:01:13 localhost sshd[2712]: Accepted password for root from 172.25.254.254 port 56801 ssh2
+Feb 10 09:01:13 localhost sshd[2712]: pam_unix(sshd:session): session opened for user root by (uid=0)
+Send a syslog message with logger
+The logger command can send messages to the rsyslog service. By default, it sends the message to the facility user with severity notice (user.notice) unless specified otherwise with the -p option. It is especially useful to test changes to the rsyslog configuration.
+
+To send a message to rsyslogd that gets recorded in the /var/log/boot.log log file, execute:
+
+[root;@serverX ~]$ logger -p local7.notice "Log entry created on serverX"
+REFERENCES
+logger(1), tail(1), rsyslog.conf(5), and logrotate(8) man pages
+
+rsyslog Manual
+
+/usr/share/doc/rsyslog-*/manual.html provided by the rsyslog-doc package
+
+Additional information may be available in the Red Hat Enterprise Linux System Administrator's Guide for Red Hat Enterprise Linux 7, which can be found at https://access.redhat.com/documentation
+
+
+
+Guided Exercise: Practice: Finding Log Entries
+In this lab, you will reconfigure rsyslog to write specific messages to a new log file.
+
+Outcomes:
+
+The rsyslog service writes all messages with priority debug to the /var/log/messages-debug log file for temporary troubleshooting purposes.
+
+Configure rsyslog on serverX to log all messages with severity debug in the newly created log file /var/log/messages-debug by adding the rsyslog configuration file /etc/rsyslog.d/debug.conf. Verify that a generated debug log message with the logger command arrives in the /var/log/messages-debug log file.
+
+Change the rsyslog configuration to log all messages with severity debug to /var/log/messages-debug on serverX by adding the /etc/rsyslog.d/debug.conf file.
+
+[root@serverX ~]# echo "*.debug /var/log/messages-debug" >/etc/rsyslog.d/debug.conf
+Restart the rsyslog service on serverX.
+
+[root@serverX ~]# systemctl restart rsyslog
+Generate a debug log message with the logger command and verify that the message gets logged to the log file /var/log/messages-debug with the tail command on serverX.
+
+Monitor the /var/log/messages-debug with the tail command on serverX.
+
+[root@serverX ~]# tail -f /var/log/messages-debug
+On a separate terminal window, use the logger command to generate a debug message on serverX.
+
+[root@serverX ~]# logger -p user.debug "Debug Message Test"
+Switch back to the terminal still running the tail -f /var/log/messages-debug command and verify the message sent with the logger command shows up.
+
+[root@serverX ~]# tail -f /var/log/messages-debug
+...
+Feb 13 10:37:44 localhost root: Debug Message Test/

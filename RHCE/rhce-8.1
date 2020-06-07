@@ -1,0 +1,145 @@
+Chapter 8. Creating and Mounting File Systems
+Mounting and Unmounting File Systems
+Guided Exercise: Practice: Mounting and Unmounting File Systems
+Adding Partitions, File Systems, and Persistent Mounts
+Guided Exercise: Practice: Adding Partitions, File Systems, and Persistent Mounts
+Managing Swap Space
+Guided Exercise: Practice: Adding and Enabling Swap Space
+Lab: Lab: Adding Disks, Partitions, and File Systems to a Linux System
+Abstract
+
+Overview
+Goal	To create and manage disks, partitions, and filesystems from the command line.
+Objectives	
+Access the contents of file systems.
+
+Manage simple partitions and filesystems.
+
+Manage swap space.
+
+Sections	
+Mounting and Unmounting File Systems (and Practice)
+
+Adding Partitions, Filesystems, and Persistent Mounts (and Practice)
+
+Managing Swap Space (and Practice)
+
+Lab	
+Adding Disks, Partitions, and Filesystems to a Linux System
+
+Mounting and Unmounting File Systems
+Accessing contents of file systems on internal and external storage devices is important.
+
+Objectives
+After completing this section, students should be able to access the contents of file systems by adding and removing file systems from the file system hierarchy.
+
+Mounting file systems manually
+A file system residing on a SATA/PATA or SCSI device needs to be mounted manually to access it. The mount command allows the root user to manually mount a file system. The first argument of the mount command specifies the file system to mount. The second argument specifies the target directory where the file system is made available after mounting it. The target directory is referred to as a mount point.
+
+The mount command expects the file system argument in one of two different ways:
+
+The device file of the partition holding the file system, residing in /dev.
+
+The UUID, a universal unique identifier of the file system.
+
+NOTE
+As long as a file system is not recreated, the UUID stays the same. The device file can change; for example, if the order of the devices is changed or if additional devices are added to the system.
+
+The blkid command gives an overview of existing partitions with a file system on them and the UUID of the file system, as well as the file system used to format the partition.
+
+[root@serverX ~]# blkid
+/dev/vda1: UUID="46f543fd-78c9-4526-a857-244811be2d88" TYPE="xfs"
+NOTE
+A file system can be mounted on an existing directory. The /mnt directory exists by default and provides an entry point for mount points. It is used for manually mounting disks. It is recommended to create a subdirectory under /mnt and use that subdirectory as a mount point unless there is a reason to mount the file system in another specific location in the file system hierarchy.
+
+Mount by device file of the partition that holds the file system.
+
+[root@serverX ~]# mount /dev/vdb1 /mnt/mydata
+Mount the file system by universal unique id, or the UUID, of the file system.
+
+[root@serverX ~]# mount UUID="46f543fd-78c9-4526-a857-244811be2d88" /mnt/mydata
+NOTE
+If the directory acting as mount point is not empty, the files that exists in that directory are not accessible as long as a file system is mounted there. All files written to the mount point directory end up on the file system mounted there.
+
+Unmounting file systems
+To unmount a file system, the umount command expects the mount point as an argument.
+
+Change to the /mnt/mydata directory. Try to umount the device mounted on the /mnt/mydata mount point. It will fail.
+
+[root@serverX ~]# cd /mnt/mydata
+[root@serverX mydata]# umount /mnt/mydata
+umount: /mnt/mydata: target is busy.
+        (In some cases useful info about processes that use
+         the device is found by lsof(8) or fuser(1))
+Unmounting is not possible if the mount point is accessed by a process. For umount to be successful, the process needs to stop accessing the mount point.
+
+The lsof command lists all open files and the process accessing them in the provided directory. It is useful to identify which processes currently prevent the file system from successful unmounting.
+
+[root@serverX mydata]# lsof /mnt/mydata
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+bash    1593 root  cwd    DIR  253,2        6  128 /mnt/mydata
+lsof    2532 root  cwd    DIR  253,2       19  128 /mnt/mydata
+lsof    2533 root  cwd    DIR  253,2       19  128 /mnt/mydata
+Once the processes are identified, an action can be taken, such as waiting for the process to complete or sending a SIGTERM or SIGKILL signal to the process. In this case, it is sufficient to change the current working directory to a directory outside the mount point.
+
+[root@serverX mydata]# cd
+[root@serverX ~]# umount /mnt/mydata
+NOTE
+A common cause for the file system on the mount point to be busy is if the current working directory of a shell prompt is below the active mount point. The process accessing the mount point is bash. Changing to a directory outside the mount point allows the device to be unmounted.
+
+Accessing removable storage devices
+Removable media, such as USB flash devices and drives, get automatically mounted by the graphical desktop environment when plugged in. The mount point for the removable medium is /run/media/<user>/<label>. The <user> is the user logged into the graphical environment. The <label> is the name given to the file system when it was created.
+
+WARNING
+To safely remove USB media from the system, it is required to unmount it before physically removing it from the USB slot to synchronize the file system. Removing a USB storage device without unmounting the file system on it can result in data loss.
+
+REFERENCES
+mount(8), umount(8), and lsof(8) man pages
+
+
+Guided Exercise: Practice: Mounting and Unmounting File Systems
+In this lab, you will mount and unmount file systems.
+
+Outcomes:
+
+The user identifies and mounts a new file system at a specified mount point, then unmounts it.
+
+Reset your serverX system. Run the script lab fs setup before starting the exercise.
+
+A new partition with a file system has been added to the second disk (vdb) on your serverX machine. Mount the newly available partition by UUID at the newly created mount point /mnt/newspace.
+
+Use the blkid to discover the UUID of the newly added partition, vdb1, on serverX.
+
+[root@serverX ~]# blkid
+/dev/xvda1: UUID="46f543fd-78c9-4526-a857-244811be2d88" TYPE="xfs" 
+/dev/xvdj1: UUID="7c5e3fbb-34eb-4431-a4a5-9b887c1b6866" TYPE="xfs"
+Create the mount point /mnt/newspace on serverX.
+
+[root@serverX ~]# mkdir /mnt/newspace
+Mount the file system by UUID on the /mnt/newspace directory of the serverX machine.
+
+[root@serverX ~]# mount UUID="7c5e3fbb-34eb-4431-a4a5-9b887c1b6866" /mnt/newspace
+Change to the /mnt/newspace directory and create a new directory, /mnt/newspace/newdir, with an empty file, /mnt/newspace/newdir/newfile, on serverX.
+
+Change to the /mnt/newspace directory on serverX.
+
+[root@serverX ~]# cd /mnt/newspace
+Create a new directory, /mnt/newspace/newdir, on serverX.
+
+[root@serverX newspace]# mkdir newdir
+Create a new empty file, /mnt/newspace/newdir/newfile, on serverX.
+
+[root@serverX newspace]# touch newdir/newfile
+Unmount the file system mounted on the /mnt/newspace directory on serverX.
+
+Try to unmount /mnt/newspace while the current directory on the shell is still /mnt/newspace on serverX.
+
+[root@serverX newspace]# umount /mnt/newspace
+Change the current directory on the shell to /root.
+
+[root@serverX newspace]# cd
+[root@serverX ~]# 
+Successfully unmount /mnt/newspace on serverX.
+
+[root@serverX ~]# umount /mnt/newspace
+

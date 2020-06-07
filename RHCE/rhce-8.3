@@ -1,0 +1,282 @@
+Managing Swap Space
+Create and activate swap spaces.
+
+Objectives
+After completing this section, students should be able to:
+
+Create and format a partition for swap space.
+
+Activate the swap space.
+
+Swap space concepts
+A swap space is an area of a disk which can be used with the Linux kernel memory management subsystem. Swap spaces are used to supplement the system RAM by holding inactive pages of memory. The combined system RAM plus swap spaces is called virtual memory.
+
+When the memory usage on a system exceeds a defined limit, the kernel will comb through RAM looking for idle memory pages assigned to processes. The kernel writes the idle page to the swap area, and will reassign the RAM page to be used by another process. If a program requires access to a page that has been written to disk, the kernel will locate another idle page of memory, write it to disk, then recall the needed page from the swap area.
+
+Since swap areas reside on disk, swap is incredibly slow when compared with RAM. While it is used to augment system RAM, usage of swap spaces should be kept to a minimum whenever possible.
+
+Create a swap space
+To create a swap space, an administrator needs to do three things:
+
+Create a partition.
+
+Set the type of the partition as 82 Linux Swap.
+
+Format a swap signature on the device.
+
+Create a partition
+
+Use a tool, such as fdisk, to create a partition of the desired size. In the following example, a 256 MiB partition will be created.
+
+[root@serverX ~]# fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table
+Building a new DOS disklabel with disk identifier 0x34e4e6d7.
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-20971519, default 2048): Enter 
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-20971519, default 20971519): +256M
+Partition 1 of type Linux and of size 256 MiB is set
+
+Command (m for help): p
+
+Disk /dev/vdb: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x34e4e6d7
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/vdb1            2048      526335      262144   83  Linux
+Assign the partition type
+
+After the swap partition has been created, it is recommended practice to change the partition's type, or system ID, to 82 Linux Swap. In the past, tools looked at the partition type to determine if the device should be activated; however, that is no longer the case. Even though the partition type is not used by utilities any longer, having the type set allows administrators to quickly determine the partition's purpose. The following example continues from within fdisk.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 82
+Changed type of partition 'Linux' to 'Linux swap / Solaris'
+
+Command (m for help): p
+
+Disk /dev/vdb: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x34e4e6d7
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/vdb1            2048      526335      262144   82  Linux swap / Solaris
+Format the device
+
+The mkswap command applies a swap signature to the device. Unlike other formatting utilities, mkswap writes a single block of data at the beginning of the device, leaving the rest of the device unformatted so it can be used for storing memory pages.
+
+[root@serverX ~]# mkswap /dev/vdb1
+Setting up swapspace version 1, size = 262140 KiB
+no label, UUID=fbd7fa60-b781-44a8-961b-37ac3ef572bf
+Activate a swap space
+An administrator can use the swapon command to activate a formatted swap space. swapon can be called on the device, or swapon -a will activate all swap spaces listed in the /etc/fstab file.
+
+[root@serverX ~]# free
+             total       used       free     shared    buffers     cached
+Mem:       1885252     791812    1093440      17092        688     292024
+-/+ buffers/cache:     499100    1386152
+Swap:            0          0          0
+[root@serverX ~]# swapon /dev/vdb1
+[root@serverX ~]# free
+             total       used       free     shared    buffers     cached
+Mem:       1885252     792116    1093136      17092        692     292096
+-/+ buffers/cache:     499328    1385924
+Swap:       262140          0     262140
+Persistently activate swap space
+
+It is likely that a swap space will be required to automatically activate every time the machine boots. In order for the machine to activate the swap space at every boot, it must be configured in the /etc/fstab file.
+
+If needed, an administrator can deactivate a swap space using the swapoff command. A swapoff will only be successful if any swapped data can be written to other active swap spaces or back into memory. If data cannot be written to other places, the swapoff will fail, with an error, and the swap space will stay active.
+
+The following is an example line in /etc/fstab adding a previously created swap space.
+
+UUID=fbd7fa60-b781-44a8-961b-37ac3ef572bf  swap  swap  defaults  0 0 
+  
+The example uses the UUID as the first field. The UUID is stored in the swap signature stored on the device, and was part of the output of mkswap. If the output of mkswap has been lost, the blkid command can be used to scan the system and report on all attached block devices. If the administrator does not wish to use the UUID, the raw device name can also be used in the first field.
+
+The second field is typically reserved for the mount point. However, for swap devices, which are not accessible through the directory structure, this field is the placeholder value swap.
+
+The third field is the file system type. The file system type for a swap space is swap.
+
+The fourth field is for options. In the example, the option defaults is used. defaults includes the mount option auto, which is what causes the swap space to be automatically activated at boot.
+
+The final two fields are the dump flag and fsck order. Swap spaces require neither backing up nor file system checking.
+
+NOTE
+By default, swap spaces are used in series, meaning that the first activated swap space will be used until it is full, then the kernel will start using the second swap space. Swap space priorities are displayed with swapon -s, and can be set with the pri= mount option. If swap spaces have the same priority, the kernel will write to them round-robin instead of writing to a single swap space until it is at capacity.
+
+REFERENCES
+mkswap(8), swapon(8), swapoff(8), mount(8), fdisk(8) man pages
+
+
+
+Guided Exercise: Practice: Adding and Enabling Swap Space
+In this lab, you will create a swap partition and enable it for use.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+Your serverX host will have 500 MiB of swap space running on its second disk.
+
+Log into serverX.
+
+Switch to root using sudo -i.
+
+No swap partition was created during the installation of serverX. During peak usage, the server has been running out of physical memory. You have ordered additional RAM and are anxiously waiting for its arrival. In the meantime, you decide to alleviate the problem by enabling swap space on the second disk. To make sure that the newly added swap space is always available for use, you will also need to configure it to be enabled upon boot.
+
+Once you have completed your work, reboot your serverX machine and verify that the swap space is available after the reboot.
+
+Create a 500 MiB partition on /dev/vdb of type Linux swap.
+
+Use fdisk to modify the second disk.
+
+[root@serverX ~]# fdisk /dev/vdb
+Print the original partition table, then create a new partition that is 500 MiB in size.
+
+Command (m for help): p
+
+Disk /dev/vdb: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0xfd41a9d3
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/vdb1            2048     2099199     1048576   83  Linux
+
+Command (m for help): n
+Partition type:
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended
+Select (default p): p
+Partition number (2-4, default 2): 2
+First sector (2099200-20971519, default 2099200): Enter
+Using default value 2099200
+Last sector, +sectors or +size{K,M,G} (2099200-20971519, default 20971519): +500M
+Partition 2 of type Linux and of size 500 MiB is set
+
+Command (m for help): p
+
+Disk /dev/vdb: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0xfd41a9d3
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/vdb1            2048     2099199     1048576   83  Linux
+/dev/vdb2         2099200     3123199      512000   83  Linux
+            
+Set the newly created partition to type Linux swap.
+
+Command (m for help): t
+Partition number (1,2, default 2): 2
+Hex code (type L to list all codes): L
+
+...
+ 1 FAT12  27 Hidden NTFS Win  82 Linux swap / So c1  DRDOS/sec (FAT-
+...
+Hex code (type L to list all codes): 82
+Changed type of partition 'Linux' to 'Linux swap / Solaris'
+
+Command (m for help): p
+
+Disk /dev/vdb: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0xfd41a9d3
+
+Device Boot    Start      End   Blocks  Id  System
+/dev/vdb1       2048  2099199  1048576  83  Linux
+/dev/vdb2    2099200  3123199   512000  82  Linux swap / Solaris
+Save the partition table changes.
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+
+WARNING: Re-reading the partition table failed with error 16: Device or resource busy.
+The kernel still uses the old table. The new table will be used at
+the next reboot or after you run partprobe(8) or kpartx(8)
+Syncing disks.
+Run partprobe to make the kernel aware of the partition table change.
+
+[root@serverX ~]# partprobe
+Initialize the newly created partition as swap space.
+
+[root@serverX ~]# mkswap /dev/vdb2
+Setting up swapspace version 1, size = 511996 KiB
+no label, UUID=74f8f3e1-6af3-4e51-9ab5-c48e52bf4a7b
+Enable the newly created swap space.
+
+Creating and initializing swap space does not yet enable it for use, as shown by the free and swapon -s command.
+
+[root@serverX ~]# free
+             total       used       free     shared    buffers     cached
+Mem:       1885252     557852    1327400      17096       1080     246040
+-/+ buffers/cache:     310732    1574520
+Swap:            0          0          0
+[root@serverX ~]# swapon -s
+[root@serverX ~]#
+Enable the newly created swap space.
+
+[root@serverX ~]# swapon /dev/vdb2
+Verify that the newly created swap space is now available.
+
+[root@serverX ~]# swapon -s
+Filename				Type		Size	Used	Priority
+/dev/vdb2                              	partition	511996	0	-1
+Disable the swap space.
+
+[root@serverX ~]# swapoff /dev/vdb2
+Verify that the swap space is disabled.
+
+[root@serverX ~]# swapon -s
+[root@serverX ~]#
+Configure the new swap space so that it is enabled upon boot.
+
+Determine the UUID of the new swap partition on the second disk.
+
+[root@serverX ~]# blkid /dev/vdb2
+/dev/vdb2: UUID="74f8f3e1-6af3-4e51-9ab5-c48e52bf4a7b" TYPE="swap"
+Add an entry to /etc/fstab.
+
+UUID=74f8f3e1-6af3-4e51-9ab5-c48e52bf4a7b swap swap defaults 0 0
+Test enabling the swap space using the entry just added to /etc/fstab.
+
+[root@serverX ~]# swapon -a
+Verify that the new swap space was enabled.
+
+[root@serverX ~]# swapon -s
+Filename                      Type            Size    Used    Priority
+/dev/vdb2                     partition       511996  0       -1
+Reboot serverX. After the server has rebooted, log in and verify that swap space is enabled.
+
+[student@serverX ~]# swapon -s
+Filename                      Type            Size    Used    Priority
+/dev/vdb2                     partition       511996  0       -1
+

@@ -1,0 +1,156 @@
+Managing Local User Accounts
+Add, remove, and modify local users with command-line tools.
+
+Objectives
+After completing this section, students should be able to create, modify, lock, and delete locally defined user accounts.
+
+Managing local users
+A number of command-line tools can be used to manage local user accounts.
+
+useradd creates users
+
+useradd username sets reasonable defaults for all fields in /etc/passwd when run without options. The useradd command does not set any valid password by default, and the user cannot log in until a password is set.
+
+useradd --help will display the basic options that can be used to override the defaults. In most cases, the same options can be used with the usermod command to modify an existing user.
+
+Some defaults, such as the range of valid UID numbers and default password aging rules, are read from the /etc/login.defs file. Values in this file are only used when creating new users. A change to this file will not have an effect on any existing users.
+
+usermod modifies existing users
+
+usermod --help will display the basic options that can be used to modify an account. Some common options include:
+
+usermod options:	 
+-c, --comment COMMENT	Add a value, such as a full name, to the GECOS field.
+-g, --gid GROUP	Specify the primary group for the user account.
+-G, --groups GROUPS	Specify a list of supplementary groups for the user account.
+-a, --append	Used with the -G option to append the user to the supplemental groups mentioned without removing the user from other groups.
+-d, --home HOME_DIR	Specify a new home directory for the user account.
+-m, --move-home	Move a user home directory to a new location. Must be used with the -d option.
+-s, --shell SHELL	Specify a new login shell for the user account.
+-L, --lock	Lock a user account.
+-U, --unlock	Unlock a user account.
+userdel deletes users
+
+userdel username removes the user from /etc/passwd, but leaves the home directory intact by default.
+
+userdel -r username removes the user and the user's home directory.
+
+WARNING
+When a user is removed with userdel without the -r option specified, the system will have files that are owned by an unassigned user ID number. This can also happen when files created by a deleted user exist outside that user's home directory. This situation can lead to information leakage and other security issues.
+
+In Red Hat Enterprise Linux 7 the useradd command assigns new users the first free UID number available in the range starting from UID 1000 or above. (unless one is explicitly specified with the -u UID option). This is how information leakage can occur: If the first free UID number had been previously assigned to a user account which has since been removed from the system, the old user's UID number will get reassigned to the new user, giving the new user ownership of the old user's remaining files. The following scenario demonstrates this situation:
+
+[root@serverX ~]# useradd prince
+[root@serverX ~]# ls -l /home
+drwx------. 3 prince  prince    74 Feb  4 15:22 prince
+[root@serverX ~]# userdel prince
+[root@serverX ~]# ls -l /home
+drwx------. 3    1000    1000   74 Feb  4 15:22 prince
+[root@serverX ~]# useradd bob
+[root@serverX ~]# ls -l /home
+drwx------. 3 bob     bob       74 Feb  4 15:23 bob
+drwx------. 3 bob     bob       74 Feb  4 15:22 prince
+Notice that bob now owns all files that prince once owned. Depending on the situation, one solution to this problem is to remove all "unowned" files from the system when the user that created them is deleted. Another solution is to manually assign the "unowned" files to a different user. The root user can find "unowned" files and directories by running: find / -nouser -o -nogroup 2> /dev/null.
+
+id displays user information
+
+id will display user information, including the user's UID number and group memberships.
+
+id username will display user information for username, including the user's UID number and group memberships.
+
+passwd sets passwords
+
+passwd username can be used to either set the user's initial password or change that user's password.
+
+The root user can set a password to any value. A message will be displayed if the password does not meet the minimum recommended criteria, but is followed by a prompt to retype the new password and all tokens are updated successfully.
+
+[root@serverX ~]# passwd student
+Changing password for user student.
+New password: redhat123
+BAD PASSWORD: The password fails the dictionary check - it is based on a dictionary word
+Retype new password: redhat123
+passwd: all authentication tokens updated successfully.
+A regular user must choose a password which is at least 8 characters in length and is not based on a dictionary word, the username, or the previous password.
+
+UID ranges
+
+Specific UID numbers and ranges of numbers are used for specific purposes by Red Hat Enterprise Linux.
+
+UID 0 is always assigned to the superuser account, root.
+
+UID 1-200 is a range of "system users" assigned statically to system processes by Red Hat.
+
+UID 201-999 is a range of "system users" used by system processes that do not own files on the file system. They are typically assigned dynamically from the available pool when the software that needs them is installed. Programs run as these "unprivileged" system users in order to limit their access to just the resources they need to function.
+
+UID 1000+ is the range available for assignment to regular users.
+
+NOTE
+Prior to Red Hat Enterprise Linux 7, the convention was that UID 1-499 was used for system users and UID 500+ for regular users. Default ranges used by useradd and groupadd can be changed in the /etc/login.defs file.
+
+REFERENCES
+useradd(8), usermod(8), userdel(8) man pages
+
+
+
+Guided Exercise: Practice: Creating Users Using Command-line Tools
+In this lab, you will create a number of users on your serverX system, setting and recording an initial password for each user.
+
+Outcomes
+
+A system with additional user accounts.
+
+Reset your serverX system.
+
+Log into the GNOME desktop on serverX as student with a password of student.
+
+Open a window with a Bash prompt.
+
+Select Applications → Utilities → Terminal.
+
+Become the root user at the shell prompt.
+
+[student@serverX ~]$ su -
+Password: redhat
+Add the user juliet.
+
+[root@serverX ~]# useradd juliet
+Confirm that juliet has been added by examining the /etc/passwd file.
+
+[root@serverX ~]# tail -2 /etc/passwd
+tcpdump:x:72:72::/:/sbin/nologin
+juliet:x:1001:1001::/home/juliet:/bin/bash
+Use the passwd command to initialize juliet's password.
+
+[root@serverX ~]# passwd juliet
+Changing password for user juliet.
+New password: juliet
+BAD PASSWORD: The password is shorter than 8 characters
+Retype new password: juliet
+passwd: all authentication tokens updated successfully.
+Continue adding the remaining users in the steps below and set initial passwords.
+
+romeo
+
+[root@serverX ~]# useradd romeo
+[root@serverX ~]# passwd romeo
+Changing password for user romeo.
+New password: romeo
+BAD PASSWORD: The password is shorter than 8 characters
+Retype new password: romeo
+passwd: all authentication tokens updated successfully.
+hamlet
+
+[root@serverX ~]# useradd hamlet
+[root@serverX ~]# passwd hamlet
+reba
+
+[root@serverX ~]# useradd reba
+[root@serverX ~]# passwd reba
+dolly
+
+[root@serverX ~]# useradd dolly
+[root@serverX ~]# passwd dolly
+elvis
+
+[root@serverX ~]# useradd elvis
+[root@serverX ~]# passwd elvis
