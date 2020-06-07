@@ -1,0 +1,442 @@
+
+Lab: Lab: Comprehensive Review
+In this lab, you will practice and demonstrate your knowledge and skills.
+
+Outcomes:
+
+Complete the following tasks and successfully grade the serverX system with lab sa1-review grade as user root on serverX.
+
+Reset the serverX machine.
+
+Run the lab sa1-review setup as user root on serverX.
+
+Use Bash commands to complete the following tasks on the serverX machine:
+
+Display the first 12 lines of the /usr/bin/clean-binary-files file and send the output to the /home/student/headtail.txt file.
+
+Display the last nine lines of the /usr/bin/clean-binary-files file and add the output to the /home/student/headtail.txt file.
+
+Display the first 12 lines of the /usr/bin/clean-binary-files file and send the command output to the /home/student/headtail.txt file.
+
+[student@serverX ~]$ head -n 12 /usr/bin/clean-binary-files >/home/student/headtail.txt
+Display the last nine lines of the /usr/bin/clean-binary-files file and add the command output to the /home/student/headtail.txt file.
+
+[student@serverX ~]$ tail -n 9 /usr/bin/clean-binary-files >>/home/student/headtail.txt
+Ten new Linux systems require change documentation files. Carry out the following tasks on serverX to create them:
+
+Create the empty files with the file name system_changes-machineY-month_Z.txt in the /home/student directory on the serverX machine as user student. Replace Y with the machine number and replace Z with the months jan, feb, and mar.
+
+Create the /home/student/syschanges directory with the subdirectories jan, feb, and mar.
+
+Sort all newly created files by month into the corresponding subdirectory.
+
+Remove all newly created files related to machine 9 and 10, because the hardware has been replaced permanently.
+
+Create a total of 30 files with names system_changes-machineY-month_Z.txt. Replace Y with the machine number and replace Z with the months jan, feb, and mar.
+
+[student@serverX ~]$ touch ~student/system_changes-machine{1..10}-month_{jan,feb,mar}.txt
+Create the /home/student/syschanges directory with the subdirectories jan, feb, and mar.
+
+[student@serverX ~]$ mkdir -p /home/student/syschanges/{jan,feb,mar}
+Sort all newly created files by month into the corresponding subdirectory.
+
+[student@serverX ~]$ mv ~student/system_changes-machine*jan.txt /home/student/syschanges/jan/
+[student@serverX ~]$ mv ~student/system_changes-machine*feb.txt /home/student/syschanges/feb/
+[student@serverX ~]$ mv ~student/system_changes-machine*mar.txt /home/student/syschanges/mar/
+Remove all newly created files related to machine 9 and 10.
+
+[student@serverX ~]$ rm -f /home/student/syschanges/*/system_changes-machine{9,10}*.txt
+Use the man pages to research how to turn off the use of colors in the output. Put the relevant option of the ls command into the text file /home/student/lscolor.txt on serverX.
+
+Look up the relevant option in the ls(1) man page to determine how to prevent ls from providing colorful output. What is the correct option?
+
+[student@serverX ~]$ man ls
+ls uses --color=never to turn off colors in the command output.
+
+Create the text file /home/student/lscolor.txt with the ls option to turn off colorful output.
+
+[student@serverX ~]$ echo "--color=never" >/home/student/lscolor.txt
+Copy the file /home/student/vimfile.txt to /home/student/longlisting.txt on serverX. Use the vim editor to change the /home/student/longlisting.txt file according to the following requirements:
+
+Remove the file owner column. Do not remove any spaces.
+
+Remove the Documents and Pictures rows.
+
+Save the file when done with editing.
+
+Copy the file /home/student/vimfile.txt to /home/student/longlisting.txt.
+
+[student@serverX ~]$ cp /home/student/vimfile.txt /home/student/longlisting.txt
+Edit the file using Vim, to take advantage of visual mode.
+
+[student@serverX ~]$ vim /home/student/longlisting.txt
+Remove the owner column from the file.
+
+Use the arrow keys to position the cursor at the first character of the group owner column. Enter visual mode with Ctrl+v. Use the arrow keys to position the cursor at the last character and row of the group owner column. Delete the selection with x.
+
+Remove the Documents and Pictures rows. This time, enter visual mode with an uppercase V, which automatically selects full lines.
+
+Use the arrow keys to position the cursor at any character on the Documents row. Enter visual mode with an uppercase V. The full line is selected, as shown in the screen shot. Delete the selection with x. Repeat for the Pictures row.
+
+Save the file and exit the editor.
+
+Press the "esc" key and enter ":wq" to write the file and exit vim.
+
+Change configuration and add new users and a new group according to the following requirements:
+
+Change the default system settings for newly created users to ensure their passwords are changed at least every 60 days.
+
+Create a new group named instructors with a GID of 30000.
+
+Create three new users: gorwell, rbradbury, and dadams, with a password of firstpw.
+
+Add the new users to the supplementary group instructors. The primary group should remain as the user private group.
+
+Set the three newly created accounts to expire 60 days from today.
+
+Change the password policy for the gorwell account to require a new password every 10 days.
+
+Force all three newly created users to change their password on first login.
+
+
+
+
+
+
+
+Create the shared directory /home/instructors on serverX according to the following requirements:
+
+The directory is owned by user root and group instructors.
+
+Set permissions on the /home/instructors directory so it has the SETGID bit set on the directory, the owner and group have full read/write/execute permissions, and other users have read permission to the directory.
+
+Open a terminal window and become root on serverX.
+
+[student@serverX ~]$ su -
+Password: redhat
+[root@serverX ~]#
+Create the /home/instructors directory.
+
+[root@serverX ~]# mkdir /home/instructors
+Change group permissions on the /home/instructors directory so it belongs to the group instructors.
+
+[root@serverX ~]# chown :instructors /home/instructors
+Set permissions on the /home/instructors directory so it is a set GID bit directory (2), the owner (7) and group (7) have full read/write/execute permissions, and other users have read permission (4) to the directory.
+
+[root@serverX ~]# chmod 2774 /home/instructors 
+Check that the permissions were set properly.
+
+[root@serverX ~]# ls -ld /home/instructors
+drwxrwsr--. 2 root instructors 1024 Dec 9 1:38 /home/instructors
+Determine the process using the most CPU resources on serverX and terminate it.
+
+In a terminal window, run the top utility. Size the window as tall as possible. Top sorts all processes by CPU utilization. The cpuhog process is the one with the highest CPU usage.
+
+[root@serverX ~]# top
+top - 12:47:46 up  2:02,  3 users,  load average: 1.67, 1.25, 0.73
+Tasks: 361 total,   6 running, 355 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 98.5 us,  1.4 sy,  0.0 ni,  0.0 id,  0.0 wa,  0.0 hi,  0.1 si,  0.0 st
+KiB Mem:   2043424 total,   897112 used,  1146312 free,     1740 buffers
+KiB Swap:  4079612 total,        0 used,  4079612 free.   296276 cached Me
+
+  PID USER      PR  NI    VIRT    RES    SHR S %CPU %MEM     TIME+ COMMAND
+ 4019 root      20   0    4156     76      0 R 57.5  0.0   2:54.15 cpuhog
+ 2492 student   20   0 1359500 168420  37492 S 16.8  8.2   3:55.58 gnome-shell
+ 1938 root      20   0  189648  35972   7568 R  1.9  1.8   0:29.66 Xorg
+ 2761 student   20   0  620192  19688  12296 S  0.4  1.0   0:04.48 gnome-termi+
+output truncated
+Exit the top display.
+
+Press q to quit.
+
+Terminate the cpuhog process using the command line. Confirm that the processes no longer display in top.
+
+[root@serverX ~]# pkill cpuhog
+Stop the currently running cups printing service on serverX. The service should not get automatically started on system boot.
+
+Stop the cups service.
+
+[student@serverX ~]$ sudo systemctl stop cups
+[student@serverX ~]$ sudo systemctl status cups
+Configure the cups service so that it does not start at system boot.
+
+[student@serverX ~]$ sudo systemctl disable cups
+[student@serverX ~]$ sudo systemctl status cups
+Configure the ssh service on serverX according to the following requirements:
+
+User student on serverX can log in with a SSH public key to the student account on desktopX.
+
+Disable ssh login for the root user and password-based SSH authentication on serverX.
+
+Generate a SSH public key on serverX as user student.
+
+[student@serverX ~]$ ssh-keygen
+Install the SSH public key generated previously on serverX to the student account on desktopX.
+
+[student@serverX ~]$ ssh-copy-id desktopX
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+student@desktopX's password: student
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'student@desktopX'"
+and check to make sure that only the key(s) you wanted were added.
+
+Log in, then change to the root account, on the serverX virtual machine.
+
+[student@serverX ~]$ su -
+Customize the ssh service on serverX by disabling SSH connections for the user root and only allow key-based login.
+
+Set the necessary configuration file parameters in /etc/ssh/sshd_config:
+
+PermitRootLogin no
+PasswordAuthentication no
+Restart the sshd service on serverX.
+
+[root@serverX ~]# systemctl restart sshd
+On a different terminal window on desktopX, validate that user root cannot connect to serverX with the ssh command. It should fail because we disabled root logins with the ssh service.
+
+[student@desktopX ~]$ ssh root@serverX
+Password: redhat
+Permission denied, please try again.
+Password: redhat
+Permission denied, please try again.
+Password: redhat
+Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password).
+Your serverX machine has been relocated to the Bahamas. The following changes have to be made on the serverX machine:
+
+Change the time zone on the serverX machine to Bahamas and verify the time zone has been changed properly.
+
+Identify the correct time zone for Bahamas on serverX.
+
+[root@serverX ~]# tzselect
+Please identify a location so that time zone rules can be set correctly.
+Please select a continent or ocean.
+ 1) Africa
+ 2) Americas
+ 3) Antarctica
+ 4) Arctic Ocean
+ 5) Asia
+ 6) Atlantic Ocean
+ 7) Australia
+ 8) Europe
+ 9) Indian Ocean
+10) Pacific Ocean
+11) none - I want to specify the time zone using the Posix TZ format.
+#? 2
+Please select a country.
+ 1) Anguilla                 28) Haiti
+ 2) Antigua & Barbuda        29) Honduras
+ 3) Argentina                30) Jamaica
+ 4) Aruba                    31) Martinique
+ 5) Bahamas                  32) Mexico
+ 6) Barbados                 33) Montserrat
+... output omitted ...
+26) Guatemala                53) Virgin Islands (US)
+27) Guyana
+#? 5
+
+The following information has been given:
+
+	Bahamas
+
+Therefore TZ='America/Nassau' will be used.
+Local time is now:	Fri Mar  7 09:38:50 EST 2014.
+Universal Time is now:	Fri Mar  7 14:38:50 UTC 2014.
+Is the above information OK?
+1) Yes
+2) No
+#? 1
+
+You can make this change permanent for yourself by appending the line
+	TZ='America/Nassau'; export TZ
+to the file '.profile' in your home directory; then log out and log in again.
+
+Here is that TZ value again, this time on standard output so that you
+can use the /usr/bin/tzselect command in shell scripts:
+America/Nassau
+Change the time zone to America/Nassau on serverX.
+
+[root@serverX ~]# timedatectl set-timezone America/Nassau
+Verify the time zone has been properly set on serverX.
+
+[root@serverX ~]# timedatectl
+      Local time: Wed 2014-04-09 18:21:06 CEST
+  Universal time: Wed 2014-04-09 16:21:06 UTC
+        RTC time: Wed 2014-04-09 16:21:06
+        Timezone: America/Nassau (CEST, +0200)
+     NTP enabled: yes
+NTP synchronized: no
+ RTC in local TZ: no
+      DST active: yes
+ Last DST change: DST began at
+                  Sun 2014-03-30 01:59:59 CET
+                  Sun 2014-03-30 03:00:00 CEST
+ Next DST change: DST ends (the clock jumps one hour backwards) at
+                  Sun 2014-10-26 02:59:59 CEST
+                  Sun 2014-10-26 02:00:00 CET
+Record the command to display all systemd journal entries recorded between 9:05:00 and 9:15:00 in the /home/student/systemdreview.txt file.
+
+[root@serverX ~]# echo "journalctl --since 9:05:00 --until 9:15:00" >/home/student/systemdreview.txt
+Configure rsyslogd by adding a rule to the newly created configuration file /etc/rsyslog.d/auth-errors.conf to log all security and authentication messages that get recorded in the authpriv facility with the priority alert and higher to the /var/log/auth-errors file as well. Test the newly added log directive with the logger command.
+
+Add the directive to log authpriv.alert syslog messages to the /var/log/auth-errors file in the /etc/rsyslog.d/auth-errors.conf configuration file.
+
+[root@serverX ~]# echo "authpriv.alert /var/log/auth-errors" >/etc/rsyslog.d/auth-errors.conf
+Restart the rsyslog service on serverX.
+
+[root@serverX ~]# systemctl restart rsyslog
+Use logger to create a new log entry to /var/log/auth-errors on serverX.
+
+[root@serverX ~]# logger -p authpriv.alert "Logging test authpriv.alert"
+Verify the message sent to syslog with the logger command appears in the /var/log/auth-errors file on serverX in the terminal with tail /var/log/auth-errors.
+
+[root@serverX ~]# tail /var/log/auth-errors
+Feb 13 11:21:53 server1 root: Logging test authpriv.alert
+Create a new static network connection using the settings in the following table. Be sure to replace the X with the correct number for your systems.
+
+Configure the new connection to be automatically started.
+
+Other connections should not start automatically.
+
+Modify the new connection so that it also uses the address 10.0.X.1/24.
+
+Configure the hosts file so that 10.0.X.1 can be referenced as "myhost".
+
+Set the host name to serverX.example.com.
+
+Parameter	Setting
+Connection name	review
+IP address	172.25.X.11/16
+Gateway address	172.25.0.1
+DNS address	172.25.254.254
+Create a new static network connection using the settings in the table. Be sure to replace the X with the correct number for your systems.
+
+[root@serverX ~]# nmcli con add con-name review ifname eth0 type ethernet ip4 172.25.X.11/16 gw4 172.25.0.1
+[root@serverX ~]# nmcli con mod "review" ipv4.dns 172.25.254.254
+Configure the new connection to be autostarted. Other connections should not start automatically.
+
+[root@serverX ~]# nmcli con mod "review" connection.autoconnect yes
+[root@serverX ~]# nmcli con mod "System eth0" connection.autoconnect no
+	
+Modify the new connection so that it also uses the address 10.0.X.1/24.
+
+[root@serverX ~]# nmcli con mod "review" +ipv4.addresses 10.0.X.1/24
+Or alternately:
+
+[root@serverX ~]# echo "IPADDR1=10.0.X.1" >> /etc/sysconfig/network-scripts/ifcfg-review
+[root@serverX ~]# echo "PREFIX1=24" >> /etc/sysconfig/network-scripts/ifcfg-review
+Configure the hosts file so that 10.0.X.1 can be referenced as "myhost".
+
+[root@serverX ~]# echo "10.0.X.1  myhost" >> /etc/hosts
+	
+Set the host name to serverX.example.com.
+
+[root@serverX ~]# hostnamectl set-hostname serverX.example.com
+Synchronize the /etc directory tree on serverX to the /configbackup directory on serverX.
+
+To be able to create the target directory /configbackup, switch to the root user account with the su command.
+
+[student@serverX ~]$ su -
+Password: redhat
+[root@desktopX ~]# 
+Create the target directory for the configuration files on serverX.
+
+[root@serverX ~]# mkdir /configbackup
+Use the rsync command to synchronize the /etc directory tree on serverX to the /configsync directory on serverX. Be aware that only the root user can read all the content in the /etc directory on serverX.
+
+[root@serverX ~]# rsync -av /etc /configbackup
+...
+Create an archive named /root/configuration-backup-server.tar.gz with the /configbackup directory as content.
+
+Store the /configbackup directory in the /root/configuration-backup-server.tar.gz archive.
+
+[root@serverX ~]# tar czf /root/configuration-backup-server.tar.gz /configbackup
+To prepare the archived directory tree for comparison with the currently actively used configuration files on serverX, extract the contents of the /root/configuration-backup-server.tar.gz archive to the /tmp/configcompare/ directory on serverX.
+
+Connect to the serverX machine as user root by using ssh.
+
+[root@desktopX ~]# ssh root@serverX
+Password: redhat
+[root@serverX ~]# 
+Create the target directory /tmp/configcompare/ where the contents of the /root/configuration-backup-server.tar.gz archive will get extracted.
+
+[root@serverX ~]# mkdir /tmp/configcompare
+Change to the target directory /tmp/configcompare/ on serverX.
+
+[root@serverX ~]# cd /tmp/configcompare
+[root@serverX configcompare]# 
+Extract the contents of the /root/configuration-backup-server.tar.gz archive to the /tmp/configcompare/ directory on serverX.
+
+[root@serverX configcompare]# tar xzf /root/configuration-backup-server.tar.gz
+Perform the following tasks on the serverX machine:
+
+Use ssh to execute the hostname command on desktopX as user student. Send the output of the hostname command to the /tmp/scpfile.txt file on desktopX.
+
+Use scp to copy the /tmp/scpfile.txt file from desktopX to /home/student/scpfile.txt.
+
+Use ssh to execute the hostname command on desktopX as user student. Send the output of the hostname command to the /tmp/scpfile.txt file on desktopX.
+
+[root@serverX ~]# ssh student@desktopX 'hostname >/tmp/scpfile.txt'
+Use scp to copy the /tmp/scpfile.txt file from desktopX to /home/student/scpfile.txt on the serverX machine.
+
+[root@serverX ~]# scp root@desktopX:/tmp/scpfile.txt /home/student/
+Create the file /etc/yum.repos.d/localupdates.repo to enable the “Updates” repository found on the content machine. It should access content found at the following URL: http://content.example.com/rhel7.0/x86_64/errata. Do not check GPG signatures.
+
+[updates]
+name=Red Hat Updates
+baseurl=http://content.example.com/rhel7.0/x86_64/errata
+enabled=1
+gpgcheck=0
+Create the file /etc/yum.repos.d/localupdates.repo with the following content:
+
+Configure serverX to adhere to specific software requirements:
+
+The kernel package should be updated to the latest version.
+
+The xsane-gimp package should be installed.
+
+The rht-system package should be installed.
+
+For security reasons, serverX should not have the wvdial package installed.
+
+Update the kernel package.
+
+yum update kernel
+
+Install the xsane-gimp package.
+
+yum install xsane-gimp
+
+Install the rht-system package.
+
+yum install rht-system
+
+For security reasons, serverX should not have the wvdial package installed.
+
+yum remove wvdial
+
+Generate a disk usage report with the du command of the /usr/share/fonts directory on serverX and save the result in the /home/student/dureport.txt file.
+
+[root@serverX ~]# du /usr/share/fonts >/home/student/dureport.txt
+Identify and mount a newly added file system by UUID on the /mnt/datadump directory on serverX.
+
+Identify the newly added file system with the blkid command on serverX.
+
+[root@serverX ~]# blkid
+/dev/xvda1: UUID="46f543fd-78c9-4526-a857-244811be2d88" TYPE="xfs" 
+/dev/xvdj1: UUID="a84f6842-ec1d-4f6d-b767-b9570f9fcdc0" TYPE="xfs"
+Create the mount point /mnt/datadump on serverX.
+
+[root@serverX ~]# mkdir /mnt/datadump
+Mount the file system by UUID on the /mnt/datadump directory of the serverX machine.
+
+[root@serverX ~]# mount UUID="a84f6842-ec1d-4f6d-b767-b9570f9fcdc0" /mnt/datadump
+Create the soft link /root/mydataspace, which points to the /mnt/datadump directory on serverX.
+
+[root@serverX ~]# ln -s /mnt/datadump /root/mydataspace
+Record the command to find all soft links on serverX that have data as part of their name in the /home/student/find.txt file.
+
+[root@serverX ~]# echo "find / -type l -name '*data*'" >/home/student/find.txt
+

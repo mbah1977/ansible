@@ -1,0 +1,219 @@
+Chapter 23. Providing File-based Storage
+Exporting NFS File Systems
+Guided Exercise: Practice: Exporting NFS File Systems
+Protecting NFS Exports
+Guided Exercise: Practice: Protecting NFS Exports
+Providing SMB File Shares
+Guided Exercise: Practice: Providing SMB File Shares
+Performing a Multiuser SMB Mount
+Guided Exercise: Practice: Performing a Multiuser SMB Mount
+Lab: Lab: Providing File-based Storage
+Abstract
+
+Overview
+Goal	To provide NFS exports and SMB file shares to specific systems and users.
+Objectives	
+Export file systems to client systems using NFS, controlling access by IP address.
+
+Export file systems to clients using NFS, controlling access with Kerberos and using labeled NFS.
+
+Share file systems with clients using SMB, controlling access by username and password.
+
+Mount an SMB share with the multiuser mount option, using password-based authentication and cifscreds to control access
+
+Sections	
+Exporting NFS File Systems (and Practice)
+
+Protecting NFS Exports (and Practice)
+
+Providing SMB File Shares (and Practice)
+
+Performing a Multiuser SMB Mount (and Practice)
+
+Lab	
+Providing File-based Storage
+
+Exporting NFS File Systems
+In this section, students learned how to:
+
+Describe NFS server configuration.
+
+Export an IP-based NFS share.
+
+Objectives
+After completing this section, students should be able to export file systems to client systems using NFS, controlling access by IP address.
+
+What is NFS?
+The Network File System (NFS) is a network file system commonly used by UNIX systems and network-attached storage devices to allow multiple clients to share access to files over the network. It provides access to shared directories or files from client systems.
+
+WARNING
+The NFS protocol transmits data in clear text over the network. Furthermore, the server relies on the client to identify users. It is not recommended to export directories with sensitive information without the use of Kerberos authentication and encryption, which is covered later in this section.
+
+NFS exports
+A NFS server installation requires the nfs-utils package to be installed. It provides all necessary utilities to export a directory with NFS to clients. The configuration file for the NFS server exports is the /etc/exports file.
+
+The /etc/exports file lists the directory to share to client hosts over the network and indicates which hosts or networks have access to the export.
+
+NOTE
+Instead of adding the information required for exporting directories to the /etc/exports file, a newly created file named *.exports can be added to the /etc/exports.d/ directory holding the configuration of exports.
+
+WARNING
+Exporting the same directory with NFS and Samba is not supported on Red Hat Enterprise Linux 7, because NFS and Samba use different file locking mechanisms, which can cause file corruption.
+
+One or more clients can be listed, separated by a space, as a:
+
+DNS-resolvable host name, like server0.example.com in the following example, where the /myshare directory is exported and can be mounted by server0.example.com.
+
+/myshare server0.example.com
+DNS-resolvable host name with the wildcards * for multiple characters and/or ? for a single character. The following example allows all subdomains in the example.com domain to access the NFS export.
+
+/myshare *.example.com
+DNS-resolvable host name with character class lists in square brackets. In this example, the hosts server0.example.com, server1.example.com, ... , and server20.example.com have access to the NFS export.
+
+/myshare server[0-20].example.com
+IPv4 address. The following example allows access to the /myshare NFS share from the 172.25.11.10 IP address.
+
+/myshare 172.25.11.10
+IPv4 network. This example shows an /etc/exports entry, which allows access to the NFS-exported directory /myshare from the 172.25.0.0/16 network.
+
+/myshare 172.25.0.0/16
+IPv6 address without square brackets. The following example allows the client with IPv6 address 2000:472:18:b51:c32:a21 access to the NFS-exported directory /myshare.
+
+/myshare 2000:472:18:b51:c32:a21
+IPv6 network without square brackets. This example allows the IPv6 network 2000:472:18:b51::/64 access to the NFS export.
+
+/myshare 2000:472:18:b51::/64
+A directory can be exported to multiple hosts simultaneously by specifying multiple targets with their options, separated by spaces, following the directory to export.
+
+/myshare *.example.com 172.25.0.0/16
+Optionally, there can be one or more export options specified in round brackets as a comma-separated list, directly followed by each client definition. Commonly used export options are:
+
+ro, read-only: the default setting when nothing is specified. It is allowed to explicitly specify it with an entry. Restricts the NFS clients to read files on the NFS share. Any write operation is prohibited. The following example explicitly states the ro flag for the server0.example.com host.
+
+/myshare desktop0.example.com(ro)
+rw, read-write: allows read and write access for the NFS clients. In the following example, the desktop0.example.com is able to access the NFS export read-only, while server[0-20].example.com has read-write access to the NFS share.
+
+/myshare desktop0.example.com(ro) server[0-20].example.com(rw)
+no_root_squash: By default, root on an NFS client is treated as user nfsnobody by the NFS server. That is, if root attempts to access a file on a mounted export, the server will treat it as an access by user nfsnobody instead. This is a security measure that can be problematic in scenarios where the NFS export is used as / by a diskless client and root needs to be treated as root. To disable this protection, the server needs to add no_root_squash to the list of options set for the export in /etc/exports.
+
+The following example allows the client diskless.example.com read-write and real root user access to the exported NFS directory /myshare.
+
+/myshare diskless.example.com(rw,no_root_squash)
+WARNING
+Note that this particular configuration is not secure, and would be better done in conjunction with Kerberos authentication and integrity checking, which is covered later in this section.
+
+Configuring an NFS export
+In this example, please follow along with these steps while your instructor demonstrates how to share a directory IP-based with NFS. The directory /myshare is on serverX and will be mounted on the desktopX system.
+
+Start the NFS service on serverX with the systemctl command.
+
+[root@serverX ~]# systemctl start nfs-server
+Enable the NFS service to start at boot on serverX.
+
+[root@serverX ~]# systemctl enable nfs-server
+Create the directory /myshare to share it with NFS on the serverX system.
+
+[root@serverX ~]# mkdir /myshare
+Export the /myshare directory on serverX to the desktopX client as a read- and write-enabled share. To do that, add the following line to the /etc/exports file on serverX:
+
+/myshare desktopX(rw)
+After the changed /etc/exports file has been saved, apply the changes by executing exportfs -r.
+
+[root@serverX ~]# exportfs -r
+The NFS port 2049/TCP for nfsd must be open on the server. To configure firewalld to enable access to the NFS exports immediately, run:
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=nfs
+Reload the firewalld rules so the new rule gets applied.
+
+[root@serverX ~]# firewall-cmd --reload
+Use the newly created mount point /mnt/nfsexport on the desktopX system to mount the NFS-exported directory.
+
+[root@desktopX ~]# mkdir /mnt/nfsexport
+On the desktopX system, the share can now be mounted on the newly created mount point /mnt/nfsexport with the mount command.
+
+[root@desktopX ~]# mount serverX:/myshare /mnt/nfsexport
+REFERENCES
+nfs(5), mount(8), mount.nfs(8), exportfs(8), and exports(5) man pages
+
+
+
+
+
+
+Guided Exercise: Practice: Exporting NFS File Systems
+In this lab, you will use NFS to provide shared storage.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+The NFS server exports an IP-based NFS share on serverX. The NFS export is mounted on desktopX.
+
+Reset the serverX system.
+
+Reset the desktopX system.
+
+Become root on your serverX system.
+
+[student@serverX ~]$ sudo -i
+Become root on your desktopX system.
+
+[student@desktopX ~]$ sudo -i
+Configure an IP-based NFS share on serverX according to the following requirements:
+
+The NFS server provides newly created shared directory /nfsshare.
+
+The /nfsshare NFS export provides read and write access for nfsnobody.
+
+Mount the share on the /mnt/nfsshare mount point on desktopX permanently.
+
+Successfully grade the setup on desktopX and serverX with lab nfsshare grade.
+
+Configure an IP-based NFS share on serverX that provides a newly created shared directory /nfsshare for the desktopX machine with read and write access for nfsnobody.
+
+Start the NFS service on serverX.
+
+[root@serverX ~]# systemctl start nfs-server
+Enable the NFS service to start at boot on serverX.
+
+[root@serverX ~]# systemctl enable nfs-server
+Create the directory /nfsshare to be shared by NFS on the serverX system.
+
+[root@serverX ~]# mkdir /nfsshare
+Change the ownership on the /nfsshare to user nfsnobody, so the directory is writable by nfsnobody.
+
+[root@serverX ~]# chown nfsnobody /nfsshare
+Change the /etc/exports configuration file on serverX to share the newly created /nfsshare directory on the desktopX system with read and write access.
+
+[root@serverX ~]# echo '/nfsshare desktopX(rw)' >>/etc/exports
+Use the exportfs -r command to reload the /etc/exports configuration file on serverX.
+
+[root@serverX ~]# exportfs -r
+Configure firewalld to allow access to the NFS service on serverX.
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=nfs
+Reload the firewalld configuration to allow access to the NFS service instantly on serverX.
+
+[root@serverX ~]# firewall-cmd --reload
+Mount the NFS export from the serverX system on the /mnt/nfsshare mount point on desktopX permanently.
+
+Create the mount point /mnt/nfsshare on the desktopX system.
+
+[root@desktopX ~]# mkdir /mnt/nfsshare
+Create the required entry in /etc/fstab to mount the exported NFS share on the newly created /mnt/nfsshare directory on the desktopX system permanently.
+
+serverX:/nfsshare /mnt/nfsshare nfs defaults 0 0
+Mount the exported NFS share on the newly created /mnt/nfsshare directory on the desktopX system and verify the /etc/fstab entry works as expected.
+
+[root@desktopX ~]# mount -a
+Verify that the NFS share mounted at /mnt/nfsshare is writable on the desktopX system.
+
+[root@desktopX ~]# touch /mnt/nfsshare/test.txt
+[root@desktopX ~]# ls -l /mnt/nfsshare
+total 0
+-rw-r--r--. 1 nfsnobody nfsnobody 0 May  8 04:14 test.txt
+Run the grading script on both serverX and desktopX:
+
+[student@serverX ~]$ lab nfsshare grade
+[student@desktopX ~]$ lab nfsshare grade
+

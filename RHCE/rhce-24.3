@@ -1,0 +1,288 @@
+Managing Database Users and Access Rights
+In this section, students learned how to:
+
+Create users.
+
+Grant privileges.
+
+Revoke privileges.
+
+Flush privileges.
+
+Objectives
+After completing this section, students should be able to configure MariaDB users and grant or revoke database access rights.
+
+Creating user accounts with MariaDB
+By default, MariaDB handles authentication and authorization through the user table in the mysql database. This means that the root password for the database is persisted in the user table and not in the operating system.
+
+NOTE
+Recent versions of MariaDB can use PAM for authentication on Linux.
+
+The CREATE USER statement creates new accounts. This statement will create a new row in the mysql.user table that has no privileges.
+
+NOTE
+information_schema and test database allows some privileges for all users. This is the main reason why the test database is often deleted.
+
+IMPORTANT
+To create a new user, the connected user must have the global CREATE USER privilege or the INSERT privilege for the mysql database.
+
+Account names are specified as 'user_name'@'host_name'. This makes it possible to create multiple user accounts with the same name, but with different privileges according to the source host (that is, the host from which the user is connecting).
+
+MariaDB [(none)]>  CREATE USER mobius@localhost1 IDENTIFIED BY 'redhat'2;
+1
+
+Username/host name for this account
+
+2
+
+Password for this account
+
+This user account can only connect from localhost, with the password redhat, and has no privileges. Passwords are encrypted in the user table:
+
+MariaDB [mysql]> SELECT host,user,password FROM user WHERE user = 'mobius';
++-----------+--------+-------------------------------------------+
+| host      | user   | password                                  |
++-----------+--------+-------------------------------------------+
+| localhost | mobius | *84BB5DF4823DA319BBF86C99624479A198E6EEE9 |
++-----------+--------+-------------------------------------------+
+1 row in set (0.00 sec)
+When using this account, before granting any privileges, access will be denied for almost any action:
+
+[root@serverX ~]# mysql -u mobius -p
+Enter password: redhat
+MariaDB [(none)]> create database inventory;
+ERROR 1044 (42000): Access denied for user 'mobius'@'localhost' to database 'inventory'
+NOTE
+If the host name is not provided, it is assumed to be "%". This means that this user can access from any source host.
+
+Table 24.2. Account Examples
+
+Account	Description
+mobius@'localhost'	User mobius can connect just from localhost.
+mobius@'192.168.1.5'	User mobius can connect from 192.168.1.5 host.
+mobius@'192.168.1.%'	User mobius can connect from any host that belongs to the network 192.168.1.0.
+mobius@'%'	User mobius can connect from any host.
+mobius@'2000:472:18:b51:c32:a21'	User mobius can connect from 2000:472:18:b51:c32:a21 host.
+
+Granting and revoking privileges for user accounts
+Privileges are the permissions that the user may have within MariaDB. The privileges are organized as:
+
+Global privileges, such as CREATE USER and SHOW DATABASES, for administration of the database server itself.
+
+Database privileges, such as CREATE for creating databases and working with databases on the server at a high level.
+
+Table privileges, such as the CRUD commands, for creating tables and manipulating data in the database.
+
+Column privileges, for granting table-like command usage, but on a particular column (generally rare).
+
+Other, more granular privileges, which are discussed in detail in the MariaDB documentation.
+
+The GRANT statement can be used to grant privileges to accounts. The connected user must have the GRANT OPTION privilege (a special privilege that exists at several levels) to grant privileges. A user may only grant privileges to others that have already been granted to that user (for example, mobius cannot grant SELECT privileges on a database table unless mobius already has that privilege and the GRANT OPTION table privilege).
+
+[root@serverX ~]# mysql -u mobius -p
+Enter password: redhat
+MariaDB [(none)]> use inventory;
+MariaDB [(inventory)]> select * from category;
+ERROR 1142 (42000): SELECT command denied to user 'mobius'@'localhost' for table 'category'
+MariaDB [(inventory)]> exit
+[root@serverX ~]# mysql -u root -p
+Enter password: redhat
+MariaDB [(none)]> use inventory;
+MariaDB [(inventory)]> GRANT SELECT, UPDATE, DELETE, INSERT1 on inventory.category2 to mobius@localhost3;
+Query OK, 0 rows affected (0.00 sec)
+MariaDB [(inventory)]> exit  
+[root@serverX ~]# mysql -u mobius -p
+Enter password: redhat
+MariaDB [(none)]> use inventory;
+MariaDB [(inventory)]> select * from category;
++----+------------+
+| id | name       |
++----+------------+
+|  1 | Networking |
+|  2 | Servers    |
+|  3 | Ssd        |
++----+------------+
+3 rows in set (0.00 sec)
+  
+1
+
+Define the privileges to be granted (in this case, the full CRUD capabilities are being granted).
+
+2
+
+Define which table the privilege will be granted for.
+
+3
+
+The user to be granted privileges.
+
+Table 24.3. Grant Examples
+
+Grant	Description
+GRANT SELECT ON database.table TO username@hostname	Grant select privilege for a specific table in a specific database to a specific user.
+GRANT SELECT ON database.* TO username@hostname	Grant select privilege for all tables in a specific database to a specific user.
+GRANT SELECT ON *.* TO username@hostname	Grant select privilege for all tables in all databases to a specific user.
+GRANT CREATE, ALTER, DROP ON database.* to username@hostname	Grant privilege to create, alter, and drop tables in a specific database to a specific user.
+GRANT ALL PRIVILEGES ON *.* to username@hostname	Grant all available privileges for all databases to a specific user, effectively creating a superuser, similar to root.
+
+The REVOKE statement allows for revoking privileges from accounts. The connected user must have the GRANT OPTION privilege and have the privileges that are being revoked to revoke a privilege.
+
+MariaDB [(none)]> REVOKE SELECT, UPDATE, DELETE, INSERT1 on inventory.category2 from mobius@localhost3;
+Query OK, 0 rows affected (0.00 sec) 
+1
+
+Define the privileges to be revoked.
+
+2
+
+Define for which table the privilege will be revoked.
+
+3
+
+Privilege revoked from this user.
+
+IMPORTANT
+After granting or revoking a privilege, reload all privileges from the privileges tables in the mysql database.
+
+MariaDB [(none)]> FLUSH PRIVILEGES;
+In order to revoke privileges, the list of privileges granted to a user will be needed. The simple command SHOW GRANTS FOR username; will provide the list of privileges for that user:
+
+MariaDB [(none)]> SHOW GRANTS FOR root@localhost;
++---------------------------------------------------------------------+
+| Grants for root@localhost                                           |
++---------------------------------------------------------------------+
+| GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION |
+| GRANT PROXY ON ''@'' TO 'root'@'localhost' WITH GRANT OPTION        |
++---------------------------------------------------------------------+
+2 rows in set (0.00 sec)
+    
+When a user is no longer required, it can be deleted from the database using DROP USER username;. The username should use the same 'user'@'host' format used for CREATE USER.
+
+IMPORTANT
+If an account that is currently connected is DROPped, it will not be deleted until the connection is closed. The connection will not be automatically closed.
+
+Troubleshooting database access
+Table 24.4. Some Common DB Access Issues
+
+Issue	Solution
+User has been granted access to connect from any host, but can only connect on localhost using the mysql command (applications he or she uses cannot connect, even on localhost).	Remove the skip-networking directive from my.cnf and restart the service.
+User can connect with any application on localhost, but not remotely.	Check the bind-address configuration in my.cnf to ensure the database is accessible.
+Ensure that the user table includes an entry for the user from the host he is trying to connect from.
+
+User can connect, but cannot see any database other than information_schema and test.	Common problem when a user has just been created, as they have no privileges by default, though they can connect and use those default databases. Add grants for the database the user requires.
+User can connect, but cannot create any databases.	Grant the user the global CREATE privilege (this also grants DROP privileges).
+User can connect, but cannot read or write any data.	Grant the user the CRUD privileges for only the database he or she will be using.
+
+REFERENCES
+mysql(1) man page
+
+MariaDB Knowledge Base: User Account Management
+
+MariaDB Knowledge Base: Account Management SQL Commands: REVOKE
+
+MariaDB Knowledge Base: Account Management SQL Commands: GRANT, "Database Privileges"
+
+
+
+
+Guided Exercise: Practice: Managing Users
+In this lab, you will install a MariaDB server.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+One MariaDB user with select privilege and another user with insert, update, delete, and select privileges on your serverX machine.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab mariadb-users setup
+Log into and set up your desktopX system.
+
+[student@desktopX ~]$ lab mariadb-users setup
+You have been asked to create two MariaDB users on your serverX machine, according to the following requirements:
+
+Table 24.5. 
+
+User	Accepts connection from host	Password	Privileges
+john	localhost	john_password	Insert, update, delete, select on all tables from inventory database
+steve	any host	steve_password	Select on all tables from inventory database
+
+Connect to MariaDB with user root (blank password).
+
+[student@serverX ~]$ mysql -u root
+Create the users john and steve.
+
+MariaDB [(none)]> CREATE USER john@localhost identified by 'john_password';  
+MariaDB [(none)]> CREATE USER steve@'%' identified by 'steve_password';  
+Grant insert, update, delete, and select privileges to user john.
+
+MariaDB [(none)]> GRANT INSERT, UPDATE, DELETE, SELECT on inventory.* to john@localhost;  
+Grant select privilege to user steve.
+
+MariaDB [(none)]> GRANT SELECT on inventory.* to steve@'%'; 
+Flush the privileges.
+
+MariaDB [(none)]> FLUSH PRIVILEGES;
+MariaDB [(none)]> exit;
+Connect with user john and verify his privileges.
+
+Connect to MariaDB as user john with the password john_password
+
+[student@serverX ~]$ mysql -u john -p
+Select the inventory database.
+
+MariaDB [(none)]> USE inventory;
+Verify the select privilege.
+
+MariaDB [(inventory)]> SELECT * FROM category;
++----+------------+
+| id | name       |
++----+------------+
+|  1 | Networking |
+|  2 | Servers    |
+|  3 | Ssd        |
++----+------------+
+3 rows in set (0.00 sec)        
+Verify the insert privilege.
+
+MariaDB [(inventory)]> INSERT INTO category(name) VALUES('Memory');
+Query OK, 1 row affected (0.00 sec)
+Verify the update privilege.
+
+MariaDB [(inventory)]> UPDATE category SET name='Solid State Drive' where id = 3;
+Query OK, 1 row affected (0.01 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+Verify the delete privilege.
+
+MariaDB [(inventory)]> DELETE FROM category WHERE name LIKE 'Memory';
+Query OK, 1 row affected (0.01 sec)
+On your desktopX system, connect with user steve and verify his privileges.
+
+Connect to MariaDB as user steve with password steve_password
+
+[student@desktopX ~]$ mysql -u steve -h serverX -p
+Select the inventory database.
+
+MariaDB [(none)]> USE inventory;
+Verify the select privilege.
+
+MariaDB [(inventory)]> SELECT * FROM category;
++----+-------------------+
+| id | name              |
++----+-------------------+
+|  1 | Networking        |
+|  2 | Servers           |
+|  3 | Solid State Drive |
++----+-------------------+
+3 rows in set (0.00 sec)
+MariaDB [(inventory)]> exit;
+Verify the insert privilege.
+
+MariaDB [(inventory)]> INSERT INTO category(name) VALUES('Memory');
+ERROR 1142 (42000): INSERT command denied to user 'steve'@'desktopX.example.com' for table 'category'
+

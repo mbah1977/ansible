@@ -1,0 +1,244 @@
+Protecting NFS Exports
+In this section, students learned how to:
+
+Set up Kerberos-enabled NFS.
+
+Configure labeled NFS and SELinux.
+
+Objectives
+After completing this section, students should be able to export file systems to clients using NFS, controlling access with Kerberos and using labeled NFS.
+
+Kerberos-enabled NFS exports
+The NFS server does not require authentication and only enforces access restriction based on the IP address or host name of the client by default. To remedy this, the NFS server provides options to secure access to files using a number of methods: none, sys, krb5, krb5i, and krb5p. The NFS server can choose to offer a single method or multiple methods for each exported share. NFS clients must connect to the exported share using one of the methods mandated for that share, specified as a mount option sec=method.
+
+Security Methods
+
+none: Anonymous access to the files, writes to the server will be allocated UID and GID of nfsnobody. This requires the SELinux Boolean nfsd_anon_write to be active.
+
+sys: File access based on standard Linux file permissions for UID and GID values. If not specified, this is the default. The NFS server trusts any UID sent by the client.
+
+krb5: Clients must prove identity using Kerberos and then standard Linux file permissions apply. UID/GID is determined based upon the Kerberos principal from the accessing user.
+
+krb5i: Adds a cryptographically strong guarantee that the data in each request has not been tampered with. UID/GID is determined based upon the Kerberos principal from the accessing user.
+
+krb5p: Adds encryption to all requests between the client and the server, preventing data exposure on the network. This will have a performance impact, but provides the most security. UID/GID is determined based upon the Kerberos principal from the accessing user.
+
+For using any of the security options that use a Kerberos server, the nfs-secure-server needs to be running in addition to the nfs-server service on the system exporting the NFS shares. The client requires the nfs-secure service to run to help with negotiating Kerberos authentication.
+
+IMPORTANT
+Kerberos options will require, at a minimum, a /etc/krb5.keytab and additional authentication configuration that is not covered in this section, joining the Kerberos realm. The /etc/krb5.keytab will normally be provided by the authentication or security administrator. Request a keytab that includes either a host principal, nfs principal, or both.
+
+Configuring a Kerberos-enabled NFS server
+In this example, please follow along with these steps while your instructor demonstrates how to export a directory with NFS using krb5p security. The required keytab files are provided. The NFS server exports the /securedexport directory to all subdomains of example.com. The client mounts the NFS export on the /mnt/securedexport mount point.
+
+Install the keytab provided at http://classroom.example.com/pub/keytabs/serverX.keytab on the serverX system, which will act as the NFS server.
+
+[root@serverX ~]# wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/serverX.keytab
+For NFS with Kerberos security, the nfs-secure-server needs to be running. Start the nfs-secure-server service on the serverX system.
+
+[root@serverX ~]# systemctl start nfs-secure-server
+Enable the nfs-secure-server to start at system boot on serverX.
+
+[root@serverX ~]# systemctl enable nfs-secure-server
+Create the directory /securedexport on serverX. This directory will be used as the NFS export.
+
+[root@serverX ~]# mkdir /securedexport
+Add the directory /securedexport to the /etc/exports file to export it with NFS. Enable krb5p security to secure access to the NFS share. Allow read and write access to the exported directory from all subdomains of the example.com domain.
+
+[root@serverX ~]# echo '/securedexport *.example.com(sec=krb5p,rw)' >>/etc/exports
+After the changed /etc/exports file has been saved, apply the changes by executing exportfs -r.
+
+[root@serverX ~]# exportfs -r
+The NFS port 2049/TCP for nfsd must be open on the server. To configure firewalld to enable access to the NFS exports immediately, run:
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=nfs
+Reload the firewalld rules so the new rule gets applied.
+
+[root@serverX ~]# firewall-cmd --reload
+Install the provided keytab on the desktopX system, which will act as the NFS client. Mount the krb5p-secured share on the desktopX system:
+
+[root@desktopX ~]# wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/desktopX.keytab
+NFS uses the nfs-secure service on the client side to help negotiate and manage communication with the server when connecting to Kerberos-secured shares. It must be running to use the secured NFS shares; start and enable it to ensure it is always available on the desktopX system.
+
+[root@desktopX ~]# systemctl enable nfs-secure
+ln -s '/usr/lib/systemd/system/nfs-secure.service'  ...
+[root@desktopX ~]# systemctl start nfs-secure
+NOTE
+The nfs-secure service is part of the nfs-utils package, which should be installed by default. If it is not installed, run:
+
+[root@desktopX ~]# yum -y install nfs-utils
+The mount point must exist to mount the krb5p-secured export from serverX on the desktopX system. /mnt/securedexport is created on the desktopX system.
+
+[root@desktopX ~]# mkdir /mnt/securedexport
+The exported directory now can be mounted on the desktopX system with krb5p security enabled.
+
+[root@desktopX ~]# mount -o sec=krb5p serverX:/securedexport /mnt/securedexport
+To clean up for the next demonstration, the /mnt/securedexport mount point needs to be unmounted on the desktopX system.
+
+[root@desktopX ~]# umount /mnt/securedexport
+SELinux and labeled NFS
+SELinux offers additional security by locking down the capabilities of services provided in Red Hat Enterprise Linux. By default, NFS mounts have the SELinux context nfs_t, independent of the SELinux context they have on the server that provides the export.
+
+This behavior can be changed on the client side by using the mount option context="selinux_context". The following example mounts the NFS export and enforces the SELinux context: system_u:object_r:public_content_rw_t:s0:
+
+[root@serverX ~]# mount -o context="system_u:object_r:public_content_rw_t:s0" serverX:/myshare /mnt/nfsexport
+The NFS server can be forced to properly export the SELinux context of a share by switching to NFS version 4.2. This specification currently only exists as an Internet draft. It is already implemented in the NFS server shipped by Red Hat Enterprise Linux 7, but needs to be turned on explicitly.
+
+To enable NFS version 4.2 on the serverX system to export the SELinux labels, change the RPCNFSDARGS="" line in the /etc/sysconfig/nfs file to:
+
+RPCNFSDARGS="-V 4.2"
+The nfs-server or nfs-secure-server respectively require a restart.
+
+[root@serverX ~]# systemctl restart nfs-server
+[root@serverX ~]# systemctl restart nfs-secure-server
+On the client side, mount -o v4.2 must be specified as the mount option.
+
+[root@desktopX ~]# mount -o sec=krb5p,v4.2 serverX:/securedexport /mnt/securedexport
+For testing purposes, a new file with the name selinux.txt is created in the exported directory /securedexport. After creation, the SELinux type is changed to public_content_t.
+
+[root@serverX ~]# touch /securedexport/selinux.txt
+[root@serverX ~]# chcon -t public_content_t /securedexport/selinux.txt
+All SELinux labels are now properly handled by serverX and forwarded to the client system desktopX.
+
+[root@desktopX ~]# ls -Z /mnt/securedexport/
+-rw-r--r--. root root unconfined_u:object_r:public_content_t:s0 selinux.txt
+NOTE
+In a default installation of Red Hat Enterprise Linux 7, the nfs_export_all_ro and nfs_export_all_rw SELinux Booleans are both enabled. This allows the NFS daemon to read and write almost any file. To lock down the capabilities of the NFS server, disable these Booleans. For content to be readable by NFS, it should have the public_content_t or nfs_t SELinux context. For content to be both readable and writable, it should have the public_content_rw_t or nfs_t context. If the public_content_rw_t context is used, the nfsd_anon_write Boolean must be enabled to allow writes. Additional NFS-related SELinux information can be found in the nfsd_selinux(8) man page, which is provided by the selinux-policy-devel RPM package.
+
+REFERENCES
+nfs(5), mount(8), mount.nfs(8), exportfs(8), exports(5), and nfsd_selinux(8) man pages
+
+
+
+
+Guided Exercise: Practice: Protecting NFS Exports
+In this lab, you will use NFS to provide shared storage protected with Kerberos and SELinux.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+The NFS server exports a Kerberized NFS share on serverX with SELinux labels. The NFS export is mounted on desktopX with krb5p security and SELinux labels available.
+
+Reset the serverX system.
+
+Reset the desktopX system.
+
+Log into and set up your server system.
+
+[student@serverX ~]$ lab nfskrb5 setup
+Log into and set up your desktop system.
+
+[student@desktopX ~]$ lab nfskrb5 setup
+Become root on your serverX system.
+
+[student@serverX ~]$ sudo -i
+Become root on your desktopX system.
+
+[student@desktopX ~]$ sudo -i
+Configure the NFS server on serverX to meet the following requirements:
+
+Share the newly created /securenfs directory on serverX with krb5p security.
+
+Allow read and write access on the share from the desktopX system.
+
+SELinux labels are exported.
+
+The NFS share is mounted on the /mnt/secureshare desktopX with krb5p security and exported SELinux labels.
+
+Preconfigured krb5 keytabs for the serverX and desktopX systems are available at:
+
+http://classroom.example.com/pub/keytabs/serverX.keytab.
+
+http://classroom.example.com/pub/keytabs/desktopX.keytab.
+
+Successfully grade the setup on desktopX and serverX with lab nfskrb5 grade.
+
+Configure NFS to share the newly created /securenfs directory on serverX with krb5p security. Allow read and write access from the desktopX system. The SELinux labels on the shared directory are exported.
+
+Install the keytab provided at http://classroom.example.com/pub/keytabs/serverX.keytab on the serverX system.
+
+[root@serverX ~]# wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/serverX.keytab
+Enable NFS version 4.2 on the serverX system to export the SELinux labels. To do that, change the RPCNFSDARGS="" line in the /etc/sysconfig/nfs file to:
+
+RPCNFSDARGS="-V 4.2"
+Start the nfs-secure-server service on the serverX system.
+
+[root@serverX ~]# systemctl start nfs-secure-server
+Enable nfs-secure-server to start at system boot on serverX.
+
+[root@serverX ~]# systemctl enable nfs-secure-server
+Create the directory /securenfs on serverX.
+
+[root@serverX ~]# mkdir /securenfs
+Add the directory /securenfs to the /etc/exports file to export it with NFS. Enable krb5p security to secure access to the NFS share. Allow read and write access to the exported directory from the desktopX system.
+
+[root@serverX ~]# echo '/securenfs desktopX(sec=krb5p,rw)' >>/etc/exports
+Reload the /etc/exports file on the serverX system.
+
+[root@serverX ~]# exportfs -r
+Configure firewalld to allow access to the NFS service on serverX.
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=nfs
+Reload the firewalld configuration to allow access to the NFS service instantly on serverX.
+
+[root@serverX ~]# firewall-cmd --reload
+Mount the krb5p-secured NFS share permanently on the /mnt/secureshare mount point so that all exported SELinux labels are present on the desktopX system.
+
+Install the keytab provided at http://classroom.example.com/pub/keytabs/desktopX.keytab on the desktopX system.
+
+[root@desktopX ~]# wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/desktopX.keytab
+Start the nfs-secure service on desktopX to help with negotiating authentication with a Kerberized NFS share.
+
+[root@desktopX ~]# systemctl start nfs-secure
+Enable the nfs-secure service to start at system boot on desktopX.
+
+[root@desktopX ~]# systemctl enable nfs-secure
+Create the mount point /mnt/secureshare on the desktopX system.
+
+[root@desktopX ~]# mkdir /mnt/secureshare
+Create the entry in the /etc/fstab file to mount the /securenfs share exported by the serverX system on the /mnt/secureshare mount point on desktopX so that the SELinux labels from the share are shown on the mount point.
+
+serverX:/securenfs /mnt/secureshare nfs defaults,v4.2,sec=krb5p 0 0
+Mount the exported NFS share on the newly created /mnt/secureshare directory on the desktopX system and verify the /etc/fstab entry works as expected.
+
+[root@desktopX ~]# mount -a
+Test the setup with the newly created file /securenfs/testfile.txt with the content "Hello World" on the serverX machine. Set the SELinux context to public_content_t on the file /securenfs/testfile.txt on serverX. Change the ownership of the /securenfs/testfile.txt file to ldapuserX:ldapuserX and the permissions to 644. Verify that the SELinux context and the permissions are present on the mounted share on the desktopX system. Verify that user ldapuserX has read and write access on the /mnt/secureshare/testfile.txt file on desktopX.
+
+Create a new file /securenfs/testfile.txt with the content "Hello World" on the serverX machine.
+
+[root@serverX ~]# echo "Hello World" > /securenfs/testfile.txt
+Set the SELinux context to public_content_t on the file /securenfs/testfile.txt on serverX.
+
+[root@serverX ~]# chcon -t public_content_t /securenfs/testfile.txt
+Change the ownership of the /securenfs/testfile.txt file to ldapuserX:ldapuserX on serverX.
+
+[root@serverX ~]# chown ldapuserX:ldapuserX /securenfs/testfile.txt
+Change the permissions of the /securenfs/testfile.txt file to 644 on the serverX system.
+
+[root@serverX ~]# chmod 644 /securenfs/testfile.txt
+Verify the SELinux context is exported on the desktopX system and available on the mounted share.
+
+[root@desktopX ~]# ls -Z /mnt/secureshare
+-rw-r--r--. ldapuserX ldapuserX unconfined_u:object_r:public_content_t:s0 testfile.txt
+Log into the desktopX system as ldapuserX with password kerberos by using ssh.
+
+[root@desktopX ~]# ssh ldapuserX@desktopX
+...
+ldapuserX@desktopX's password: kerberos
+Creating home directory for ldapuserX
+Verify the file /mnt/secureshare/testfile.txt is writable by the Kerberos-authenticated ldapuserX.
+
+[ldapuserX@desktopX ~]$ echo "I can write" >>/mnt/secureshare/testfile.txt
+[ldapuserX@desktopX ~]$ cat /mnt/secureshare/testfile.txt
+Hello World
+I can write
+Run the grading script on both serverX and desktopX:
+
+[student@serverX ~]$ lab nfskrb5 grade
+[student@desktopX ~]$ lab nfskrb5 grade
+
+
+
+
+

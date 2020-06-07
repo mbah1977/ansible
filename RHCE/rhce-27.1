@@ -1,0 +1,572 @@
+Chapter 27. Bash Conditionals and Control Structures
+Enhancing Bash Shell Scripts with Conditionals and Control Structures
+Guided Exercise: Practice: Enhancing Bash Shell Scripts with Conditionals and Control Structures
+Lab: Lab: Bash Conditionals and Control Structures
+Abstract
+
+Overview
+Goal	To use Bash conditionals and other control structures to write more sophisticated shell commands and scripts.
+Objectives	
+Incorporate the use of positional parameters, exit status, test conditions, and conditional structures to implement flow control in Bash shell scripts.
+
+Sections	
+Enhancing Bash Shell Scripts with Conditionals and Control Structures (and Practice)
+
+Lab	
+Bash Conditionals and Control Structures
+
+Enhancing Bash Shell Scripts with Conditionals and Control Structures
+In this section, students learned how to:
+
+Extend script functionality with the use of positional parameters.
+
+Evaluate exit status to verify success or failure of program execution.
+
+Perform tests on script inputs, files, and directories with the test command.
+
+Utilize if/then and case statements to perform different actions for different conditions.
+
+Objectives
+After completing this section, students should be able to incorporate the use of positional parameters, exit status, test conditions, and conditional structures to implement flow control in Bash shell scripts.
+
+Using Bash special variables
+While user-defined variables provide a means for script authors to create containers to store values used by a script, Bash also provides some predefined variables, which can be useful when writing shell scripts. One type of predefined variable is positional parameters.
+
+Positional parameters
+
+Positional parameters are variables which store the values of command-line arguments to a script. The variables are named numerically. The variable 0 refers to the script name itself. Following that, the variable 1 is predefined with the first argument to the script as its value, the variable 2 contains the second argument, and so on. The values can be referenced with the syntax $1, $2, etc.
+
+NOTE
+While rare, when referencing values past the ninth positional parameter, the brace-quoted form of variable expansion must be used. For example, the value of the tenth positional argument must be referenced with the syntax ${10} rather than $10. Otherwise, Bash will expand the '$1' in $10 to the value of the first positional argument to the script.
+
+Bash provides special variables to refer to positional parameters: $* and $@. Both of these variables refer to all arguments in a script, but with a slight difference. When $* is used, all of the arguments are seen as a single word. However, when $@ is used, each argument is seen as a separate word. This is demonstrated in the following example.
+
+[student@serverX bin]$ cat showargs
+#!/bin/bash
+
+for ARG in "$*"; do
+	echo $ARG
+done
+
+[student@serverX bin]$ ./showargs 1 2 3
+1 2 3
+
+[student@serverX bin]$ cat showargs
+#!/bin/bash
+
+for ARG in "$@"; do
+	echo $ARG
+done
+
+[student@serverX bin]$ ./showargs 1 2 3
+1
+2
+3
+Another value which may be useful when working with positional parameters is $#, which represents the number of command-line arguments passed to a script. This value can be used to verify whether any arguments, or the correct number of arguments, are passed to a script.
+
+[student@serverX bin]$ cat countargs
+#!/bin/bash
+echo "There are $# arguments."
+
+[student@serverX bin]$ ./countargs
+There are 0 arguments.
+
+[student@serverX bin]$ ./countargs 1 2 3
+There are 3 arguments.
+Evaluating exit codes
+Every command returns an exit status, also commonly referred to as return status or exit code. A successful command exits with an exit status of 0. Unsuccessful commands exit with a nonzero exit status. Upon completion, a command's exit status is passed to the parent process and stored in the ? variable. Therefore, the exit status of an executed command can be retrieved by displaying the value of $?. The following examples demonstrate the execution and exit status retrieval of several common commands.
+
+[student@serverX bin]$ 
+ls /etc/hosts
+
+/etc/hosts
+
+[student@serverX bin]$ echo $?
+0
+
+[student@serverX bin]$ ls /etc/nofile
+ls: cannot access /etc/nofile: No such file or directory
+
+[student@serverX bin]$ echo $?
+2
+
+[student@serverX bin]$ grep localhost /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+[student@serverX bin]$ echo $?
+0
+
+[student@serverX bin]$ grep random /etc/hosts
+
+[student@serverX bin]$ echo $?
+1
+Using exit codes within a script
+
+Once executed, a script will exit when it has processed all of its contents. However, there may be times when it is desirable to exit a script midway through, such as when an error condition is encountered. This can be accomplished with the use of the exit command within a script. When a script encounters the exit command, it will exit immediately and skip the processing of the remainder of the script.
+
+The exit command can be executed with an optional integer argument between 0 and 255, which represents an exit code. An exit code value of 0 represents no error. All other nonzero values indicate an error exit code. Script authors can use different nonzero values to differentiate between different types of errors encountered. This exit code is passed back to the parent process, which stores it in the ? variable and can be accessed with $? as demonstrated in the following examples.
+
+[student@serverX bin]$ cat hello
+#!/bin/bash
+echo "Hello, world"
+exit 0
+
+[student@serverX bin]$ ./hello
+Hello, world
+
+[student@serverX bin]$ echo $?
+0
+[student@serverX bin]$ cat hello
+#!/bin/bash
+echo "Hello, world"
+exit 1
+
+[student@serverX bin]$ ./hello
+Hello, world
+
+[student@serverX bin]$ echo $?
+1
+If the exit command is called without an argument, then the script will exit and pass on to the parent process the exit status of the last command executed.
+
+Testing script inputs
+To ensure that scripts are not easily derailed by unexpected conditions, it is good practice for script authors to not make assumptions regarding inputs, such as command-line arguments, user inputs, command substitutions, variable expansions, file name expansions, etc. Integrity checking can be performed by using Bash's test feature. Tests can be performed using Bash's test command syntax, [ <TESTEXPRESSION> ]. They can also be performed using Bash's newer extended test command syntax, [[ <TESTEXPRESSION> ]], which has been available since Bash version 2.02.
+
+Like all commands, the test command produces an exit code upon completion, which is stored as the value $?. To see the conclusion of a test, simply display the value of $? immediately following the execution of the test command. Once again, an exit status value of 0 indicates the test succeeded, while nonzero values indicate the test failed.
+
+Performing comparison tests
+
+Comparison test expressions make use of binary comparison operators. These operators expect two objects, one on each side of the operator, and evaluate the two for equality and inequality. Bash uses a different set of operators for string and numeric comparisons, and uses the following syntax format:
+
+[ <ITEM1> <BINARY COMPARISON OPERATOR> <ITEM2> ]
+Bash's numeric comparison is limited to integer comparison. The following list of binary comparison operators is used in Bash for integer comparison.
+
+Operator	Meaning	Example
+-eq	is equal to	[ "$a" -eq "$b" ]
+-ne	is not equal to	[ "$a" -ne "$b" ]
+-gt	is greater than	[ "$a" -gt "$b" ]
+-ge	is greater than or equal to	[ "$a" -ge "$b" ]
+-lt	is less than	[ "$a" -lt "$b" ]
+-le	is less than or equal to	[ "$a" -le "$b" ]
+The following examples demonstrate the use of Bash's numeric comparison operators.
+
+[student@serverX ~]$ [ 1 -eq 1 ]; echo $?
+0
+[student@serverX ~]$ [ 1 -ne 1 ]; echo $?
+1
+[student@serverX ~]$ [ 8 -gt 2 ]; echo $?
+0
+[student@serverX ~]$ [ 2 -ge 2 ]; echo $?
+0
+[student@serverX ~]$ [ 2 -lt 2 ]; echo $?
+1
+[student@serverX ~]$ [ 1 -lt 2 ]; echo $?
+0
+Bash's string comparison uses the following binary operators.
+
+Operator	Meaning	Example
+=	is equal to	[ "$a" = "$b" ]
+==	is equal to	[ "$a" == "$b" ]
+!=	is not equal to	[ "$a" != "$b" ]
+The following examples demonstrate the use of Bash's string comparison operators.
+
+[student@serverX ~]$ [ abc = abc ]; echo $?
+0
+[student@serverX ~]$ [ abc == def ]; echo $?
+1
+[student@serverX ~]$ [ abc != def ]; echo $?
+0
+Bash also has a few unary operators available for string evaluation. Unary operators evaluate just one item using the following format.
+
+[ <UNARY OPERATOR> <ITEM> ]
+The following table shows Bash's unary operators for string evaluation.
+
+Operator	Meaning	Example
+-z	string is zero length (null)	[ -z "$a" ]
+-n	string is not null	[ -n "$a" ]
+The following examples demonstrate the use of Bash's string unary operators.
+
+[student@serverX ~]$ STRING=''; [ -z "$STRING" ]; echo $?
+0
+[student@serverX ~]$ STRING='abc'; [ -n "$STRING" ]; echo $?
+0
+Testing files and directories
+
+Bash's string and binary operators allow users to implement the good practice of not assuming the integrity of inputs to a shell script. The same caution should be utilized when scripts interact with external entities, such as files and directories. Bash offers a large number of test operators for this purpose, as listed in the following table.
+
+Operator	Meaning	Example
+-b	file exists and is block special	[ -b <FILE> ]
+-c	file exists and is character special	[ -c <FILE> ]
+-d	file exists and is a directory	[ -d <DIRECTORY> ]
+-e	file exists	[ -e <FILE> ]
+-f	file is a regular file	[ -f <FILE> ]
+-L	file exists and is a symbolic link	[ -L <FILE> ]
+-r	file exists and read permission is granted	[ -r <FILE> ]
+-s	file exists and has a size greater than zero	[ -s <FILE> ]
+-w	file exists and write permission is granted	[ -w <FILE> ]
+-x	file exists and execute (or search) permission is granted	[ -x <FILE> ]
+Bash also offers a few binary comparison operators for performing file comparison. These operators are defined in the following table.
+
+Operator	Meaning	Example
+-ef	FILE1 has the same device and inode number as FILE2	[ <FILE1> -ef <FILE2> ]
+-nt	FILE1 has newer modification date than FILE2	[ <FILE1> -nt <FILE2> ]
+-ot	FILE1 has older modification date than FILE2	[ <FILE1> -ot <FILE2> ]
+NOTE
+The space characters on the inside of the brackets of the test expression, as well as those used to separate the elements within the test expression, are not there for readability, but rather are required for the proper evaluation of the expression. If any of these space characters are missing, the test will either fail or produce inaccurate or unexpected results.
+
+Logical AND, OR operators
+
+Situations may arise where it may be useful to test more than one condition. Bash's logical AND operator, &&, allows users to perform a compound condition test to see if both of two conditions are true. On the other hand, Bash's logical OR operator, ||, allows users to test whether one of two conditions are true. The following examples demonstrate the use of Bash's logical AND and OR operators.
+
+[student@serverX ~]$ [ 2 -gt 1 ] && [ 1 -gt 0 ]; echo $?
+0
+[student@serverX ~]$ [ 2 -gt 1 ] && [ 1 -gt 2 ]; echo $?
+1
+[student@serverX ~]$ [ 2 -gt 1 ] || [ 1 -gt 2 ]; echo $?
+0
+[student@serverX ~]$ [ 0 -gt 1 ] || [ 1 -gt 2 ]; echo $?
+1
+Using conditional structures
+Simple shell scripts represent a collection of commands which are executed from beginning to end. Conditional structures allow users to incorporate decision making into shell scripts, so that certain portions of the script are executed only when certain conditions are met.
+
+If/then statement
+
+The simplest of the conditional structures in Bash is the if/then construct, which has the following syntax.
+
+if <CONDITION>; then
+      <STATEMENT>
+      ...
+      <STATEMENT>
+    fi
+With this construct, if a given condition is met, one or more actions are taken. If the given condition is not met, then no action is taken. The numeric, string, and file tests previously demonstrated are frequently utilized for testing the conditions in if/then statements. The following code section demonstrates the use of an if/then statement to start the psacct service if it is not active.
+
+systemctl is-active psacct > /dev/null 2>&1
+
+if  [ $? -ne 0 ]; then
+  systemctl start psacct
+fi
+If/then/else statement
+
+The if/then conditional structure can be further expanded so that different sets of actions can be taken depending on whether a condition is met. This is accomplished with the if/then/else conditional construct.
+
+if <CONDITION>; then
+      <STATEMENT>
+      ...
+      <STATEMENT>
+    else
+      <STATEMENT>
+      ...
+      <STATEMENT>
+fi
+The following code section demonstrates the use of an if/then/else statement to start the psacct service if it is not active and to stop it if it is active.
+
+systemctl is-active psacct > /dev/null 2>&1
+
+if  [ $? -ne 0 ]; then
+  systemctl start psacct
+else
+  systemctl stop psacct
+fi
+If/then/elif/then/else statement
+
+Lastly, the if/then/else conditional structure can be further expanded to test more than one condition, executing a different set of actions when a condition is met. The construct for this is shown in the following example. In this conditional structure, Bash will test the conditions in the order presented. Upon finding a condition that is true, Bash will execute the actions associated with the condition and then skip the remainder of the conditional structure. If none of the conditions are true, then Bash will execute the actions enumerated in the else clause.
+
+if <CONDITION>; then
+      <STATEMENT>
+      ...
+      <STATEMENT>
+    elif <CONDITION>; then
+      <STATEMENT>
+      ...
+      <STATEMENT>
+    else
+      <STATEMENT>
+      ...
+      <STATEMENT>
+    fi
+The following code section demonstrates the use of an if/then/elif/then/else statement to run the mysql client if the mariadb service is active, run the psql client if the postgresql service is active, or run the sqlite3 client if both the mariadb and postgresql services are not active.
+
+systemctl is-active mariadb > /dev/null 2>&1
+MARIADB_ACTIVE=$?
+systemctl is-active postgresql > /dev/null 2>&1
+POSTGRESQL_ACTIVE=$?
+
+if  [ "$MARIADB_ACTIVE" -eq 0 ]; then
+  mysql
+elif  [ "$POSTGRESQL_ACTIVE" -eq 0 ]; then
+  psql
+else
+  sqlite3
+fi
+Case statement
+
+Users can add as many elif clauses as they want into an if/then/elif/then/else statement to test as many conditions as they need. However, as more are added, the statement and its logic becomes increasingly harder to read and comprehend. For these more complex situations, Bash offers another conditional structure known as case statements. The case statement utilizes the following syntax:
+
+case <VALUE> in
+   <PATTERN1>)
+       <STATEMENT>
+       ...
+       <STATEMENT>
+       ;;
+   <PATTERN2>)
+       <STATEMENT>
+       ...
+       <STATEMENT>
+       ;;
+esac
+The case statement attempts to match <VALUE> to each <PATTERN> in order, one by one. When a pattern matches, the code segment associated with that pattern is executed, with the ;; syntax indicating the end of the block. All other patterns remaining in the case statement are then skipped and the case statement is exited. As many pattern/statement blocks as needed can be added.
+
+To mimic the behavior of an else clause in an if/then/elif/then/else construct, simply use * as the final pattern in the case statement. Since this expression matches anything, it has the effect of executing a set of commands if none of the other patterns are matched.
+
+The case statements are widely used in init scripts. The following code section is an example of how they are commonly used to take different actions, depending on the argument passed to the script.
+
+case "$1" in
+   start)
+       start
+       ;;
+   stop)
+       rm -f $lockfile
+       stop
+       ;;
+   restart)
+       restart
+       ;;
+   reload)
+       reload
+       ;;
+   status)
+       status
+       ;;
+   *)
+       echo "Usage: $0 (start|stop|restart|reload|status)"
+       ;;
+esac
+If the actions to be taken are the same for more than one pattern in a case statement, the patterns can be combined to share the same action block, as demonstrated in the following example. The pipe character, |, is used to separate the multiple patterns.
+
+case "$1" in
+   ...
+   reload|restart)
+       restart
+       ;;
+   ...
+esac
+REFERENCES
+bash(1) and test(1) man pages
+
+ii
+
+
+
+
+
+Guided Exercise: Practice: Enhancing Bash Shell Scripts with Conditionals and Control Structures
+In this lab, you will create a Bash shell script to automate the process of creating Apache virtual hosts.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+A Bash script which automates the process of creating Apache virtual host configuration files and a document root directory. The script will perform the necessary checks to accommodate first-time execution of the script on a server, as well as ensure that virtual host conflicts do not occur.
+
+Reset serverX.
+
+Log into serverX and become root with sudo -i.
+
+Your company provides web hosting service to customers, and you have been tasked with writing a Bash shell script called /usr/local/sbin/mkvhost to automate the many steps involved in setting up an Apache name-based virtual host for your customers. The script will be used for virtual host creation on all servers going forward, so it needs to also be able to accommodate the one-time tasks that are executed the first time a new server is configured for name-based virtual hosting.
+
+The script will take two arguments. The first argument will be the fully qualified domain name of the new virtual host. The second argument will be a number between 1 and 3, which represents the support tier that the customer purchased. The support tier determines the support email address, which will be set with the Apache ServerAdmin directive for the virtual host.
+
+The script will create a configuration file under /etc/httpd/conf.vhosts.d with the name <VIRTUALHOSTNAME>.conf for each virtual host. It will also create a document root directory for the virtual host at /srv/<VIRTUALHOSTNAME>/www. Prior to creating the virtual host configuration file and document root directory, the script will check to make sure they do not already exist to ensure there will not be a conflict.
+
+Install the httpd package, then enable and start httpd.
+
+Install the httpd package with yum.
+
+[root@serverX ~]# yum install -y httpd
+Enable and start httpd.
+
+[root@serverX ~]# systemctl enable httpd
+ln -s '/usr/lib/systemd/system/httpd.service' '/etc/systemd/system/multi-user.target.wants/httpd.service'
+[root@serverX ~]# systemctl start httpd
+Begin writing your script. Store the first and second argument of the script in the VHOSTNAME and TIER variables, respectively. Set the following variables:
+
+Variable	Value
+HTTPDCONF	/etc/httpd/conf/httpd.conf
+VHOSTCONFDIR	/etc/httpd/conf.vhosts.d
+DEFVHOSTCONFFILE	$VHOSTCONFDIR/00-default-vhost.conf
+VHOSTCONFFILE	$VHOSTCONFDIR/$VHOSTNAME.conf
+WWWROOT	/srv
+DEFVHOSTDOCROOT	$WWWROOT/default/www
+VHOSTDOCROOT	$WWWROOT/$VHOSTNAME/www
+Create the new script file with a text editor.
+
+[root@serverX ~]# vim /usr/local/sbin/mkvhost
+Specify the interpreter program for the script.
+
+#!/bin/bash
+Set the variables for the arguments.
+
+# Variables
+VHOSTNAME=$1
+TIER=$2
+Set the other variables.
+
+HTTPDCONF=/etc/httpd/conf/httpd.conf
+VHOSTCONFDIR=/etc/httpd/conf.vhosts.d
+DEFVHOSTCONFFILE=$VHOSTCONFDIR/00-default-vhost.conf
+VHOSTCONFFILE=$VHOSTCONFDIR/$VHOSTNAME.conf
+WWWROOT=/srv
+DEFVHOSTDOCROOT=$WWWROOT/default/www
+VHOSTDOCROOT=$WWWROOT/$VHOSTNAME/www
+Check the argument values in the VHOSTNAME and TIER variables. If either is blank, display the message "Usage: mkvhost VHOSTNAME TIER" and exit with a status of 1. If the arguments are passed correctly, then use a case statement to set a VHOSTADMIN variable to the proper support email address, based on the value of $TIER. The case statement will use the $TIER values of 1, 2, and 3 to set VHOSTADMIN to the corresponding support email address. If any other $TIER value is encountered, the case statement should display the message "Invalid tier specified." and exit with a status of 1.
+
+TIER	$VHOSTADMIN
+1	basic_support@example.com
+2	business_support@example.com
+3	enterprise_support@example.com
+Create the if/then/else/fi statement. Use an OR conditional to check whether either of the arguments is blank and, if so, display the usage message and exit with a status of 1.
+
+# Check arguments
+if [ "$VHOSTNAME"  = '' ] || [ "$TIER" = '' ]; then
+        echo "Usage: $0 VHOSTNAME TIER"
+        exit 1
+else
+Create the case statement.
+
+# Set support email address
+        case $TIER in
+                1)      VHOSTADMIN='basic_support@example.com'
+                        ;;
+                2)      VHOSTADMIN='business_support@example.com'
+                        ;;
+                3)      VHOSTADMIN='enterprise_support@example.com'
+                        ;;
+                *)      echo "Invalid tier specified."
+                        exit 1
+                        ;;
+        esac
+Close the if statement.
+
+fi
+Check to see if the $VHOSTCONFDIR directory is nonexistent. If so, create the directory. Check the exit status of the directory creation and display the error message "ERROR: Failed creating $VHOSTCONFDIR" if the directory creation failed.
+
+# Create conf directory one time if non-existent
+if [ ! -d $VHOSTCONFDIR ]; then
+        mkdir $VHOSTCONFDIR
+
+        if [ $? -ne 0 ]; then
+                echo "ERROR: Failed creating $VHOSTCONFDIR."
+                exit 1 # exit 1
+        fi
+fi
+For Apache to be aware of the $VHOSTCONFDIR directory, you must have an include statement in $HTTPDCONF. Check to see if the following entry exists in the configuration file. If not, make a backup of the file to $HTTPDCONF.orig and then append the entry to the end of the configuration file. Check the exit status of the file modification and display the error message "ERROR: Failed adding include directive" if it failed.
+
+IncludeOptional conf\.vhosts\.d/\*\.conf
+# Add include one time if missing
+grep -q '^IncludeOptional conf\.vhosts\.d/\*\.conf$' $HTTPDCONF
+
+if [ $? -ne 0 ]; then
+        # Backup before modifying
+        cp -a $HTTPDCONF $HTTPDCONF.orig
+
+        echo "IncludeOptional conf.vhosts.d/*.conf" >> $HTTPDCONF
+
+        if [ $? -ne 0 ]; then
+                echo "ERROR: Failed adding include directive."
+                exit 1
+        fi
+fi
+Check to see if a default virtual host already exists and, if not, create it.
+
+Verify if the default virtual host configuration file already exists and, if not, create and populate it with the following statement:
+
+cat <<DEFCONFEOF > $DEFVHOSTCONFFILE
+<VirtualHost _default_:80>
+  DocumentRoot $DEFVHOSTDOCROOT
+  CustomLog "logs/default-vhost.log" combined
+</VirtualHost>
+
+<Directory $DEFVHOSTDOCROOT>
+  Require all granted
+</Directory>
+DEFCONFEOF
+# Check for default virtual host
+if [ ! -f $DEFVHOSTCONFFILE ]; then
+        cat <<DEFCONFEOF > $DEFVHOSTCONFFILE
+<VirtualHost _default_:80>
+  DocumentRoot $DEFVHOSTDOCROOT
+  CustomLog "logs/default-vhost.log" combined
+</VirtualHost>
+
+<Directory $DEFVHOSTDOCROOT>
+  Require all granted
+</Directory>
+DEFCONFEOF
+fi
+Verify if the default virtual host document root directory already exists and, if not, create it.
+
+if [ ! -d $DEFVHOSTDOCROOT ]; then
+        mkdir -p $DEFVHOSTDOCROOT
+        restorecon -Rv /srv/
+fi
+Check to see if the virtual host's configuration file already exists and, if so, display the error message "ERROR: $VHOSTCONFFILE already exists." and exit with a status of 1. Check to see if the virtual host's document root directory already exists and, if so, display the error message "ERROR: $VHOSTDOCROOT already exists." and exit with a status of 1. If no errors are encountered with the previous two checks, continue with the creation of the virtual host configuration file, $VHOSTCONFFILE, and document root directory, $VHOSTDOCROOT. Populate the virtual host configuration file with the following here statement:
+
+cat <<CONFEOF > $VHOSTCONFFILE
+<VirtualHost *:80>
+  ServerName $VHOSTNAME
+  ServerAdmin $VHOSTADMIN
+  DocumentRoot $VHOSTDOCROOT
+  ErrorLog "logs/${VHOSTNAME}_error_log"
+  CustomLog "logs/${VHOSTNAME}_access_log" common
+</VirtualHost>
+
+<Directory $VHOSTDOCROOT>
+  Require all granted
+</Directory>
+CONFEOF
+# Check for virtual host conflict
+if [ -f $VHOSTCONFFILE ]; then
+        echo "ERROR: $VHOSTCONFFILE already exists."
+        exit 1
+elif [ -d $VHOSTDOCROOT ]; then
+        echo "ERROR: $VHOSTDOCROOT already exists."
+        exit 1
+else
+        cat <<CONFEOF > $VHOSTCONFFILE
+<Directory $VHOSTDOCROOT>
+  Require all granted
+  AllowOverride None
+</Directory>
+
+<VirtualHost *:80>
+  DocumentRoot $VHOSTDOCROOT
+  ServerName $VHOSTNAME
+  ServerAdmin $VHOSTADMIN
+  ErrorLog "logs/${VHOSTNAME}_error_log"
+  CustomLog "logs/${VHOSTNAME}_access_log" common
+</VirtualHost>
+CONFEOF
+
+        mkdir -p $VHOSTDOCROOT
+        restorecon -Rv $WWWROOT
+fi
+Verify the syntax of the configuration file with the command apachectl configtest. If there are no errors, then reload httpd.service. Otherwise, display the error message "ERROR: Configuration error." and exit with a status of 1.
+
+# Check config and reload
+apachectl configtest &> /dev/null
+
+if [ $? -eq 0 ]; then
+        systemctl reload httpd &> /dev/null
+else
+        echo "ERROR: Config error."
+        exit 1
+fi
+Save and execute the script.
+
+Make the script executable.
+
+[root@serverX ~]# chmod u+x /usr/local/sbin/mkvhost
+Execute the script.
+
+[root@serverX ~]# /usr/local/sbin/mkvhost wwwX.example.com 3
+

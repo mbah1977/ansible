@@ -1,0 +1,101 @@
+Lab: Lab: Writing Bash Scripts
+In this lab, you will write a simple Bash script to automate the creation of user accounts.
+
+Resources:
+Files:	/tmp/support/newusers
+Machines:	serverX
+Outcomes:
+
+A shell script, /usr/local/sbin/mkaccounts, which creates new user accounts based on information provided in a data file.
+
+Reset serverX.
+
+Log into serverX and become the root user with sudo -i.
+
+Run lab bashbasic setup.
+
+Your company provides hosting service to customers, and you have been tasked with writing a Bash shell script called /usr/local/sbin/mkaccounts to automate the process of creating accounts for new customers. At the end of each day, a colon-separated data file called /tmp/support/newusers is created and contains information on new customers that have signed up. The script will read through this data file and create a user account for each new customer.
+
+The sales department has requested that the script also generate a report breaking down the new customers by support tier, so sales staff can stay informed regarding trends of support tier purchases. For each support tier, they would like the report to detail the total number of new customers and the percentage of the day's new customers that chose the tier type.
+
+Once you have completed the script, run lab bashbasic grade to verify its functionality.
+
+Create your script. Set the file name, /tmp/support/newusers, as the value of the variable NEWUSERSFILE.
+
+Create the new script with a text editor.
+
+[root@serverX ~]# vim /usr/local/sbin/mkaccounts
+Specify the interpreter program for the script.
+
+#!/bin/bash
+Set the NEWUSERSFILE variable.
+
+# Variables
+NEWUSERSFILE=/tmp/support/newusers
+Loop through the entries in the $NEWUSERSFILE data file and extract the values of the first, second, and last fields to obtain the first name, last name, and support tier level of each new customer. Create an account for each new customer such that the account name is the lowercase combination of their first initial and last name (i.e., jdoe) and the comment of the account is their full name (i.e., John Doe).
+
+Read through the entries in the file by initiating a for loop in combination with command substitution.
+
+# Loop
+for ENTRY in $(cat $NEWUSERSFILE); do
+Extract and save the values of the first, second, and last fields.
+
+        # Extract first, last, and tier fields
+        FIRSTNAME=$(echo $ENTRY | cut -d: -f1)
+        LASTNAME=$(echo $ENTRY | cut -d: -f2)
+        TIER=$(echo $ENTRY | cut -d: -f4)
+Compose the account name for the new customer.
+
+        # Make account name
+        FIRSTINITIAL=$(echo $FIRSTNAME | cut -c 1 | tr 'A-Z' 'a-z')
+        LOWERLASTNAME=$(echo $LASTNAME | tr 'A-Z' 'a-z')
+
+        ACCTNAME=$FIRSTINITIAL$LOWERLASTNAME
+Create the account with the useradd command.
+
+        # Create account
+        useradd $ACCTNAME -c "$FIRSTNAME $LASTNAME"
+            
+Close the for loop.
+
+done
+Create a report summarizing the number of new customers for each support tier and what percentage of the total new user accounts the support type comprises. The report should print as follows:
+
+"Tier 1","22","44%"
+"Tier 2","15","30%"
+"Tier 3","13","26%"
+Determine the total number of new customers and store the value in a variable.
+
+TOTAL=$(cat $NEWUSERSFILE | wc -l)
+Determine the total number of new customers for each support tier and store the totals into variables.
+
+TIER1COUNT=$(grep -c :1$ $NEWUSERSFILE)
+TIER2COUNT=$(grep -c :2$ $NEWUSERSFILE)
+TIER3COUNT=$(grep -c :3$ $NEWUSERSFILE)
+Calculate the percentages for each support tier.
+
+TIER1PCT=$[ $TIER1COUNT * 100 / $TOTAL ]
+TIER2PCT=$[ $TIER2COUNT * 100 / $TOTAL ]
+TIER3PCT=$[ $TIER3COUNT * 100 / $TOTAL ]
+Print the report.
+
+# Print report
+echo "\"Tier 1\",\"$TIER1COUNT\",\"$TIER1PCT%\""
+echo "\"Tier 2\",\"$TIER2COUNT\",\"$TIER2PCT%\""
+echo "\"Tier 3\",\"$TIER3COUNT\",\"$TIER3PCT%\""
+            
+Save and execute the script. Verify that the script performed as intended. If the script did not perform as intended, you will need to run lab bashbasic clean to purge out accounts that might have been created before rerunning your script.
+
+Make the script executable.
+
+[root@serverX ~]# chmod u+x /usr/local/sbin/mkaccounts
+Execute the script.
+
+[root@serverX ~]# /usr/local/sbin/mkaccounts
+"Tier 1","22","44%"
+"Tier 2","15","30%"
+"Tier 3","13","26%"
+Verify your script by running lab bashbasic grade.
+
+Red Hat Training + Certification logoRed Hat logo
+Priv

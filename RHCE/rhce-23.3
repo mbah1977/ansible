@@ -1,0 +1,368 @@
+Providing SMB File Shares
+In this section, students learned how to perform SMB server configuration.
+
+Objectives
+After completing this section, students should be able to share directories with clients using SMB, controlling access by username and password.
+
+What is SMB?
+Server Message Block (SMB) is the standard file-sharing protocol for Microsoft Windows servers and clients. SMB file servers can be configured in a number of different ways. One of the simplest is to configure the file servers and their clients as members of a common Windows workgroup, which announces servers and clients to the local subnet. The file servers each manage their own local user accounts and passwords independently. More sophisticated configurations may be members of a Windows domain and coordinate user authentication through a domain controller.
+
+Using a software package named Samba, Red Hat Enterprise Linux is able to act as a server for SMB file shares. Mounting SMB file shares as a client is handled by a kernel driver and utilities included in the cifs-utils package.
+
+SMB file sharing with Samba
+The Samba service can share Linux file systems as SMB network file shares. This section will cover the basic configuration steps needed for a Samba server to provide a file share to the members of a Windows workgroup, managing its own users locally. It will not discuss the more complex configuration required to make the Samba server a member of a Windows domain.
+
+The basic steps that must be performed in order to configure Samba to provide an SMB file share as a workgroup member are:
+
+Install the samba package.
+
+Prepare the permissions on the directory to be shared.
+
+Configure /etc/samba/smb.conf.
+
+Set up appropriate Linux users with NTLMv2 passwords.
+
+Start Samba and open the local firewall.
+
+Verify that the share can be mounted from a client.
+
+Installing Samba
+To deploy the Samba service on a Red Hat Enterprise Linux system, the samba package must be installed. This can be done directly, or as part of the file-server package group:
+
+[root@serverX ~]# yum install samba
+Preparing directories for sharing
+WARNING
+Do not use Samba to share a directory that is also an NFS export or a mounted NFS file system. This can result in file corruption, stale file locks, or other file access issues with the share.
+
+The directory to be shared must be created if it does not already exist.
+
+[root@serverX ~]# mkdir /sharedpath
+Users and regular permissions
+
+The permissions which should be set on the directory will depend on who needs access to it and how it will be mounted by clients.
+
+A client normally mounts a share by authenticating access to the SMB server as a particular user. All files on the share need to be readable (and possibly writable) by the user that is used to mount the share.
+
+SELinux contexts and Booleans
+
+In order for Samba to work correctly when SELinux is in enforcing mode, the directory will need to have correct SELinux contexts and certain SELinux Booleans may need to be set.
+
+If the shared directory will only be accessed through Samba, then the directory and all its subdirectories and files should be labeled samba_share_t, which gives Samba read and write access. It is best to configure the SELinux policy so that restorecon will set this type on the share and its contents if the file system is relabeled.
+
+For example, to configure restorecon so that the files in /sharedpath have the type samba_share_t, and then to relabel the directory, run:
+
+[root@serverX ~]# semanage fcontext -a -t samba_share_t '/sharedpath(/.*)?'
+[root@serverX ~]# restorecon -vvFR /sharedpath
+restorecon reset /sharedpath context unconfined_u:object_r:default_t:s0->system_u:object_r:samba_share_t:s0
+NOTE
+Samba can also serve files labeled with the SELinux types public_content_t (read-only) and public_content_rw_t (read-write). To allow read-write access to files and directories labeled public_content_rw_t, the SELinux Boolean smbd_anon_write must also be enabled.
+
+Configuring /etc/samba/smb.conf
+The main configuration file for Samba is /etc/samba/smb.conf. This file is divided into multiple sections. Each section starts with a section name in square brackets, followed by a list of parameters set to particular values.
+
+/etc/samba/smb.conf starts with a [global] section used for general server configuration. Subsequent sections each define a file share or printer share provided by the Samba server. Two special sections may exist, [homes] and [printers], which have special uses. Any line beginning with either a semicolon (;) or a hash (#) character is commented out.
+
+The [global] section
+
+The [global] section defines the basic configuration of the Samba server. There are three things which should be configured here:
+
+workgroup is used to specify the Windows workgroup for the server. Most Windows systems default to WORKGROUP, although Windows XP Home defaulted to MSHOME. This is used to help systems browse for the server using the NetBIOS for TCP/IP name service.
+
+To set the workgroup to WORKGROUP, change the existing workgroup entry in the /etc/samba/smb.conf to:
+
+workgroup = WORKGROUP
+security controls how clients are authenticated by Samba. For security = user, clients log in with a valid username and password managed by the local Samba server. This setting is the default in /etc/samba/smb.conf.
+
+hosts allow is a comma-, space-, or tab-delimited list of hosts that are permitted to access the Samba service. If it is not specified, all hosts can access Samba. If it is not specified in the [global] section, it can be set on each share separately. If it is specified in the [global] section, then it will apply to all shares, regardless of whether each share has a different setting.
+
+Hosts can be specified by host name or by source IP address. Host names are checked by reverse-resolving the IP address of the incoming connection attempt. The full syntax of this directive is described by the hosts_access(5) man page.
+
+Allowed hosts can be specified in a number of ways:
+
+IPv4 network/prefix: 172.25.0.0/24
+
+IPv4 network/netmask: 172.25.0.0/255.255.255.0
+
+If the IPv4 subnet prefix is on a byte boundary: 172.25.0.
+
+IPv6 network/prefix: [2001:db8:0:1::/64]
+
+Host name: desktop.example.com
+
+All hosts ending in example.com: .example.com
+
+For example, to restrict access to only the hosts from the 172.25.0.0/16 network using the trailing dot notation, the hosts allow entry in the /etc/samba/smb.conf configuration file would read:
+
+hosts allow = 172.25.
+To additionally allow access from all host names ending with ".example.com", the /etc/samba/smb.conf configuration file entry would be:
+
+hosts allow = 172.25. .example.com
+File share sections
+
+To create a file share, at the end of /etc/samba/smb.conf, place the share name in brackets to start a new section for the share. Some key directives should be set in this section:
+
+path must be set to indicate which directory to share; for example, path = /sharedpath.
+
+writable = yes should be set if all authenticated users should have read-write access to the share. The default setting is writable = no.
+
+If writable = no is set, a comma-separated write list of users with read-write access to the share can be provided. Users not on the list will have read-only access. Members of local groups can also be specified: write list = @management will permit all authenticated users who are members of the Linux group "management" to have write access.
+
+valid users, if set, specifies a list of users allowed to access the share. Users not on the list are not allowed to access the share. However, if the list is blank, all users can access the share.
+
+For example, to allow only user fred and members of group management read-only access to the share myshare, the section would read:
+
+[myshare]
+    path = /sharedpath
+    writable = no
+    valid users = fred, @management
+The [homes] section
+
+The [homes] section defines a special file share, which is enabled by default. This share makes local home directories available via SMB. The share name can be specified as homes, in which case the Samba server will convert it to the home directory path of the authenticating user, or as a specific username.
+
+IMPORTANT
+The samba_enable_home_dirs SELinux Boolean allows local Linux home directories to be shared by Samba to other systems. This needs to be enabled for [homes] to work (setsebool -P samba_enable_home_dirs=on).
+
+The use_samba_home_dirs Boolean, on the other hand, allows remote SMB file shares to be mounted and used as local Linux home directories. It is easy to confuse the two options.
+
+Validating /etc/samba/smb.conf
+
+To verify that there are no errors in the edited smb.conf file, the command testparm is available. Run testparm with no arguments to verify that there are no obvious syntax errors.
+
+[root@serverX ~]# testparm
+Load smb config files from /etc/samba/smb.conf
+rlimit_max: increasing rlimit_max (1024) to minimum Windows limit (16384)
+Processing section "[random]"
+Processing section "[homes]"
+Processing section "[printers]"
+Loaded services file OK.
+Server role: ROLE_STANDALONE
+Press enter to see a dump of your service definitions
+
+[global]
+	server string = Samba Server Version %v
+	log file = /var/log/samba/log.%m
+	max log size = 50
+	idmap config * : backend = tdb
+	cups options = raw
+
+[random]
+	comment = Test File Share
+	path = /srv/random
+
+[homes]
+	comment = Home Directories
+	read only = No
+	browseable = No
+
+[printers]
+	comment = All Printers
+	path = /var/spool/samba
+	printable = Yes
+	print ok = Yes
+	browseable = No
+IMPORTANT
+The directive read only = no is the same as writable = yes, which can be confusing.
+
+Preparing Samba users
+The security = user setting requires a Linux account with a Samba account that has a valid NTLM password. To create a Samba-only system user, keep the Linux password locked, and set the login shell to /sbin/nologin. This prevents the login of the user directly, or with ssh on the system.
+
+For example, to create the locked Linux account for a user fred:
+
+[root@serverX ~]# useradd -s /sbin/nologin fred
+The samba-client contains the smbpasswd command. It can create Samba accounts and set passwords.
+
+[root@serverX ~]# yum -y install samba-client
+If smbpasswd is passed a username without any options, it will attempt to change the account password. The root user can use it with the-a option to add the Samba account and set the NTLM password. The -x option can be used by root to delete a Samba account and password for a user.
+
+For example, to create a Samba account for user fred and assign an NTLM password:
+
+[root@serverX ~]# smbpasswd -a fred
+New SMB password:  redhat
+Retype new SMB password:  redhat
+...
+Added user fred.
+A more powerful tool than smbpasswd is also available for the root user, pdbedit. For example, pdbedit -L will list all users with Samba accounts configured on the system. For more information, see the pdbedit(8) man page.
+
+Starting Samba
+Use systemctl to start the Samba services immediately and enable them to start at boot time:
+
+[root@serverX ~]# systemctl start smb nmb
+[root@serverX ~]# systemctl enable smb nmb
+The two services these units start, smbd and nmbd, must communicate through the local firewall. Samba's smbd daemon normally uses TCP/445 for SMB connections. It also listens on TCP/139 for NetBIOS over TCP backward compatibility. The nmbd daemon uses UDP/137 and UDP/138 to provide NetBIOS over TCP/IP network browsing support.
+
+To configure firewalld to allow clients to talk to the local Samba services, run:
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=samba
+success
+[root@serverX ~]# firewall-cmd --reload
+success
+IMPORTANT
+Samba checks periodically to determine if /etc/samba/smb.conf has been changed. If the configuration file has changed, Samba automatically reloads it. This will not affect any connections already established to the Samba service, until the connection is closed or Samba is completely restarted.
+
+The command systemctl reload smb nmb can be used to reload the configuration file immediately, or systemctl restart smb nmb to restart Samba entirely.
+
+Mounting SMB file systems
+Regular SMB mounts
+
+The cifs-utils package can be used to mount SMB file shares on the local system, whether from a Samba server or a native Microsoft Windows server. By default, SMB mounts use a single set of user credentials (the mount credentials) for mounting the share and determining access rights to files on the share. All users on the Linux system using the mount use the same credentials to determine file access.
+
+The mount command is used to mount the share. By default, the protocol used to authenticate users is NTLMv2 password hashing encapsulated in Raw NTLMSSP messages (sec=ntlmssp), as expected by recent versions of Microsoft Windows. The mount credentials can be provided in two ways. If mounting interactively at a shell prompt, the username= option can be used to specify which SMB user to authenticate as; the user will be prompted for the password. If mounting automatically, a credentials file readable only by root containing the username and password can be provided with the credentials= option.
+
+For example, to mount the share myshare from the SMB file server serverX, authenticating as SMB user fred, who has the NTLM password redhat:
+
+[root@desktopX ~]# mkdir /mnt/myshare
+[root@desktopX ~]# mount -o username=fred //serverX/myshare /mnt/myshare
+Password for fred@//serverX/myshare:  redhat
+REFERENCES
+samba(7), smb.conf(5), testparm(1), mount(8), mount.cifs(8), smbpasswd(8), pdbedit(8), and samba_selinux(8) man pages
+
+
+
+
+Guided Exercise: Practice: Providing SMB File Shares
+In this lab, you will use SMB to provide shared storage.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+Share a directory with SMB on serverX according to the given requirements, then mount it on desktopX.
+
+Reset the desktopX system.
+
+Reset the serverX system.
+
+Become root on your serverX system.
+
+[student@serverX ~]$ sudo -i
+Become root on your desktopX system.
+
+[student@desktopX ~]$ sudo -i
+Configure a SMB share on the serverX system according to the following requirements:
+
+Share the newly created directory /smbshare with SMB.
+
+Members of the auxiliary group marketing have read and write permissions on the share.
+
+All users that are not member of the marketing group have read permission.
+
+The Samba server is in the mycompany workgroup and the share name in Samba is smbshare.
+
+Create the Samba-only user brian, who is part of the marketing team, with the password redhat.
+
+Create the new Samba-only user rob with the password redhat, who is not part of the marketing team.
+
+Successfully grade the setup on the serverX system with lab smbshare grade.
+
+Deploy the required RPM packages to run the SMB service on serverX.
+
+[root@serverX ~]# yum -y install samba
+Create the auxiliary system group marketing and the /smbshare directory on serverX. The marketing system group owns the /smbshare directory. Adjust the permissions on the /smbshare directory to have the SGID bit set, and write is prohibited by others. The SELinux context type on the /smbshare directory and all newly created files and subdirectories is samba_share_t.
+
+Create the auxiliary system group marketing on the serverX system.
+
+[root@serverX ~]# groupadd -r marketing
+Create the /smbshare directory on serverX.
+
+[root@serverX ~]# mkdir -p /smbshare
+Change the group ownership of the /smbshare directory to marketing on the serverX system.
+
+[root@serverX ~]# chgrp marketing /smbshare
+Adjust the permissions on the /smbshare directory to have the SGID bit set, and write is prohibited by others.
+
+[root@serverX ~]# chmod 2775 /smbshare
+Add the directory /smbshare, and all files shown as follows, to the SELinux policy as a directory sharing files with SMB by setting its label to samba_share_t.
+
+[root@serverX ~]# semanage fcontext -a -t samba_share_t '/smbshare(/.*)?'
+Apply the SELinux rule for the /smbshare directory that was added in the previous step on serverX.
+
+[root@serverX ~]# restorecon -vvFR /smbshare
+restorecon reset /smbshare context unconfined_u:object_r:default_t:s0->system_u:object_r:samba_share_t:s0
+Change the /etc/samba/smb.conf configuration file on serverX to reflect the configuration requested.
+
+Modify or confirm the following:
+
+[global]
+...
+ workgroup = mycompany
+...
+ security = user
+ passdb backend = tdbsam
+Add a section at the end of the file as follows.
+
+[smbshare]
+ path = /smbshare
+ write list = @marketing
+Create the Samba-only user brian, who is part of the marketing team. The user brian has read and write access to the smbshare SMB share. A new Samba user rob is created, who is not part of the marketing team. The user rob has read access to the smbshare SMB share. Both newly added users have the SMB password redhat.
+
+Install the samba-client RPM package because it contains smbpasswd.
+
+[root@serverX ~]# yum -y install samba-client
+Create the system user brian as a member of the auxiliary group marketing on serverX.
+
+[root@serverX ~]# useradd -s /sbin/nologin -G marketing brian
+Add the SMB user brian to Samba. The Samba user is automatically mapped to the local system user brian.
+
+[root@serverX ~]# smbpasswd -a brian
+New SMB password:  redhat
+Retype new SMB password:  redhat
+Added user brian.
+Create the system user rob on serverX.
+
+[root@serverX ~]# useradd -s /sbin/nologin rob
+Add the SMB user rob to Samba. The Samba user is automatically mapped to the local system user rob.
+
+[root@serverX ~]# smbpasswd -a rob
+New SMB password:  redhat
+Retype new SMB password:  redhat
+Added user rob.
+Start and enable the smb and nmb services, and allow access to them through the firewall on serverX.
+
+Start the smb and nmb services on the serverX system.
+
+[root@serverX ~]# systemctl start smb nmb
+Enable the smb and nmb services to start at system boot on serverX.
+
+[root@serverX ~]# systemctl enable smb nmb
+Configure firewalld to allow access to the SMB service on serverX.
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=samba
+success
+[root@serverX ~]# firewall-cmd --reload
+success
+Verify the newly created SMB share works as expected on the desktopX system with the created Samba-only users brian and rob. The user brian has read and write access to the smbshare SMB share. The user rob has read access to the smbshare SMB share.
+
+Install the cifs-utils package because it provides the mount.cifs command.
+
+[root@desktopX ~]# yum -y install cifs-utils
+Create the mount point /mnt/brian on desktopX.
+
+[root@desktopX ~]# mkdir /mnt/brian
+Mount the //serverX/smbshare Samba share temporarily as user brian on the mount point /mnt/brian on the desktopX system.
+
+[root@desktopX ~]# mount -o username=brian //serverX/smbshare /mnt/brian
+Password for brian@//serverX/smbshare:  redhat
+Verify on desktopX that user brian has read and write access to the smbshare share provided by serverX because he is a member of the marketing auxiliary group.
+
+[root@desktopX ~]# echo "Hello World" >/mnt/brian/brian1.txt
+[root@desktopX ~]# cat /mnt/brian/brian1.txt
+Hello World
+Create the mount point /mnt/rob on desktopX.
+
+[root@desktopX ~]# mkdir /mnt/rob
+Mount the //serverX/smbshare Samba share temporarily as user rob on the mount point /mnt/rob on the desktopX system.
+
+[root@desktopX ~]# mount -o username=rob //serverX/smbshare /mnt/rob
+Password for rob@//serverX/smbshare:  redhat
+Verify on desktopX that user rob has no write permission to the smbshare Samba share provided by the serverX system.
+
+[root@desktopX ~]# touch /mnt/rob/rob1.txt
+touch: cannot touch `/mnt/rob/rob1.txt´: Permission denied
+Test if read access for Samba user rob works as expected on the /mnt/rob Samba share on the desktopX system.
+
+[root@desktopX ~]# cat /mnt/rob/brian1.txt
+Hello World
+Run the grading script on serverX:
+
+[student@serverX ~]$ lab smbshare grade
+

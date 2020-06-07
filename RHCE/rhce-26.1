@@ -1,0 +1,596 @@
+Chapter 26. Writing Bash Scripts
+Bash Shell Scripting Basics
+Guided Exercise: Practice: Writing Bash Scripts
+Lab: Lab: Writing Bash Scripts
+Abstract
+
+Overview
+Goal	To write simple, well-structured shell scripts using Bash's shell expansion features and for-loop construct.
+Objectives	
+To write simple shell scripts using Bash.
+
+Sections	
+Bash Shell Scripting Basics (and Practice)
+
+Lab	
+Writing Bash Scripts
+
+Bash Shell Scripting Basics
+In this section, students learned how to:
+
+Write, execute, and debug simple Bash shell scripts.
+
+Store and retrieve data during script execution with the use of variables.
+
+Enhance script functionality with command substitution and arithmetic expansion.
+
+Perform iterative execution of tasks with for loops.
+
+Troubleshoot Bash shell script issues with debug and verbose modes.
+
+Objectives
+After completing this section, students should be able to write and debug simple Bash shell scripts which utilizes variable expansion, command line substitution, arithmetic expansion, and for loops..
+
+Bash scripting basics
+Bash Shell Scripting Basics
+Many simple day-to-day system administration tasks can be accomplished by the numerous Linux command-line tools available to administrators. However, tasks with greater complexity often require the chaining together of multiple commands. In these situations, Linux command-line tools can be combined with the offerings of the Bash shell to create powerful shell scripts to solve real-world problems.
+
+In its simplest form, a Bash shell script is simply an executable file composed of a list of commands. However, when well-written, a shell script can itself become a powerful command-line tool when executed on its own, and can even be further leveraged by other scripts.
+
+Proficiency in shell scripting is essential to the success of Linux system administrators in all operational environments. Working knowledge of shell scripting is especially crucial in enterprise environments, where its use can translate to improved efficiency and accuracy of routine task completion.
+
+Choosing a programming language
+
+While Bash shell scripting can be used to accomplish many tasks, it may not be the right tool for all scenarios. Administrators have a wide variety of programming languages at their disposal, such as C, C++, Perl, Python, Ruby and other programming languages. Each programming language has its strengths and weaknesses, and as such, none of the programming languages are the right tool for every situation.
+
+Bash shell scripts are a good choice for tasks which can be accomplished mainly by calling other command-line utilities. If the task involves heavy data processing and manipulation, other languages such as Perl or Python will be better suited for the job. While Bash supports arithmetic operations, they are limited to simple integer arithmetic. For more complex arithmetic operations, C or C++ should be considered. If a solution requires the use of arrays, Bash is probably not the best tool. Bash has supported one-dimensional arrays for some time, and the latest version even supports associative arrays. However, Perl or Python have much better array functionality, with the ability to accommodate multidimensional arrays.
+
+As administrators become proficient at shell scripting, they will gain more knowledge regarding its capabilities and limitations. This experience combined with exposure to other programming languages over time, will provide administrators with a better understanding of the advantages and disadvantages of each, and which problems each one is best suited for.
+
+Creating and executing Bash shell scripts
+A Bash shell script can be created by opening a new empty file in a text editor. While any text editor can be used, advanced editors, such as vim or emacs, understand Bash shell syntax and can provide color-coded highlighting. This highlighting can be a tremendous help for spotting syntactical errors, such as unpaired quotes, unclosed brackets, and other common blunders.
+
+The command interpreter
+
+The first line of a Bash shell script begins with '#!', also commonly referred to as a sharp-bang, or the abbreviated version, sha-bang. This two-byte notation is technically referred to as the magic pattern. It indicates that the file is an executable shell script. The path name that follows is the command interpreter, the program that should be used to execute the script. Since Bash shell scripts are to be interpreted by the Bash shell, they begin with the following first line.
+
+#!/bin/bash
+...
+Executing a Bash shell script
+
+After a Bash shell script is written, its file permissions and ownership need to be modified so that it is executable. Execute permission is modified with the chmod command, possibly in conjunction with the chown command to change the file ownership of the script accordingly. Execute permission should only be granted to the users that the script is intended for.
+
+Once a Bash shell script is executable, it can be invoked by entering its name on the command line. If only the base name of the script file is entered, Bash will search through the directories specified in the shell's PATH environmental variable, looking for the first instance of an executable file matching that name. Administrators should avoid script names that match other executable files, and should also ensure that the PATH variable is correctly configured on their system so that the script will be the first match found by the shell. The which command, followed by the file-name of the executeable script displays in which directory the script resides that is executed when the script name is invoked as a command resides.
+
+[student@serverX ~]$ which hello
+~/bin/hello
+
+[student@serverX ~]$ echo $PATH
+/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/student/.local/bin:/home/student/bin
+Displaying output
+The echo command can be used to display arbitrary text by passing the text as an argument to the command. By default, the text is directed to standard out (STDOUT), but can also be directed to standard error (STDERR) using output redirection. In the following simple Bash script, the echo command displays the message "Hello, world" to STDOUT.
+
+[student@serverX ~]$ cat hello
+#!/bin/bash
+
+echo "Hello, world"
+
+[student@serverX ~]$ ./hello
+Hello, world
+While seemingly simple in its function, the echo command is widely used in shell scripts due to its usefulness for various purposes. It is commonly used to display informational or error messages during the script execution. These messages can be a helpful indicator of the progress of a script and can be directed either to standard out, standard error, or be redirected to a log file for archiving. When displaying error messages, it is good practice to direct them to STDERR to make it easier to differentiate error messages from normal status messages.
+
+[student@serverX ~]$ cat hello
+#!/bin/bash
+
+echo "Hello, world"
+echo "ERROR: Houston, we have a problem." >&2
+
+[student@serverX ~]$ ./hello 2> hello.log
+Hello, world
+
+[student@serverX ~]$ cat hello.log
+ERROR: Houston, we have a problem.
+The echo command can also be very helpful when trying to debug a problematic shell script. The addition of echo statements to the portion of the script that is not behaving as expected can help clarify the commands being executed, as well as the values of variables being invoked.
+
+Quoting special characters
+
+A number of characters or words have special meanings to the Bash shell in specific context. There are situations when the literal values, rather than the special meanings, of these characters or words are desired. For example, the # character is interpreted by Bash as the beginning of a comment and is therefore ignored, along with everything following it on the same line. If this special meaning is not desired, then Bash needs to be informed that the # character is to be treated as a literal value. The meanings of special characters or words can be disabled through the use of the escape character, \, single quotes, '', or double quotes, "".
+
+The escape character, \, removes the special meaning of the single character immediately following it. For example, to display the literal string # test with the echo command, the # character must not be interpreted by Bash with special meaning. The escape character can be placed in front of the # character to disable its special meaning.
+
+[student@serverX ~]$ echo # not a comment
+
+[student@serverX ~]$ echo \# not a comment
+# not a comment
+The escape character, \, only removes the special meaning of a single character. When more than one character in a text string needs to be escaped, users can either use the escape character multiple times or employ single quotes, ''. Single quotes preserve the literal meaning of all characters they enclose. The following example demonstrates how single quotes can be used when multiple characters need to be escaped.
+
+[student@serverX ~]$ echo # not a comment #
+
+[student@serverX ~]$ echo \# not a comment #
+# not a comment
+
+[student@serverX ~]$ echo \# not a comment \#
+# not a comment #
+
+[student@serverX ~]$ echo '# not a comment #'
+# not a comment #
+While single quotes preserve the literal value of all characters they enclose, double quotes differ in that they do not preserve the literal value of the dollar sign, $, the back-ticks, ``, and the backslash, \. When enclosed with double quotes, the dollar sign and back-ticks preserve their special meaning, and the special meaning of the backslash character is only retained when it precedes a dollar sign, back-tick, double quote, backslash, or newline.
+
+[student@serverX ~]$ echo '$HOME'
+$HOME
+
+[student@serverX ~]$ echo '`pwd`'
+`pwd`
+
+[student@serverX ~]$ echo '"Hello, world"'
+"Hello, world"
+
+[student@serverX ~]$ echo "$HOME"
+/home/student
+
+[student@serverX ~]$ echo "`pwd`"
+/home/student
+
+[student@serverX ~]$ echo ""Hello, world""
+Hello, world
+
+[student@serverX ~]$ echo "\$HOME"
+$HOME
+
+[student@serverX ~]$ echo "\`pwd\`"
+`pwd`
+
+[student@serverX ~]$ echo "\"Hello, world\""
+"Hello, world"
+Using variables
+Bash Shell Scripting Variables and Expansions
+As the complexity of a shell script increases, it is often helpful to make use of variables. A variable serves as a container, within which a shell script can store data in memory. Variables make it easy to access and modify the stored data during a script's execution.
+
+Assigning values to variables
+
+Data is assigned as a value to a variable via the following syntax:
+
+VARIABLENAME=value
+While variable names are typically uppercase letters, they can be made up of numbers, letters (uppercase and lowercase), and the underscore character, '_'. However, a variable name cannot start with a number. The equal sign, =, is used to assign values to variables and must not be separated from the variable name or the value by spaces. The following are some examples of valid variable declarations.
+
+COUNT=40
+first_name=John
+file1=/tmp/abc
+_ID=RH123
+Two common types of data stored in variables are integer values and string values. It is good practice to quote string values when assigning them to variables, since the space character is interpreted by Bash as a word separator when not enclosed within single or double quotes. Whether single or double quotes should be used to enclose variable values depends on how characters with special meanings to Bash should be treated.
+
+full_name='John Doe'
+full_name="$FIRST $LAST"
+price='$1'
+Expanding variable values
+
+The value of a variable can be recalled through a process known as variable expansion by preceding the variable name with a dollar sign, $. For example, the value of the VARIABLENAME variable can be referenced with $VARIABLENAME. The $VARIABLENAME syntax is the simplified version of the brace-quoted form of variable expansion, ${VARIABLENAME}. While the simplified form is usually acceptable, there are situations where the brace-quoted form must be used to remove ambiguity and avoid unexpected results.
+
+In the following example, without the use of brace quotes, Bash will interpret $FIRST_$LAST as the variable $FIRST_ followed by the variable $LAST, rather than the variables $FIRST and $LAST separated by the '_' character. Therefore, brace quoting must be used for variable expansion to function properly in this scenario.
+
+[student@serverX ~]$ FIRST_=Jane
+
+[student@serverX ~]$ FIRST=John
+
+[student@serverX ~]$ LAST=Doe
+
+[student@serverX ~]$ echo $FIRST_$LAST
+JaneDoe
+
+[student@serverX ~]$ echo ${FIRST}_$LAST
+John_Doe
+Using Bash shell expansion features
+Aside from variable expansion, the Bash shell offers several other types of shell expansion features. Of these, command substitution and arithmetic expansion can be useful in Bash shell scripting, and are commonly used.
+
+Command substitution
+
+Command substitution replaces the invocation of a command with the output from its execution. This feature allows the output of a command to be used in a new context, such as the argument to another command, the value for a variable, and the list for a loop construct.
+
+Command substitution can be invoked with the old form of enclosing the command in back-ticks, such as `<COMMAND>`. However, the preferred method is to use the newer $() syntax, $(<COMMAND>).
+
+[student@serverX ~]$ echo "Current time: `date`"
+Current time is Thu Jun  5 16:24:24 EDT 2014.
+
+[student@serverX ~]$ echo "Current time: $(date)"
+Current time is Thu Jun  5 16:24:30 EDT 2014.
+The newer syntax is preferred since it allows for nesting of command substitutions. In the following nested command substitution example, the output of the find command is used as arguments for the tar command, which then has its output stored into the variable TAROUTPUT.
+
+[root@serverX ~]# TAROUTPUT=$(tar cvf /tmp/incremental_backup.tar $(find /etc -type f -mtime -1))
+
+[root@serverX ~]# echo $TAROUTPUT
+/etc/group /etc/gshadow /etc/shadow- /etc/passwd /etc/shadow /etc/passwd- /etc/tuned/active_profile /etc/rht /etc/group- /etc/gshadow- /etc/resolv.conf
+Arithmetic expansion
+
+Bash's arithmetic expansion can be used to perform simple integer arithmetic operations, and uses the syntax $[<EXPRESSION>]. When enclosed within $[], arithmetic expressions are evaluated by Bash and then replaced with their results. Bash performs variable expansion and command substitution on the enclosed expression before its evaluation. Like command line substitution, nesting of arithmetic substitutions is allowed.
+
+[student@serverX ~]$ echo $[1+1]
+2
+
+[student@serverX ~]$ echo $[2*2]
+4
+
+[student@serverX ~]$ COUNT=1; echo $[$[$COUNT+1]*2]
+4
+Space characters are allowed in the expression used within an arithmetic expansion. The use of space characters can improve readability in complicated expressions or when variables are included.
+
+[student@serverX ~]$ SEC_PER_MIN=60
+
+[student@serverX ~]$ MIN_PER_HR=60
+
+[student@serverX ~]$ HR_PER_DAY=24
+
+[student@serverX ~]$ SEC_PER_DAY=$[ $SEC_PER_MIN * $MIN_PER_HR * $HR_PER_DAY ]
+
+[student@serverX ~]$ echo "There are $SEC_PER_DAY seconds in a day."
+There are 86400 seconds in a day.
+The following are some of the commonly used operators in arithmetic expressions, along with their meanings.
+
+Operator	Meaning
+<VARIABLE>++	variable post-increment
+<VARIABLE>--	variable post-decrement
+++<VARIABLE>	variable pre-increment
+--<VARIABLE>	variable pre-decrement
+-	unary minus
++	unary plus
+**	exponentiation
+*	multiplication
+/	division
+%	remainder
++	addition
+-	subtraction
+When multiple operators exist in an expression, Bash will evaluate certain operators in order according to their precedence. For example, multiplication and division operators have a higher precedence than addition and subtraction. Parentheses can be used to group sub expressions if the evaluation order desired differs from the default precedence.
+
+[student@serverX ~]$ echo $[ 1 + 1 * 2]
+3
+
+[student@serverX ~]$ echo $[ (1 +1) * 2 ]
+4
+The following table lists the order of precedence for commonly used arithmetic operators from highest to lowest. Operators that have equal precedence are listed together.
+
+Operator	Meaning
+<VARIABLE>++, <VARIABLE>--	variable post-increment and post-decrement
+++<VARIABLE>, --<VARIABLE>	variable pre-increment and pre-decrement
+-, +	unary minus and plus
+**	exponentiation
+*, /, %	multiplication, division, remainder
++, -	addition, subtraction
+Iterating with the for loop
+Bash Shell Scripting Iterations and Troubleshooting
+System administrators often encounter repetitive tasks in their day-to-day activities. Repetitive tasks can take the form of executing an action multiple times on a target, such as checking a process every minute for 10 minutes to see if it has completed. Task repetition can also take the form of executing an action a single time across multiple targets, such as performing a database backup of each database on a system. The for loop is one of the multiple shell looping constructs offered by Bash, and can be used for task iterations.
+
+Using the for loop
+
+Bash's for-loop construct uses the following syntax. The loop processes the items provided in <LIST> in order one by one and exits after processing the last item on the list. Each item in the list is temporarily stored as the value of <VARIABLE>, while the for loop executes the block of commands contained in its construct. The naming of the variable is arbitrary. Typically, the variable value is referenced by commands in the command block.
+
+for <VARIABLE> in <LIST>; do
+     <COMMAND>
+     ...
+     <COMMAND> referencing <VARIABLE>
+done
+The list of items provided to a for loop can be supplied in several ways. It can be a list of items entered directly by the user, or be generated from different types of shell expansion, such as variable expansion, brace expansion, file name expansion, and command substitution. Some examples that demonstrate the different ways lists can be provided to for loops follow.
+
+[student@serverX ~]$ for HOST in host1 host2 host3; do echo $HOST; done
+host1
+host2
+host3
+
+[student@serverX ~]$ for HOST in host{1,2,3}; do echo $HOST; done
+host1
+host2
+host3
+
+[student@serverX ~]$ for HOST in host{1..3}; do echo $HOST; done
+host1
+host2
+host3
+
+[student@serverX ~]$ for FILE in file*; do ls $FILE; done
+filea
+fileb
+filec
+
+[student@serverX ~]$ for FILE in file{a..c}; do ls $FILE; done
+filea
+fileb
+filec
+
+[student@serverX ~]$ for PACKAGE in $(rpm -qa | grep kernel); do echo "$PACKAGE was installed on $(date -d @$(rpm -q --qf "%{INSTALLTIME}\n" $PACKAGE))"; done
+abrt-addon-kerneloops-2.1.11-12.el7.x86_64 was installed on Tue Apr 22 00:09:07 EDT 2014
+kernel-3.10.0-121.el7.x86_64 was installed on Thu Apr 10 15:27:52 EDT 2014
+kernel-tools-3.10.0-121.el7.x86_64 was installed on Thu Apr 10 15:28:01 EDT 2014
+kernel-tools-libs-3.10.0-121.el7.x86_64 was installed on Thu Apr 10 15:26:22 EDT 2014
+
+[student@serverX ~]$ for EVEN in $(seq 2 2 8); do echo "$EVEN"; done; echo "Who do we appreciate?"
+
+2
+4
+6
+8
+Who do we appreciate?
+Troubleshooting shell script bugs
+Inevitably, administrators who write, use, or maintain shell scripts will encounter bugs with a script. Bugs are typically due to typographical errors, syntactical errors, or poor script logic.
+
+A good way to deal with shell scripting bugs is to make a concerted effort to prevent them from occurring in the first place during the authoring of the script. As previously mentioned, using a text editor with Bash syntactical highlighting can help make mistakes more obvious when writing scripts. Another easy way to avoid introducing bugs into scripts is by adhering to good practices during the creation of the script.
+
+Good styling practices
+
+Use comments to help clarify to readers the purpose and logic of the script. The top of every script should include comments providing an overview of the script's purpose, intended actions, and general logic. Also use comments throughout the script to clarify the key portions, and especially sections that may cause confusion. Comments will not only aid other users in the reading and debugging of the script, but will also often help the author recall the workings of the script once some time has passed.
+
+Structure the contents of the script to improve readability. As long as the syntax is correct, the command interpreter will flawlessly execute the commands within a script with absolutely no regard for their structure or formatting. Here are some good practices to follow:
+
+Break up long commands into multiple lines of smaller code chunks. Shorter pieces of code are much easier for readers to digest and comprehend.
+
+Line up the beginning and ending of multiline statements to make it easier to see that control structures begin and end, and whether they are being closed properly.
+
+Indent lines with multiline statements to represent the hierarchy of code logic and the flow of control structures.
+
+Use line spacing to separate command blocks to clarify when one code section ends and another begins.
+
+Use consistent formatting through the entirety of a script.
+
+When utilized, these simple practices can make it significantly easier to spot mistakes during authoring, as well as improve the readability of the script for future readers. The following example demonstrates how the incorporation of comments and spacing can greatly improve script readability.
+
+#!/bin/bash
+for PACKAGE in $(rpm -qa | grep kernel); do echo "$PACKAGE was installed on $(date -d @$(rpm -q --qf "%{INSTALLTIME}\n" $PACKAGE))"; done
+#!/bin/bash
+#
+# This script provides information regarding when kernel-related packages
+# are installed on a system by querying information from the RPM database.
+#
+
+# Variables
+PACKAGETYPE=kernel
+PACKAGES=$(rpm -qa | grep $PACKAGETYPE)
+
+# Loop through packages
+for PACKAGE in $PACKAGES; do
+     # Determine package install date and time
+     INSTALLEPOCH=$(rpm -q --qf "%{INSTALLTIME}\n" $PACKAGE)
+
+     # RPM reports time in epoch, so need to convert
+     # it to date and time format with date command
+     INSTALLDATETIME=$(date -d @$INSTALLEPOCH)
+
+     # Print message
+     echo "$PACKAGE was installed on $INSTALLDATETIME"
+done
+Do not make assumptions regarding the outcome of actions taken by a script. This is especially true of inputs to the script, such as command-line arguments, input from users, command substitutions, variable expansions, and file name expansions. Rather than making assumptions about the integrity of these inputs, make the worthwhile effort to employ the use of proper quoting and sanity checking.
+
+The same caution should be utilized when acting upon entities external to the script. This includes interacting with files, and calling external commands. Make use of Bash's vast number of file and directory tests when interacting with files and directories. Perform error checking on the exit status of commands rather than counting on their success and blindly continuing along with the script when an unexpected error occurs.
+
+The extra steps taken to rule out assumptions will increase the script's robustness, and keep it from being easily derailed and then inflicting unintended and unnecessary damage to a system. A couple of seemingly harmless lines of code, such as the ones that follow, make very risky assumptions about command execution outcome and file name expansion. If the directory change fails, either due to directory permissions or the directory being nonexistent, the subsequent file removal will be performed on a list of unknown files in an unintended directory.
+
+cd $TMPDIR
+rm *
+Lastly, while well-intentioned administrators may employ good practices when authoring their scripts, not all will always agree on what constitutes good practices. Administrators should do themselves and others a favor and always apply their practices consistently through the entirety of their scripts. They should also be considerate and understanding of individual differences when it comes to programming styles and formatting in scripts authored by others. When modifying others' scripts, administrators should follow the existing structure, formatting, and practices used by the original author, rather than imposing their own style on a portion of the script and destroying the script's consistency, and thereby ruining its readability and future maintainability.
+
+Debug and verbose modes
+
+If despite best efforts, bugs are introduced into a script, administrators will find Bash's debug mode extremely useful. To activate the debug mode on a script, add the -x option to the command interpreter in the first line of the script.
+
+#!/bin/bash -x
+Another way to run a script in debug mode is to execute the script as an argument to Bash with the -x option.
+
+[student@serverX bin]$ bash -x <SCRIPTNAME>
+Bash's debug mode will print out commands executed by the script prior to their execution. The results of all shell expansion performed will be displayed in the printout. The following example shows the extra output that is displayed when debug mode is activated.
+
+[student@serverX bin]$ cat filesize
+#!/bin/bash
+
+DIR=/home/student/tmp
+
+for FILE in $DIR/*; do
+	echo "File $FILE is $(stat --printf='%s' $FILE) bytes."
+done
+
+[student@serverX bin]$ ./filesize
+File /home/student/tmp/filea is 133 bytes.
+File /home/student/tmp/fileb is 266 bytes.
+File /home/student/tmp/filec is 399 bytes.
+
+[student@serverX bin]$ bash -x ./filesize
++ DIR=/home/student/tmp
++ for FILE in '$DIR/*'
+++ stat --printf=%s /home/student/tmp/filea
++ echo 'File /home/student/tmp/filea is 133 bytes.'
+File /home/student/tmp/filea is 133 bytes.
++ for FILE in '$DIR/*'
+++ stat --printf=%s /home/student/tmp/fileb
++ echo 'File /home/student/tmp/fileb is 266 bytes.'
+File /home/student/tmp/fileb is 266 bytes.
++ for FILE in '$DIR/*'
+++ stat --printf=%s /home/student/tmp/filec
++ echo 'File /home/student/tmp/filec is 399 bytes.'
+File /home/student/tmp/filec is 399 bytes.
+While Bash's debug mode provides helpful information, the voluminous output may actually become more hindrance than help for troubleshooting, especially as the lengths of scripts increase. Fortunately, the debug mode can be enabled partially on just a portion of a script, rather than on its entirety. This feature is especially useful when debugging a long script and the source of the problem has been narrowed to a portion of the script.
+
+Debugging can be turned on at a specific point in a script by inserting the command set -x and turned off by inserting the command set +x. The following demonstration shows the previous example script with debugging enabled just for the command line enclosed in the for loop.
+
+[student@serverX bin]$ cat filesize
+#!/bin/bash
+
+DIR=/home/student/tmp
+
+for FILE in $DIR/*; do
+        set -x
+        echo "File $FILE is $(stat --printf='%s' $FILE) bytes."
+        set +x
+done
+
+[student@serverX bin]$ ./filesize
+++ stat --printf=%s /home/student/tmp/filea
++ echo 'File /home/student/tmp/filea is 133 bytes.'
+File /home/student/tmp/filea is 133 bytes.
++ set +x
+++ stat --printf=%s /home/student/tmp/fileb
++ echo 'File /home/student/tmp/fileb is 266 bytes.'
+File /home/student/tmp/fileb is 266 bytes.
++ set +x
+++ stat --printf=%s /home/student/tmp/filec
++ echo 'File /home/student/tmp/filec is 399 bytes.'
+File /home/student/tmp/filec is 399 bytes.
++ set +x
+In addition to debug mode, Bash also offers a verbose mode, which can be invoked with the -v option. In verbose mode, Bash will print each command to standard out prior to its execution.
+
+[student@serverX bin]$ cat filesize
+#!/bin/bash
+
+DIR=/home/student/tmp
+
+for FILE in $DIR/*; do
+	echo "File $FILE is $(stat --printf='%s' $FILE) bytes."
+done
+
+[student@serverX bin]$ bash -v ./filesize
+stat --printf='%s' $FILE) bytes."
+stat --printf='%s' $FILE) bytes.
+stat --printf='%s' $FILE
+File /home/student/tmp/filea is 133 bytes.
+stat --printf='%s' $FILE) bytes."
+stat --printf='%s' $FILE) bytes.
+stat --printf='%s' $FILE
+File /home/student/tmp/fileb is 266 bytes.
+stat --printf='%s' $FILE) bytes."
+stat --printf='%s' $FILE) bytes.
+stat --printf='%s' $FILE
+File /home/student/tmp/filec is 399 bytes.
+Like the debug feature, the verbose feature can also be turned on and off at specific points in a script by inserting the set -v and set +v lines, respectively.
+
+REFERENCES
+bash(1), magic(5), echo(1), echo(1p), and seq(1) man pages
+
+
+
+Guided Exercise: Practice: Writing Bash Scripts
+In this lab, you will create a Bash shell script to automate the process of individually backing up every MariaDB database on serverX and generating a report providing statistics on each database backup.
+
+Resources:
+Machines:	serverX
+Outcomes:
+
+A Bash script which automates the process of performing individual backups of each database in MariaDB. The script will also report the size statistics on each database backup.
+
+Reset serverX.
+
+Log into serverX and become root with sudo -i.
+
+You have been tasked with writing a Bash shell script to perform a backup of all MariaDB databases on a server using mysqldump. Each database will be backed up to the directory /dbbackup and will be named DATABASENAME.dump. Your script will print out the message 'Backing up "DATABASENAME"' as it initiates the dump of each database.
+
+Once the backups for all the databases are completed, your script will generate a report showing the name of each database backup, its size, and the percentage of the total database dump size it accounts for. The data for each database should be lined up in columns for readability.
+
+The complete output of your script should look like the following:
+
+[root@serverX ~]# /usr/local/sbin/dbbackup
+Backing up "mysql"
+Backing up "test"
+
+/dbbackup/mysql.dump          	  514664	99%
+/dbbackup/test.dump           	    1261	 0%
+Install the mariadb-server package, then enable and start the mariadb service.
+
+Install mariadb-server package with yum.
+
+[root@serverX ~]# yum install -y mariadb-server
+Enable and start mariadb.
+
+[root@serverX ~]# systemctl enable mariadb
+ln -s '/usr/lib/systemd/system/mariadb.service' '/etc/systemd/system/multi-user.target.wants/mariadb.service'
+[root@serverX ~]# systemctl start mariadb
+Create the database backup directory.
+
+[root@serverX ~]# mkdir /dbbackup
+On the command line, formulate a command to generate a list of database names, excluding the system databases information_schema and performance_schema.
+
+Issue the SHOW DATABASES command to mysql as the root MySQL user.
+
+[root@serverX ~]# mysql -u root -e 'SHOW DATABASES'
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| test               |
++--------------------+
+Utilize the --skip-column-names and -E formatting options to simplify the output for parsing.
+
+[root@serverX ~]# mysql --skip-column-names -E -u root -e 'SHOW DATABASES'
+*************************** 1. row ***************************
+information_schema
+*************************** 2. row ***************************
+mysql
+*************************** 3. row ***************************
+performance_schema
+*************************** 4. row ***************************
+test
+Exclude the row header lines and the two system databases from the output.
+
+[root@serverX ~]# mysql --skip-column-names -E -u root -e 'SHOW DATABASES' | grep -v '^*' | grep -v '^information_schema$' | grep -v '^performance_schema$'
+mysql
+test
+Create your script. Store the MySQL user, the formatting options, the SHOW DATABASES command, and the backup directory as variables.
+
+Create the new script file with a text editor.
+
+[root@serverX ~]# vim /usr/local/sbin/dbbackup
+Specify the interpreter program for the script.
+
+#!/bin/bash
+Set the variables.
+
+# Variables
+DBUSER=root
+FMTOPTIONS='--skip-column-names -E'
+COMMAND='SHOW DATABASES'
+BACKUPDIR=/dbbackup
+Initiate a for loop and loop through the list of databases to back up each one to the /dbbackup directory.
+
+Initiate the for loop by passing in a list of database names via command substitution.
+
+# Backup non-system databases
+for DBNAME in $(mysql $FMTOPTIONS -u $DBUSER -e "$COMMAND" | grep -v ^* | grep -v information_schema | grep -v performance_schema); do
+Add the commands to be executed within each loop.
+
+  echo "Backing up \"$DBNAME\""
+  mysqldump -u $DBUSER $DBNAME > $BACKUPDIR/$DBNAME.dump
+Close the for loop.
+
+done
+Generate a report of each database's name, dump size, and the percentage of the total dump size it accounts for.
+
+Initiate a for loop to iterate through and total up the size of each database dump in the /dbbackup directory.
+
+# Add up size of all database dumps
+for DBDUMP in $BACKUPDIR/*; do
+Add the commands to be executed within each loop.
+
+  SIZE=$(stat --printf "%s\n" $DBDUMP)
+  TOTAL=$[ $TOTAL + $SIZE ]
+Close the for loop.
+
+done
+Create a for loop to iterate through and report on each database dump.
+
+# Report name, size, and percentage of total for each database dump
+echo
+for DBDUMP in $BACKUPDIR/*; do
+Add the commands to be executed within each loop.
+
+  SIZE=$(stat --printf "%s\n" $DBDUMP)
+  echo "$DBDUMP,$SIZE,$[ 100 * $SIZE / $TOTAL ]%"
+Close the for loop.
+
+done
+Save and execute the script.
+
+Make the script executable.
+
+[root@serverX ~]# chmod u+x /usr/local/sbin/dbbackup
+Execute the script.
+
+[root@serverX ~]# /usr/local/sbin/dbbackup
+Backing up "mysql"
+Backing up "test"
+
+/dbbackup/mysql.dump,514664,99%
+/dbbackup/test.dump,1261,0%

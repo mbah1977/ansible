@@ -1,0 +1,66 @@
+Lab: Lab: Configuring the Shell Environment
+In this lab, you will make configuration changes to the shell environment for individual users, and all users, on the machine.
+
+Your international coworkers have complained that when they log into the console of serverX, the language on the machine is set incorrectly. You will configure the machine such that when a user logs in with the terminal type of linux, the LANG variable will be set to en_US.
+
+The student user requires a command be added to their environment. diskcheck will run iostat -d and df -hP --type xfs.
+
+The student user needs an environment variable JAVA_HOME set to /usr/lib/jvm.
+
+Resources:
+Files:	
+/etc/profile
+
+~/.bash_profile
+
+~/.bashrc
+
+Machines:	serverX
+Outcomes:
+
+All users will have their LANG variable set to en_US when using a linux terminal type. The student user will have a function, named diskcheck, defined in the environment. The student will have an environment variable, JAVA_HOME, defined in the environment.
+
+Reset your serverX system.
+
+Detect the terminal type of a shell. If it is linux, make sure the language is set to en_US.
+
+Edit the /etc/profile file. At the bottom of the file, add a bit of script which will check the TERM variable to see if it is set to linux. If it is, assign the LANG variable to en_US and export the LANG setting.
+
+if [ "$TERM" == "linux" ]
+then
+  LANG=en_US
+  export LANG
+fi
+To verify the setting works, switch to a virtual console and log in as a user. Check the value of the LANG variable.
+
+[student@serverX ~]$ echo $LANG
+en_US
+Add a function to the student user's environment. The function is called diskcheck, and when called, will display the output of the iostat -d and df -hP --type xfs commands.
+
+Edit the student user's ~/.bashrc and add the function definition. Add the new function at the end of the file.
+
+# User specific aliases and functions
+diskcheck() {
+  iostat -d
+  echo
+  df -hP --type xfs
+}
+Source the ~/.bashrc and verify the function.
+
+[student@serverX ~]$ . ~/.bashrc
+[student@serverX ~]$ diskcheck
+Set an environment variable, JAVA_HOME, to /usr/lib/jvm for the student user.
+
+Edit the student user's .bash_profile, and at the bottom of the file, add an entry for JAVA_HOME. Set JAVA_HOME to /usr/lib/jvm. Use the export command to tag the variable to be available for all sub-shells.
+
+JAVA_HOME=/usr/lib/jvm
+export JAVA_HOME
+Source the .bash_profile to read the changes into the environment.
+
+[student@serverX ~]$ . ~/.bash_profile
+Ensure the variable is available in sub-shells.
+
+[student@serverX ~]$ bash
+[student@serverX ~]$ echo $JAVA_HOME
+/usr/lib/jvm
+

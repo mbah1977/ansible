@@ -1,0 +1,461 @@
+
+Lab: Lab: Comprehensive Review of System Administration III
+In this lab, you will configure a system using the skills taught in this course.
+
+Resources:
+Files:	
+/home/student/myapp.php
+
+/home/student/mydb.mysqldump
+
+Machines:	serverX and desktopX
+Outcomes:
+
+A system configured according to the listed specifications.
+
+Reset your desktopX system.
+
+Log into and set up your desktopX system.
+
+[student@desktopX ~]$ lab sa3-review setup
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab sa3-review setup
+Specifications
+
+You have been tasked with configuring a new system for your company: serverX. The system should be configured according to the following requirements:
+
+Your serverX system has two interfaces named slave1 and slave2. These interfaces should be slaved in a new teaming device called team1.
+
+The teaming device should use the activebackup runner, and be configured with the following IP addresses:
+
+192.168.0.100/24
+
+fd00:ba5e:ba11:X::1/64
+
+When successfully configured, both 192.168.0.254 and fd00:ba5e:ba11:X::fe should be pingable.
+
+Your serverX system should provide caching DNS services to systems on the 172.25.X.0/24 subnet, using 172.25.254.254 as a forwarder.
+
+DNSSEC validation for the example.com domain should be bypassed.
+
+Your serverX system should accept new email messages over SMTP from the 172.25.X.0/24 subnet. All messages not addressed to @serverX.example.com or @localhost[.localdomain] should be forwarded to the SMTP smarthost running on desktopX.example.com.
+
+Your serverX should export an iSCSI disk called iqn.2014-06.com.example:serverX.zoidberg. This iSCSI device should be backed by a 512 MiB partition on the secondary hard drive. Access should only be allowed to clients with an IQN of iqn.2014-06.com.example:desktopX.
+
+Your serverX system should export the (new) /exports/hypnotoad directory using NFSv4. This export should require Kerberos authentication and full encryption. All clients on the 172.25.X.0/24 subnet should have read-write access to this export.
+
+File system permissions on the underlying /exports/hypnotoad directory should be 1777.
+
+Both your desktopX and serverX systems have already been configured for LDAP and Kerberos for user information and authentication. desktopX has also been configured with a client keytab for Kerberos.
+
+A keytab for your serverX system can be obtained from http://classroom.example.com/pub/keytabs/serverX.keytab.
+
+Your serverX system should export the (new) directory /exports/bigbang using smb. This directory should be owned by the bigbang group, and any new files created in this directory should automatically be owned by the bigbang group as well.
+
+The name for the share should be bigbang, and the Samba-only user penny should be able to connect read-write using the password I<3Sheldon. penny should be a member of the bigbang group.
+
+Your serverX system should serve out two TLS-protected domains on port 444/TCP: wwwX.example.com and webappX.example.com. These domains should serve out content from /srv/wwwX/www/ and /srv/webappX/www/, respectively.
+
+The TLS-enabled website on https://wwwX.example.com:444 should respond with the following text:
+
+This is wwwX
+The website at https://webappX.example.com:444 should respond by executing the PHP application found in /home/student/myapp.php.
+
+You will need the following certificates and keys to complete this requirement:
+
+http://classroom.example.com/pub/example-ca.crt
+
+http://classroom.example.com/pub/tls/certs/wwwX.crt
+
+http://classroom.example.com/pub/tls/private/wwwX.key
+
+http://classroom.example.com/pub/tls/certs/webappX.crt
+
+http://classroom.example.com/pub/tls/private/webappX.key
+
+The PHP application needs a database to work. A complete backup (mysqldump) of a working database can be found in /home/student/mydb.mysqldump.
+
+On your desktopX machine, create a new (executable) script called /home/student/bin/myusers.
+
+When this script is called with the userlist argument, it should return a list of all users defined in /etc/passwd with a shell other than /sbin/nologin. Output should be a list of usernames, one per line, sorted alphabetically.
+
+When this script is called with the userinfo argument, it should return the preferred shell of the second argument, or “invalid user” if that user does not exist. If the second argument is empty or undefined, the error message “Please specify a username” must be displayed, and an exit code of 132 must be returned.
+
+If the script is called without any arguments, the following text must be displayed:
+
+myusers userlist
+myusers userinfo <USERNAME>
+Examples:
+
+[student@desktopX ~]$ myusers
+myusers userlist
+myusers userinfo <USERNAME>
+[student@desktopX ~]$ myusers userlist
+halt
+root
+shutdown
+student
+sync
+[student@desktopX ~]$ myusers userinfo student
+/bin/bash
+Any error conditions not specified previously should return no output, and an exit code of 0.
+
+All your changes must survive a reboot. When you are done configuring your serverX system, reboot it, then run the following command on desktopX to verify your work.
+
+[student@desktopX ~]$ lab sa3-review grade
+Your serverX system has two interfaces named slave1 and slave2. These interfaces should be slaved in a new teaming device called team1.
+
+The teaming device should use the activebackup runner, and be configured with the following IP addresses:
+
+192.168.0.100/24
+
+fd00:ba5e:ba11:X::1/64
+
+When successfully configured, both 192.168.0.254 and fd00:ba5e:ba11:X::fe should be pingable.
+
+Create a new teaming device called team1, using the activebackup runner.
+
+[student@serverX ~]$ sudo nmcli con add type team con-name team1 ifname team1 config '{"runner": {"name": "activebackup"}}'
+Add the IP addresses to the team1 config.
+
+[student@serverX ~]$ sudo nmcli con mod team1 ipv4.addresses '192.168.0.100/24'
+[student@serverX ~]$ sudo nmcli con mod team1 ipv4.method static
+[student@serverX ~]$ sudo nmcli con mod team1 ipv6.addresses 'fd00:ba5e:ba11:X::1/64'
+[student@serverX ~]$ sudo nmcli con mod team1 ipv6.method static
+Add both the slave1 and slave2 interfaces as slaves to the team1 interface.
+
+[student@serverX ~]$ sudo nmcli con add type team-slave con-name team1-slave1 ifname slave1 master team1
+[student@serverX ~]$ sudo nmcli con add type team-slave con-name team1-slave2 ifname slave2 master team1
+Test by pinging both 192.168.0.254 and fd00:ba5e:ba11:X::fe.
+
+[student@serverX ~]$ ping -c1 192.168.0.254
+[student@serverX ~]$ ping6 -c1 fd00:ba5e:ba11:X::fe
+Your serverX system should provide caching DNS services to systems on the 172.25.X.0/24 subnet, using 172.25.254.254 as a forwarder.
+
+DNSSEC validation for the example.com domain should be bypassed.
+
+Install unbound on your serverX system.
+
+[student@serverX ~]$ sudo yum install unbound
+Configure unbound to listen on all interfaces. Add the following lines to /etc/unbound/unbound.conf inside the server: block:
+
+interface: 0.0.0.0
+interface: ::0
+Allow queries from the 172.25.X.0/24 subnet. Add the following line to /etc/unbound/unbound.conf inside the server: block:
+
+access-control: 172.25.X.0/24 allow
+Disable DNSSEC validation for the example.com domain. Add the following line to /etc/unbound/unbound.conf inside the server: block:
+
+domain-insecure: example.com
+Configure unbound to forward all requests to 172.25.254.254. Add the following lines to /etc/unbound/unbound.conf:
+
+forward-zone:
+    name: .
+    forward-addr: 172.25.254.254
+Start and enable the unbound.service service.
+
+[student@serverX ~]$ sudo systemctl enable unbound.service
+[student@serverX ~]$ sudo systemctl start unbound.service
+Configure the default firewall zone to allow DNS traffic.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-service=dns
+[student@serverX ~]$ sudo firewall-cmd --reload
+Your serverX system should accept new email messages over SMTP from the 172.25.X.0/24 subnet. All messages not addressed to @serverX.example.com or @localhost[.localdomain] should be forwarded to the SMTP smarthost running on desktopX.example.com.
+
+Verify that the postfix package is installed on serverX.
+
+[student@serverX ~]$ sudo yum install postfix
+Configure postfix to listen on all network interfaces, relaying mail from the 172.25.X.0/24 (and localhost) subnet.
+
+[student@serverX ~]$ sudo postconf -e 'inet_interfaces = all'
+[student@serverX ~]$ sudo postconf -e 'mynetworks = 172.25.X.0/24, 127.0.0.0/8'
+Configure postfix to only perform local delivery for the serverX.example.com, localhost, and localhost.localdomain domains.
+
+[student@serverX ~]$ sudo postconf -e 'mydestination = serverX.example.com, localhost.localdomain, localhost'
+Configure postfix to send all mail not included in mydestination to the server at desktopX.example.com.
+
+[student@serverX ~]$ sudo postconf -e 'relayhost = [desktopX.example.com]'
+Open all relevant ports on the firewall.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-service=smtp
+[student@serverX ~]$ sudo firewall-cmd --reload
+(Re)start and enable the postfix.service service.
+
+[student@serverX ~]$ sudo systemctl restart postfix.service
+[student@serverX ~]$ sudo systemctl enable postfix.service
+Create a new 512 MiB partition on your secondary hard drive on serverX, then export that over iSCSI using the name iqn.2014-06.com.example:serverX.zoidberg, but only to clients with the iqn.2014-06.com.example:desktopX initiator name.
+
+Install the necessary packages.
+
+[student@serverX ~]$ sudo yum install targetd targetcli
+Start and enable the targetd.service service.
+
+[student@serverX ~]$ sudo systemctl start targetd.service
+[student@serverX ~]$ sudo systemctl enable targetd.service
+Create a new 512 MiB partition on your secondary hard drive.
+
+NOTE
+These solutions use /dev/vdb for the secondary hard drive. In your environment, you will need to replace /dev/vdb with the device node of your actual secondary hard drive.
+
+[student@serverX ~]$ sudo fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table
+Building a new DOS disklabel with disk identifier 0x0aee5076.
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-20971519, default 2048): Enter
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-20971519, default 20971519): +512M
+Partition 1 of type Linux and of size 512 MiB is set
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+Syncing disks.
+Configure targetd for the target, including the ACL. Make sure the configuration persists. Remember to use the Tab key liberally.
+
+[student@serverX ~]$ sudo targetcli
+targetcli shell version 2.1.fb34
+Copyright 2011-2013 by Datera, Inc. and others.
+For help on commands, type 'help'
+
+/> backstores/block create serverX.zoidberg /dev/vdb1
+/> /iscsi create iqn.2014-06.com.example:serverX.zoidberg
+/> /iscsi/iqn.2014-06.com.example:serverX.zoidberg/tpg1/luns create /backstores/block/serverX.zoidberg 1
+/> /iscsi/iqn.2014-06.com.example:serverX.zoidberg/tpg1/portals create 172.25.X.11 3260
+/> /iscsi/iqn.2014-06.com.example:serverX.zoidberg/tpg1/acls create iqn.2014-06.com.example:desktopX
+/> saveconfig
+/> exit
+Open port 3260/TCP on the firewall.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-port=3260/tcp
+[student@serverX ~]$ sudo firewall-cmd --reload
+Configure a Kerberized NFSv4 export for /exports/hypnotoad. A keytab can be obtained from http://classroom.example.com/pub/keytabs/serverX.keytab. The export should be available read-write to clients using both Kerberos authentication and encryption. The exported directory should have 1777 permissions.
+
+Create the exported directory.
+
+[student@serverX ~]$ sudo mkdir -m1777 -p /exports/hypnotoad
+Create a new file /etc/exports with the following contents:
+
+/exports/hypnotoad 172.25.X.0/24(sec=krb5p,rw)
+Download the keytab to /etc/krb5.keytab:
+
+[student@serverX ~]$ sudo wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/serverX.keytab
+Start and enable the nfs-secure-server.service service.
+
+[student@serverX ~]$ sudo systemctl start nfs-secure-server.service
+[student@serverX ~]$ sudo systemctl enable nfs-secure-server.service
+Open the ports needed for NFSv4 on the firewall.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-service=nfs
+[student@serverX ~]$ sudo firewall-cmd --reload
+Your serverX system should export the (new) directory /exports/bigbang using smb. This directory should be owned by the bigbang group, and any new files created in this directory should automatically be owned by the bigbang group as well. Users outside of the bigbang group should not have access to this share.
+
+The name for the share should be bigbang, and the Samba-only user penny should be able to connect read-write using the password I<3Sheldon. penny should be a member of the bigbang group.
+
+Create the user and group.
+
+[student@serverX ~]$ sudo groupadd bigbang
+[student@serverX ~]$ sudo useradd -s /sbin/nologin -G bigbang penny
+Create the /exports/bigbang directory with permissions 2770, owned by the bigbang group.
+
+[student@serverX ~]$ sudo mkdir -m 2770 -p /exports/bigbang
+[student@serverX ~]$ sudo chgrp bigbang /exports/bigbang
+Mark the /exports/bigbang directory, and all of its children, as being of the SELinux samba_share_t context.
+
+[student@serverX ~]$ sudo semanage fcontext -a -t samba_share_t '/exports/bigbang(/.*)?'
+[student@serverX ~]$ sudo restorecon -RFv /exports/bigbang
+Install both the samba and samba-client packages.
+
+[student@serverX ~]$ sudo yum install samba samba-client
+Add an export block for the /exports/bigbang directory to the /etc/samba/smb.conf file. Use the share name bigbang.
+
+[bigbang]
+  path = /exports/bigbang
+  valid users = @bigbang
+  write list = @bigbang
+Set the Samba password for penny to I<3Sheldon.
+
+[student@serverX ~]$ sudo smbpasswd -a penny
+New SMB password: I<3Sheldon
+Retype new SMB password: I<3Sheldon
+Added user penny.
+Start and enable the smb.service service.
+
+[student@serverX ~]$ sudo systemctl start smb.service
+[student@serverX ~]$ sudo systemctl enable smb.service
+Open up all the relevant ports on the firewall.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-service=samba
+[student@serverX ~]$ sudo firewall-cmd --reload
+Your serverX system should serve out two TLS-protected domains on port 444/TCP: wwwX.example.com and webappX.example.com. These domains should serve out content from /srv/wwwX/www/ and /srv/webappX/www/, respectively.
+
+The TLS-enabled website on https://wwwX.example.com:444 should respond with the following text:
+
+This is wwwX
+The website at https://webappX.example.com:444 should respond by executing the PHP application found in /home/student/myapp.php.
+
+You will need the following certificates and keys to complete this requirement:
+
+http://classroom.example.com/pub/example-ca.crt
+
+http://classroom.example.com/pub/tls/certs/wwwX.crt
+
+http://classroom.example.com/pub/tls/private/wwwX.key
+
+http://classroom.example.com/pub/tls/certs/webappX.crt
+
+http://classroom.example.com/pub/tls/private/webappX.key
+
+The PHP application needs a database to work. A complete backup (mysqldump) of a working database can be found in /home/student/mydb.mysqldump.
+
+Install the needed packages:
+
+[student@serverX ~]$ sudo yum install httpd mod_ssl mariadb-server php php-mysql
+Start and enable the mariadb service, then restore the database dump.
+
+[student@serverX ~]$ sudo systemctl start mariadb
+[student@serverX ~]$ sudo systemctl enable mariadb
+[student@serverX ~]$ sudo mysql < /home/student/mydb.mysqldump
+Create the content directories and their content.
+
+[student@serverX ~]$ sudo mkdir -p /srv/{www,webapp}X/www
+[student@serverX ~]$ sudo cp /home/student/myapp.php /srv/webappX/www/index.php
+[student@serverX ~]$ echo "This is wwwX" | sudo tee /srv/wwwX/www/index.html
+[student@serverX ~]$ sudo restorecon -RFv /srv/
+Download all needed certificates.
+
+[student@serverX ~]$ cd /etc/pki/tls/certs
+[student@serverX certs]$ sudo wget http://classroom.example.com/pub/example-ca.crt
+[student@serverX certs]$ sudo wget http://classroom.example.com/pub/tls/certs/wwwX.crt
+[student@serverX certs]$ sudo wget http://classroom.example.com/pub/tls/certs/webappX.crt
+[student@serverX certs]$ cd /etc/pki/tls/private
+[student@serverX private]$ sudo wget http://classroom.example.com/pub/tls/private/wwwX.key
+[student@serverX private]$ sudo wget http://classroom.example.com/pub/tls/private/webappX.key
+[student@serverX private]$ sudo chmod 0400 w*key
+Configure SELinux to allow httpd to listen on port 444/TCP.
+
+[student@serverX ~]$ sudo semanage port -a -t http_port_t -p tcp 444
+Configure httpd to listen on port 444/TCP using https by adding the following line to /etc/httpd/conf/httpd.conf:
+
+Listen 444 https
+Configure two virtual hosts by adding the following two files to /etc/httpd/conf.d/:
+
+/etc/httpd/conf.d/wwwX.conf
+
+<VirtualHost *:444>
+  ServerName wwwX.example.com
+  SSLEngine On
+  SSLProtocol all -SSLv2 -SSLv3
+  SSLCipherSuite HIGH:MEDIUM:!aNull:!MD5
+  SSLHonorCipherOrder on
+  SSLCertificateFile /etc/pki/tls/certs/wwwX.crt
+  SSLCertificateKeyFile /etc/pki/tls/private/wwwX.key
+  SSLCertificateChainFile /etc/pki/tls/certs/example-ca.crt
+  DocumentRoot /srv/wwwX/www
+</VirtualHost>
+
+<Directory /srv/wwwX/www>
+  Require all granted              
+</Directory>
+/etc/httpd/conf.d/webappX.conf
+
+<VirtualHost *:444>
+  ServerName webappX.example.com
+  SSLEngine On
+  SSLProtocol all -SSLv2 -SSLv3
+  SSLCipherSuite HIGH:MEDIUM:!aNull:!MD5
+  SSLHonorCipherOrder on
+  SSLCertificateFile /etc/pki/tls/certs/webappX.crt
+  SSLCertificateKeyFile /etc/pki/tls/private/webappX.key
+  SSLCertificateChainFile /etc/pki/tls/certs/example-ca.crt
+  DocumentRoot /srv/webappX/www
+</VirtualHost>
+
+<Directory /srv/webappX/www>
+  Require all granted              
+</Directory>
+Start and enable the httpd.service service.
+
+[student@serverX ~]$ sudo systemctl start httpd.service
+[student@serverX ~]$ sudo systemctl enable httpd.service
+Open all needed ports on the firewall.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-port=444/tcp
+[student@serverX ~]$ sudo firewall-cmd --reload
+On your desktopX machine, create a new (executable) script called /home/student/bin/myusers.
+
+When this script is called with the userlist argument, it should return a list of all users defined in /etc/passwd, with a shell other than /sbin/nologin. Output should be a list of usernames, one per line, sorted alphabetically.
+
+When this script is called with the userinfo argument, it should return the preferred shell of the second argument, or “invalid user” if that user does not exist. If the second argument is empty or undefined, the error message “Please specify a username” must be displayed, and an exit code of 132 must be returned.
+
+If the script is called without any arguments, the following text must be displayed:
+
+myusers userlist
+myusers userinfo <USERNAME>
+Examples:
+
+[student@serverX ~]$ myusers
+myusers userlist
+myusers userinfo <USERNAME>
+[student@serverX ~]$ myusers userlist
+halt
+root
+shutdown
+student
+sync
+[student@serverX ~]$ myusers userinfo student
+/bin/bash
+Any error conditions not previously specified should return no output, and an exit code of 0.
+
+Create the /home/student/bin/ directory:
+
+[student@desktopX ~]$ mkdir /home/student/bin
+Create the new file /home/student/bin/myusers with the following content:
+
+#!/bin/bash
+
+if [ $# -eq 0 ]; then
+  echo "$(basename $0) userlist"
+  echo "$(basename $0) userinfo <USERNAME>"
+fi
+
+case $1 in
+  userlist)
+    grep -v ':/sbin/nologin$' /etc/passwd | cut -d: -f1 | sort
+  ;;
+  userinfo)
+    if [ "$2" == "" ]; then
+      echo "Please specify a username"
+      exit 132
+    fi
+    if ! getent passwd $2 &> /dev/null; then
+      echo "invalid user"
+      exit
+    fi
+    getent passwd $2 | cut -d: -f7
+  ;;
+  *)
+   exit
+  ;;
+esac
+Make the new script executable:
+
+[student@desktopX ~]$ chmod +x /home/student/bin/myusers
+Reboot your serverX machine, then verify your work by running the lab sa3-review grade command on your desktopX system.
+
+[student@desktopX ~]$ lab sa3-review grade
+

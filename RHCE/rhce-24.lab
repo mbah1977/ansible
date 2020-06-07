@@ -1,0 +1,122 @@
+Lab: Lab: Configuring MariaDB Databases
+In this lab, you will install, configure, restore, and populate a MariaDB database.
+
+Resources:
+Files:	/home/student/mariadb.dump
+Machines:	desktopX and serverX
+Outcomes:
+
+A MariaDB service listening for remote connections. A backup file will be restored and three users with different privileges will be created.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab mariadb setup
+Log into and set up your desktopX system.
+
+[student@desktopX ~]$ lab mariadb setup
+Your developers are working on a legacy system, and the MariaDB has stopped working. You have the logical backup file from last night. You are asked to install a new MariaDB database server and to restore from this backup.
+
+A new ticket has been assigned to you to create new remote access accounts with the following information:
+
+User	Password	Privileges
+mary	mary_password	Select on all tables from legacy database
+legacy	legacy_password	Select, insert, update, delete on all tables from legacy database
+report	report_password	Select on all tables from legacy database
+Since developers do not have access to the production environment, they asked you to insert new records in the manufacturer table:
+
+Name	Seller	Phone number
+HP	Joe Doe	+1 (432) 754-3509
+Dell	Luke Skywalker	+1 (431) 219-4589
+Lenovo	Darth Vader	+1 (327) 647-6784
+Install MariaDB database groups.
+
+Install the MariaDB client on your desktopX machine.
+
+[root@desktopX ~]# yum groupinstall mariadb-client -y
+Install MariaDB database server on your serverX machine.
+
+[root@serverX ~]# yum groupinstall mariadb -y
+Start and enable the MariaDB service.
+
+Start the MariaDB service.
+
+[root@serverX ~]# systemctl start mariadb.service
+Enable the MariaDB service.
+
+[root@serverX ~]# systemctl enable mariadb.service
+Configure the firewall to accept remote connections.
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=mysql
+[root@serverX ~]# firewall-cmd --reload
+Create the legacy database.
+
+Connect to the MariaDB database server.
+
+[root@serverX ~]# mysql -u root
+Create the legacy database.
+
+MariaDB [(none)]> create database legacy;
+MariaDB [(none)]> exit;
+Restore the database backup (/home/student/mariadb.dump).
+
+[root@serverX ~]# mysql -u root legacy < /home/student/mariadb.dump
+Create users according to the ticket.
+
+Connect to the MariaDB database server.
+
+[root@serverX ~]# mysql -u root
+Create user mary.
+
+MariaDB [(none)]> CREATE USER mary@'%' IDENTIFIED BY 'mary_password'; 
+Create user legacy.
+
+MariaDB [(none)]> CREATE USER legacy@'%' IDENTIFIED BY 'legacy_password'; 
+Create user report.
+
+MariaDB [(none)]> CREATE USER report@'%' IDENTIFIED BY 'report_password'; 
+Grant privileges to mary.
+
+MariaDB [(none)]> GRANT SELECT ON legacy.* TO mary@'%'; 
+Grant privileges to legacy.
+
+MariaDB [(none)]> GRANT SELECT,INSERT,UPDATE,DELETE ON legacy.* TO legacy@'%'; 
+Grant privileges to report.
+
+MariaDB [(none)]> GRANT SELECT ON legacy.* TO report@'%'; 
+Flush privileges.
+
+MariaDB [(none)]> FLUSH PRIVILEGES; 
+Insert the new manufacturers.
+
+Select legacy database.
+
+MariaDB [(none)]> USE legacy; 
+Describe table to verify attributes.
+
+MariaDB [(legacy)]> DESCRIBE manufacturer; 
++--------------+--------------+------+-----+---------+----------------+
+| Field        | Type         | Null | Key | Default | Extra          |
++--------------+--------------+------+-----+---------+----------------+
+| id           | int(11)      | NO   | PRI | NULL    | auto_increment |
+| name         | varchar(100) | NO   |     | NULL    |                |
+| seller       | varchar(100) | YES  |     | NULL    |                |
+| phone_number | varchar(17)  | YES  |     | NULL    |                |
++--------------+--------------+------+-----+---------+----------------+
+4 rows in set (0.00 sec)   
+Insert HP as manufacturer.
+
+MariaDB [(legacy)]> INSERT INTO manufacturer(name,seller,phone_number) values ('HP','Joe Doe','+1 (432) 754-3509'); 
+Insert Dell as manufacturer.
+
+MariaDB [(legacy)]> INSERT INTO manufacturer(name,seller,phone_number) values ('DELL','Luke Skywalker','+1 (431) 219-4589'); 
+Insert Lenovo as manufacturer.
+
+MariaDB [(legacy)]> INSERT INTO manufacturer(name,seller,phone_number) values ('Lenovo','Darth Vader','+1 (327) 647-6784'); 
+From your desktopX system, validate your work.
+
+[student@desktopX ~]$ lab mariadb grade
+

@@ -1,0 +1,128 @@
+Chapter 22. Providing Remote Block Storage
+iSCSI Concepts
+Quiz: Practice: iSCSI Concepts
+Providing iSCSI Targets
+Guided Exercise: Practice: Providing iSCSI Targets
+Accessing iSCSI Storage
+Guided Exercise: Practice: Accessing iSCSI Storage
+Lab: Lab: Providing Block-based Storage
+Abstract
+
+Overview
+Goal	To provide and use networked iSCSI block devices as remote disks.
+Objectives	
+Explain at a high level how iSCSI is used to provide remote access to block devices.
+
+Provide remote access using a local disk as a LUN of an iSCSI storage target.
+
+Access remote storage using an iSCSI initiator and prepare it for use.
+
+Sections	
+iSCSI Concepts (and Practice)
+
+Providing iSCSI Targets (and Practice)
+
+Accessing iSCSI Storage (and Practice)
+
+Lab	
+Providing Block-based Storage
+
+iSCSI Concepts
+In this section, students learned how to:
+
+Describe the history of the SCSI protocol and adaptation for use over networks.
+
+Describe block storage cabling topologies.
+
+Define iSCSI components and terms.
+
+Objectives
+After completing this section, students should be able to:
+
+Describe the network stack of iSCSI protocol components.
+
+Describe the topology distinctions between Fibre Channel and iSCSI.
+
+Describe the distinction between block I/O and file I/O.
+
+Introduction to iSCSI
+The Internet Small Computer System Interface (iSCSI) is a TCP/IP-based protocol for emulating a SCSI high-performance local storage bus over IP networks, providing data transfer and management to remote block storage devices. As a storage area network (SAN) protocol, iSCSI extends SANs across local and wide area networks (LANs, WANs, and the Internet), providing location-independent data storage retrieval with distributed servers and arrays.
+
+
+Figure 22.1: SCSI and iSCSI block storage topologies
+The SCSI protocol suite provides the Command Descriptor Block (CDB) command set over a device bus communication protocol. The original SCSI topology used physical cabling with a 20-meter limitation for all devices per channel (cabled bus). Devices used unique numeric target IDs (0-7, or 0-15 with dual channel). Physical SCSI disks and cabling were obsoleted by popular implementation of Fibre Channel (FC), which retained the SCSI CDB command set but replaced the disk and bus communication with protocols for longer and faster optical cabling.
+
+The iSCSI protocol also retains the CDB command set, performing bus communication between iSCSI systems that is encapsulated over standard TCP/IP. iSCSI servers emulate SCSI devices using files, logical volumes, or disks of any type as the underlying storage (backstore) presented as targets. An iSCSI service is typically implemented in software above either an operating system TCP/IP stack or a TCP offload engine (TOE), a specialized Ethernet network interface card (NIC) that includes the TCP/IP network layers to increase performance. iSCSI can also be hardware-implemented as a host bus adapter (HBA) for a greater performance increase.
+
+Enterprise-grade SANs require dedicated traffic infrastructure. FC's independent optical cabling and switches guarantees isolation. iSCSI should also be implemented on cabling that is independent of standard LAN traffic, since performance can degrade due to bandwidth congestion on shared networks. Both Ethernet and FC now offer copper and optical cabling options, allowing network consolidation combined with traffic classification.
+
+Storage area network traffic is typically unencrypted, since physical server-to-storage cabling is normally enclosed within secure data centers. For WAN security, iSCSI and Fibre Channel over Ethernet (FCoE) can utilize Internet Protocol Security (IPSec), a protocol suite for securing IP network traffic. Select networking hardware (preferred NICs, TOEs, and HBAs) can provide encryption. iSCSI offers Challenge-Handshake Authentication Protocol (CHAP) usernames and passwords as an authentication mechanism to limit connectivity between chosen initiators and targets.
+
+Until recently, iSCSI was not considered an enterprise-grade storage option, primarily due to the use of slower 100 and 1000 Mb/s Ethernet, compared to FC's 1 and 4 Gb/s optical infrastructure. With current 10 or 40 Gb/s Ethernet and 8, 10, 16, or 20 Gb/s FC, and pending 100 Gb/s Ethernet and 32 or 128 Gb/s FC, bandwidth availability is now similar for both.
+
+
+Figure 22.2: Fibre Channel block storage topologies
+The use of iSCSI extends a SAN beyond the limits of local cabling, facilitating storage consolidation in local or remote data centers. Because iSCSI structures are logical, new storage allocations are made using only software configuration, without the need for additional cable or physical disks. iSCSI also simplifies data replication, migration and disaster recovery using multiple remote data centers.
+
+iSCSI fundamentals
+
+The iSCSI protocol functions in a familiar client-server configuration. Client systems configure initiator software to send SCSI commands to remote server storage targets. Accessed iSCSI targets appear on the client system as local, unformatted SCSI block devices, identical to devices connected with SCSI cabling, FC direct attached, or FC switched fabric.
+
+Table 22.1. iSCSI Component Terminology
+
+Term	Description
+initiator	An iSCSI client, typically available as software but also implemented as iSCSI HBAs. Initiators must be given unique names (see IQN).
+target	An iSCSI storage resource, configured for connection from an iSCSI server. Targets must be given unique names (see IQN). A target provides one or more numbered block devices called logical units (see LUN). An iSCSI server can provide many targets concurrently.
+ACL	An Access Control List (entry), an access restriction using the node IQN (commonly the iSCSI Initiator Name) to validate access permissions for an initiator.
+discovery	Querying a target server to list configured targets. Target use requires an additional access steps (see login).
+IQN	An iSCSI Qualified Name, a worldwide unique name used to identify both initiators and targets, in the mandated naming format:
+   iqn.YYYY-MM.com.reversed.domain[:optional_string]
+ 
+   iqn—Signifying that this name will use a domain as its identifier.
+   YYYY-MM—The first month in which the domain name was owned.
+   com.reversed.domain—The reversed domain name of the organization creating this iSCSI name.
+   optional_string—An optional, colon-prefixed string assigned by the domain owner as desired while remaining worldwide unique. It may include colons to separate organization boundaries.
+login	Authenticating to a target or LUN to begin client block device use.
+LUN	A Logical Unit Number, numbered block devices attached to and available through a target. One or more LUNs may be attached to a single target, although typically a target provides only one LUN.
+node	Any iSCSI initiator or iSCSI target, identified by its IQN.
+portal	An IP address and port on a target or initiator used to establish connections. Some iSCSI implementations use portal and node interchangeably.
+TPG	Target Portal Group, the set of interface IP addresses and TCP ports to which a specific iSCSI target will listen. Target configuration (e.g., ACLs) can be added to the TPG to coordinate settings for multiple LUNs.
+
+iSCSI uses ACLs to perform LUN masking, managing the accessibility of appropriate targets and LUNs to initiators. Access to targets may also be limited with CHAP authentication. iSCSI ACLs are similar to FC's use of device worldwide numbers (WWNs) for soft zoning management restrictions. Although FC switch-level compulsory port restriction (hard zoning) has no comparable iSCSI mechanism, Ethernet VLANs could provide similar isolation security.
+
+Unlike local block devices, iSCSI network-accessed block devices are discoverable from many remote initiators. Typical local file systems (e.g., ext4, XFS, btrfs) do not support concurrent multisystem mounting, which can result in significant file system corruption. Clustered systems resolve multiple system access by use of the Global File System (GFS2), designed to provide distributed file locking and concurrent multinode file system mounting.
+
+
+Figure 22.3: Block I/O network stack components
+An attached iSCSI block device appears as a local SCSI block device (sdx) for use underneath a local file system, swap space, or a raw database installation as diagrammed previously. See the following for contrast with the use of network file server protocols (e.g., NFS, SMB), providing file I/O from remote file systems to local applications on multiple client systems concurrently.
+
+
+Figure 22.4: File I/O network stack components
+REFERENCES
+Open-iSCSI project
+
+Technical Committee T10 - SCSI Storage Interfaces
+
+RFC 3270 - Internet Small Computer Systems Interface (iSCSI)
+
+
+
+
+
+
+Quiz: Practice: iSCSI Concepts
+Match the following items to their counterparts in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+Description	Term
+Unique name to identify individual iSCSI targets and initiators.	IQN
+Unique number to identify individual Fibre Channel port and nodes.	WWN
+Storage resource on an iSCSI server.	target
+Storage resource block device on an iSCSI server.	LUN
+iSCSI client implemented in either software or hardware.	initiator
+A single iSCSI initiator or target.	node
+A single IP connection address on an initiator or target.	portal
+

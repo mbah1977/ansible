@@ -1,0 +1,209 @@
+Lab: Lab: Providing File-based Storage
+In this lab, you will create storage shares with NFS and SMB.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+Share directories with NFS and Kerberos security on serverX according to the requirements given, then mount them on desktopX; share a directory with SMB on serverX according to the requirements given, then mount it on desktopX.
+
+Reset the serverX system.
+
+Reset the desktopX system.
+
+Log into and set up your server system.
+
+[student@serverX ~]$ lab storageshares setup
+Log into and set up your desktop system.
+
+[student@desktopX ~]$ lab storageshares setup
+Become root on your serverX system.
+
+[student@serverX ~]$ sudo -i
+Become root on your desktopX system.
+
+[student@desktopX ~]$ sudo -i
+Successfully grade the setup on desktopX and serverX with lab storageshares grade.
+
+Configure the NFS server on serverX to meet the following requirements:
+
+Share the newly created /krbnfs directory on serverX with krb5p security.
+
+Allow read and write access on the share from the desktopX system.
+
+SELinux labels are exported.
+
+Preconfigured krb5 keytabs for the serverX and desktopX systems are available at:
+
+http://classroom.example.com/pub/keytabs/serverX.keytab.
+
+http://classroom.example.com/pub/keytabs/desktopX.keytab.
+
+Allow access to the NFS service through the firewall.
+
+Mount the NFS share serverX:/krbnfs on the newly created mount point /mnt/securespace permanently on desktopX with krb5p security and exported SELinux labels.
+
+Configure a SMB share on the serverX system according to the following requirements:
+
+Share the newly created directory /sambaspace with SMB.
+
+Members of the auxiliary group sales have read and write permissions on the share.
+
+All users that are not members of the sales group have read permission.
+
+The Samba server is in the salesdep workgroup, and the share name in Samba is smbspace.
+
+Create the Samba-only user frank, who is part of the sales team, with the password redhat.
+
+Create the new Samba-only user martin, who is not part of the sales team, with the password redhat.
+
+Allow access to the SMB service through the firewall.
+
+Mount the Samba share permanently on the /mnt/salesshare mount point on desktopX as a multiuser mount. Authenticate with the newly created credentials file /root/smb-multiuser.txt. Mount the Samba share with the credentials of user frank.
+
+Configure NFS to share the newly created /krbnfs directory on serverX with krb5p security. Allow read and write access from the desktopX system. Mount the NFS share at the /mnt/securespace directory on the desktopX system. The SELinux labels from the exported directory are available on the desktopX system where the share is mounted. The Kerberos-authenticated user ldapuserX can successfully access the share.
+
+Install the keytab provided at http://classroom.example.com/pub/keytabs/serverX.keytab on the serverX system.
+
+[root@serverX ~]# wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/serverX.keytab
+Enable NFS version 4.2 on the serverX system to export the SELinux labels. To do that, change the RPCNFSDARGS="" line in the /etc/sysconfig/nfs file to:
+
+RPCNFSDARGS="-V 4.2"
+Start the nfs-secure-server service on the serverX system.
+
+[root@serverX ~]# systemctl start nfs-secure-server
+Enable the nfs-secure-server to start at system boot on serverX.
+
+[root@serverX ~]# systemctl enable nfs-secure-server
+Create the directory /krbnfs on serverX.
+
+[root@serverX ~]# mkdir /krbnfs
+Add the directory /krbnfs to the /etc/exports file to export it with NFS. Enable krb5p security to secure access to the NFS share. Allow read and write access to the exported directory.
+
+[root@serverX ~]# echo '/krbnfs desktopX(sec=krb5p,rw)' >>/etc/exports
+Reload the /etc/exports file on the serverX system.
+
+[root@serverX ~]# exportfs -r
+Configure firewalld to allow access to the NFS service on serverX.
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=nfs
+Reload the firewalld configuration to allow access to the NFS service on serverX.
+
+[root@serverX ~]# firewall-cmd --reload
+Mount the NFS share serverX:/krbnfs on the newly created mount point /mnt/securespace permanently on desktopX with krb5p security and exported SELinux labels.
+
+Install the keytab provided at http://classroom.example.com/pub/keytabs/desktopX.keytab on the desktopX system.
+
+[root@desktopX ~]# wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/desktopX.keytab
+Start the nfs-secure service on desktopX to help with negotiating authentication with a Kerberized NFS share.
+
+[root@desktopX ~]# systemctl start nfs-secure
+Enable the nfs-secure share to start at system boot on desktopX.
+
+[root@desktopX ~]# systemctl enable nfs-secure
+Create the mount point /mnt/securespace on the desktopX system.
+
+[root@desktopX ~]# mkdir /mnt/securespace
+Create the entry in the /etc/fstab file to mount the /krbnfs share exported by the serverX system on the /mnt/securespace mount point on desktopX so that the SELinux labels from the share are shown on the mount point.
+
+serverX:/krbnfs /mnt/securespace nfs defaults,v4.2,sec=krb5p 0 0
+Mount the exported NFS share on the newly created /mnt/securespace directory on the desktopX system and verify the /etc/fstab entry works as expected.
+
+[root@desktopX ~]# mount /mnt/securespace
+Configure the serverX machine to share the newly created directory /sambaspace with SMB. Members of the auxiliary group sales have read and write permissions on the share. All users that are not member of the sales group have read permission. Ensure that all newly created files of a user that is a member of the sales group have the group ownership sales. The Samba server is in the salesdep workgroup and the share name in Samba is smbspace.
+
+Deploy the required RPM packages to run the SMB service on serverX.
+
+[root@serverX ~]# yum -y install samba
+Create the auxiliary system group sales on the serverX system.
+
+[root@serverX ~]# groupadd -r sales
+Create the /sambaspace directory on serverX.
+
+[root@serverX ~]# mkdir -p /sambaspace
+Change the group ownership of the /sambaspace directory to sales on the serverX system.
+
+[root@serverX ~]# chgrp sales /sambaspace
+Adjust the permissions on the /sambaspace directory to have the SGID bit set and write is prohibited by others.
+
+[root@serverX ~]# chmod 2775 /sambaspace
+Add the directory /sambaspace and all files shown as follows to the SELinux policy as a directory sharing files with SMB by setting its label to samba_share_t.
+
+[root@serverX ~]# semanage fcontext -a -t samba_share_t '/sambaspace(/.*)?'
+Apply the SELinux rule for the /sambaspace directory that was added in the previous step on serverX.
+
+[root@serverX ~]# restorecon -vvFR /sambaspace
+restorecon reset /sambaspace context unconfined_u:object_r:default_t:s0->system_u:object_r:samba_share_t:s0
+Change the /etc/samba/smb.conf configuration file on serverX. The workgroup is salesdep. The newly created SMB share is named smbspace and shares the /sambaspace directory where all members of the system group sales have write access.
+
+Modify or confirm the following:
+
+[global]
+...
+ workgroup = salesdep
+...
+ security = user
+ passdb backend = tdbsam
+Add a section at the end of the file as follows.
+
+[smbspace]
+ path = /sambaspace
+ write list = @sales
+Create the Samba-only user frank, who is part of the sales group. The user frank has read and write access to the smbspace SMB share. A new Samba user martin is created, who is not part of the sales team. The user martin has read access to the smbspace SMB share. Both newly added users have the SMB password redhat.
+
+Install the samba-client RPM package because it contains the smbpasswd.
+
+[root@serverX ~]# yum -y install samba-client
+Create the system user frank as a member of the auxiliary group sales on serverX.
+
+[root@serverX ~]# useradd -s /sbin/nologin -G sales frank
+Add the SMB user frank to Samba. The Samba user is automatically mapped to the local system user frank.
+
+[root@serverX ~]# smbpasswd -a frank
+New SMB password:  redhat
+Retype new SMB password:  redhat
+Added user frank.
+Create the system user martin on serverX.
+
+[root@serverX ~]# useradd -s /sbin/nologin martin
+Add the SMB user martin to Samba. The Samba user is automatically mapped to the local system user martin.
+
+[root@serverX ~]# smbpasswd -a martin
+New SMB password:  redhat
+Retype new SMB password:  redhat
+Added user martin.
+Start the smb and nmb services on the serverX system.
+
+[root@serverX ~]# systemctl start smb nmb
+Enable the smb and nmb services to start at system boot on serverX.
+
+[root@serverX ~]# systemctl enable smb nmb
+Configure firewalld to allow access to the SMB service on serverX.
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=samba
+success
+[root@serverX ~]# firewall-cmd --reload
+success
+Mount the Samba share permanently on the /mnt/salesshare mount point on desktopX as a multiuser mount. Authenticate with the newly created credentials file /root/smb-multiuser.txt. Mount the Samba share with the credentials of user frank.
+
+Install the cifs-utils package to provide the mount.cifs command on the desktopX system.
+
+[root@desktopX ~]# yum -y install cifs-utils
+Create the mount point /mnt/salesshare on desktopX.
+
+[root@desktopX ~]# mkdir /mnt/salesshare
+Mount the Samba share permanently with a credentials file on the /mnt/salesshare mount point on desktopX. Mount the Samba share with the credentials of user frank.
+
+[root@desktopX ~]# echo 'username=frank' >/root/smb-multiuser.txt
+[root@desktopX ~]# echo 'password=redhat' >>/root/smb-multiuser.txt
+Create the entry in /etc/fstab to permanently mount the Samba share //serverX/smbspace with multiuser option as user frank on the /mnt/salesshare mount point on desktopX.
+
+//serverX/smbspace /mnt/salesshare cifs credentials=/root/smb-multiuser.txt,multiuser,sec=ntlmssp 0 0
+Verify the entry in /etc/fstab to permanently mount the Samba share on desktopX is correct by mounting the share with the fstab entry.
+
+[root@desktopX ~]# mount /mnt/salesshare
+Successfully grade the setup on desktopX and serverX with lab storageshares grade.
+
+[root@desktopX ~]# lab storageshares grade
+[root@serverX ~]# lab storageshares grade
+

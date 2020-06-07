@@ -1,0 +1,376 @@
+
+Lab: Lab: Comprehensive Review of System Administration II
+In this lab, you will configure a system using the skills taught in this course.
+
+Resources:
+Files:	http://serverX.example.com/logfile
+Machines:	serverX and desktopX
+Outcomes:
+
+Two systems configured according to the specified requirements that follow.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab sa2-review setup
+Reset your desktopX system.
+
+You have been tasked with configuring a new system for your company: desktopX. The system should be configured according to the following requirements.
+
+The system should authenticate users using LDAP and Kerberos using the following settings:
+
+Name	Value
+LDAP server
+
+classroom.example.com
+
+Search Base
+
+dc=example,dc=com
+
+Use TLS
+
+Yes
+
+TLS CA Cert
+
+http://classroom.example.com/pub/example-ca.crt
+
+Kerberos Realm
+
+EXAMPLE.COM
+
+Kerberos KDC
+
+classroom.example.com
+
+Kerberos Admin Server
+
+classroom.example.com
+
+For testing purposes, you can use the user ldapuserX, with the password kerberos.
+
+Home directories for your LDAP users should be automatically mounted on access. These home directories are served from the NFS share classroom.example.com:/home/guests.
+
+serverX exports a CIFS share called westeros. This share should be mounted automatically at boot on the mount point /mnt/westeros. To mount this share, you will need to use the username tyrion with the password slapjoffreyslap. This password should not be stored anywhere an unprivileged user can read it.
+
+serverX exports an NFSv4 share called /essos. This share needs to be mounted read-write at boot on /mnt/essos using Kerberos authentication, encryption, and integrity checking.
+
+A keytab for your system can be downloaded from http://classroom.example.com/pub/keytabs/desktopX.keytab.
+
+Configure a new 512 MiB logical volume called arya in a new 2 GiB volume group called stark.
+
+This new logical volume should be formatted with an XFS file system, and mounted persistently on /mnt/underfoot.
+
+Your system should be outfitted with a new 512 MiB swap partition, automatically activated at boot.
+
+Create a new group called kings, and four new users belonging to that group: stannis, joffrey, renly, and robb.
+
+Create a new directory /ironthrone, owned by root:root with permissions 700.
+
+Configure this directory so that users in the kings group have both read and write privileges on it, with the exception of the user joffrey, who should only be granted read privileges.
+
+These restrictions should also apply to all new files and directories created under the /ironthrone directory.
+
+Install the httpd and mod_ssl packages, then enable and start the httpd.service service.
+
+Open up port 12345/tcp in the default zone for the firewall running on your system.
+
+Create a new directory called /docroot. Make sure that the SELinux context for this directory is set to public_content_t, and that this context will survive a relabel operation.
+
+http://serverX.example.com/logfile contains the logs for a recent project. Download this file, then extract all lines ending in ERROR or FAIL to the file /home/student/errors.txt. All lines should be kept in the order in which they appear in the log file.
+
+Your system should have a new directory used to store temporary files named /run/veryveryvolatile. Whenever systemd-tmpfiles --clean is run, any file older than 5 seconds should be deleted from that directory.
+
+This directory should have permissions 1777, and be owned by root:root.
+
+All changes must survive a reboot. When you are done configuring your system, you can test your work by rebooting your desktopX machine and running the following command:
+
+[student@desktopX ~]$ lab sa2-review grade
+The system should authenticate users using LDAP and Kerberos using the following settings:
+
+Name	Value
+LDAP server
+
+classroom.example.com
+
+Search Base
+
+dc=example,dc=com
+
+Use TLS
+
+Yes
+
+TLS CA Cert
+
+http://classroom.example.com/pub/example-ca.crt
+
+Kerberos Realm
+
+EXAMPLE.COM
+
+Kerberos KDC
+
+classroom.example.com
+
+Kerberos Admin Server
+
+classroom.example.com
+
+For testing purposes, you can use the user ldapuserX, with the password kerberos.
+
+Install the authconfig-gtk and sssd packages.
+
+[student@desktopX ~]$ sudo yum install authconfig-gtk sssd
+Run authconfig-gtk, and enter the information provided. Do not forget to uncheck the Use DNS to locate KDCs for realms option.
+
+[student@desktopX ~]$ sudo authconfig-gtk
+Home directories for your LDAP users should be automatically mounted on access. These home directories are served from the NFS share classroom.example.com:/home/guests.
+
+Install the autofs package.
+
+[student@desktopX ~]$ sudo yum install autofs
+Create a new file called /etc/auto.master.d/guests.autofs with the following contents:
+
+/home/guests  /etc/auto.guests
+Create a new file called /etc/auto.guests with the following contents:
+
+* -rw,sync  classroom.example.com:/home/guests/&
+Start and enable the autofs.service service.
+
+[student@desktopX ~]$ sudo systemctl enable autofs.service
+[student@desktopX ~]$ sudo systemctl start autofs.service
+serverX exports a CIFS share called westeros. This share should be mounted automatically at boot on the mount point /mnt/westeros. To mount this share, you will need to use the username tyrion with the password slapjoffreyslap. This password should not be stored anywhere an unprivileged user can read it.
+
+Install the cifs-utils package.
+
+[student@desktopX ~]$ sudo yum install cifs-utils
+Create the mount point.
+
+[student@desktopX ~]$ sudo mkdir -p /mnt/westeros
+Create a credentials file named /root/tyrion.creds with the following content, then set the permissions on that file to 0600:
+
+username=tyrion
+password=slapjoffreyslap
+[student@desktopX ~]$ sudo chmod 0600 /root/tyrion.creds
+Add the following line to /etc/fstab:
+
+//serverX.example.com/westeros /mnt/westeros cifs creds=/root/tyrion.creds 0 0
+Mount all file systems, and inspect the mounted file system.
+
+[student@desktopX ~]$ sudo mount -a
+[student@desktopX ~]$ cat /mnt/westeros/README.txt
+serverX exports an NFSv4 share called /essos. This share needs to be mounted read-write at boot on /mnt/essos using Kerberos authentication, encryption, and integrity checking.
+
+A keytab for your system can be downloaded from http://classroom.example.com/pub/keytabs/desktopX.keytab.
+
+Create the mount point.
+
+[student@desktopX ~]$ sudo mkdir -p /mnt/essos
+Download the keytab for your system.
+
+[student@desktopX ~]$ sudo wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/desktopX.keytab
+Add the following line to /etc/fstab:
+
+serverX.example.com:/essos /mnt/essos nfs sec=krb5p,rw 0 0
+Start and enable the nfs-secure.service service.
+
+[student@desktopX ~]$ sudo systemctl enable nfs-secure.service
+[student@desktopX ~]$ sudo systemctl start nfs-secure.service
+Mount all file systems.
+
+[student@desktopX ~]$ sudo mount -a
+Configure a new 512 MiB logical volume called arya in a new 2 GiB volume group called stark.
+
+This new logical volume should be formatted with an XFS file system, and mounted persistently on /mnt/underfoot.
+
+Create a 2 GiB partition on your secondary disk.
+
+NOTE
+The solutions for this exercise use /dev/vdb as the device node for the secondary disk. In your ROL environment, the secondary disk will be named differently; adjust the following instructions accordingly.
+
+[student@desktopX ~]$ sudo fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table
+Building a new DOS disklabel with disk identifier 0xcade6cae.
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+Partition number (1-4, default 1): Enter
+First sector (2048-20971519, default 2048): Enter
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-20971519, default 20971519): +2G
+Partition 1 of type Linux and of size 2 GiB is set
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+Syncing disks.
+Turn the new partition into a physical volume.
+
+[student@desktopX ~]$ sudo pvcreate /dev/vdb1
+Build a new volume group using the new physical volume.
+
+[student@desktopX ~]$ sudo vgcreate stark /dev/vdb1
+Create a new 512 MiB logical volume (LV) in the new volume group.
+
+[student@desktopX ~]$ sudo lvcreate -n arya -L 512M stark
+Format the new LV with an XFS file system.
+
+[student@desktopX ~]$ sudo mkfs -t xfs /dev/stark/arya
+Create the mount point.
+
+[student@desktopX ~]$ sudo mkdir -p /mnt/underfoot
+Add the following line to /etc/fstab:
+
+/dev/stark/arya /mnt/underfoot xfs defaults 1 2
+Mount all file systems.
+
+[student@desktopX ~]$ sudo mount -a
+Your system should be outfitted with a new 512 MiB swap partition, automatically activated at boot.
+
+Create a new 512 MiB partition on your secondary disk and set the partition type to 82.
+
+NOTE
+The solutions for this exercise use /dev/vdb as the device node for the secondary disk. In your ROL environment, the secondary disk will be named differently; adjust the following instructions accordingly.
+
+[student@desktopX ~]$ sudo fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Command (m for help): n
+Partition type:
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended
+Select (default p): p
+Partition number (2-4, default 2): Enter
+First sector (4196352-20971519, default 4196352): Enter
+Using default value 4196352
+Last sector, +sectors or +size{K,M,G} (4196352-20971519, default 20971519): +512M
+Partition 2 of type Linux and of size 512 MiB is set
+
+Command (m for help): t
+Partition number (1,2, default 2): Enter
+Hex code (type L to list all codes): 82
+Changed type of partition 'Linux' to 'Linux swap / Solaris'
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+
+WARNING: Re-reading the partition table failed with error 16: Device or resource busy.
+The kernel still uses the old table. The new table will be used at
+the next reboot or after you run partprobe(8) or kpartx(8)
+Syncing disks.
+[student@desktopX ~]$ sudo partprobe
+Format the new partition as swap.
+
+[student@desktopX ~]$ sudo mkswap /dev/vdb2
+Retrieve the UUID for your new swap partition.
+
+[student@desktopX ~]$ sudo blkid /dev/vdb2
+Add the following line to /etc/fstab; make sure to use the UUID you found in the previous step.
+
+UUID="xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx" swap swap defaults 0 0
+Activate all swaps.
+
+[student@desktopX ~]$ sudo swapon -a
+Create a new group called kings, and four new users belonging to that group: stannis, joffrey, renly, and robb.
+
+Create the kings group.
+
+[student@desktopX ~]$ sudo groupadd kings
+Create the four users, and add them to the kings group.
+
+[student@desktopX ~]$ for NEWUSER in stannis joffrey renly robb; do
+>   sudo useradd -G kings ${NEWUSER}
+> done
+Create a new directory /ironthrone, owned by root:root with permissions 0700.
+
+Configure this directory so that users in the kings group have both read and write privileges on it, with the exception of the user joffrey, who should only be granted read privileges.
+
+These restrictions should also apply to all new files and directories created under the /ironthrone directory.
+
+Create the directory with the correct permissions.
+
+[student@desktopX ~]$ sudo mkdir -m 0700 /ironthrone
+Add an ACL on /ironthrone granting users in the kings group read and write privileges. Do not forget to add execute permissions as well, since this is a directory.
+
+[student@desktopX ~]$ sudo setfacl -m g:kings:rwX /ironthrone
+Add an ACL for the user joffrey, with only read and execute permissions.
+
+[student@desktopX ~]$ sudo setfacl -m u:joffrey:r-x /ironthrone
+Add the two previous ACLs as default ACLs as well.
+
+[student@desktopX ~]$ sudo setfacl -m d:g:kings:rwx /ironthrone
+[student@desktopX ~]$ sudo setfacl -m d:u:joffrey:r-x /ironthrone
+Install the httpd and mod_ssl packages, then enable and start the httpd.service service.
+
+Install the httpd and mod_ssl packages.
+
+[student@desktopX ~]$ sudo yum install httpd mod_ssl
+Start and enable the httpd.service service.
+
+[student@desktopX ~]$ sudo systemctl start httpd.service
+[student@desktopX ~]$ sudo systemctl enable httpd.service
+Open up port 12345/tcp in the default zone for the firewall running on your system.
+
+Open port 12345/tcp in the permanent configuration of the default zone for your firewall.
+
+[student@desktopX ~]$ sudo firewall-cmd --permanent --add-port=12345/tcp
+Reload your firewall to activate your changes.
+
+[student@desktopX ~]$ sudo firewall-cmd --reload
+Create a new directory called /docroot. Make sure that the SELinux context for this directory is set to public_content_t, and that this context will survive a relabel operation.
+
+Create the /docroot directory.
+
+[student@desktopX ~]$ sudo mkdir /docroot
+Add a new default file context for the /docroot directory and all its descendants.
+
+[student@desktopX ~]$ sudo semanage fcontext -a -t public_content_t '/docroot(/.*)?'
+Relabel the /docroot directory.
+
+[student@desktopX ~]$ sudo restorecon -RvF /docroot
+http://serverX.example.com/logfile contains the logs for a recent project. Download this file, then extract all lines ending in ERROR or FAIL to the file /home/student/errors.txt. All lines should be kept in the order in which they appear in the log file.
+
+Download the log file.
+
+[student@desktopX ~]$ wget http://serverX.example.com/logfile
+Extract every line that ends in either ERROR or FAIL into the file /home/student/errors.txt, while keeping the line order intact.
+
+[student@desktopX ~]$ grep -e 'ERROR$' -e 'FAIL$' logfile > /home/student/errors.txt
+Your system should have a new directory used to store temporary files named /run/veryveryvolatile. Whenever systemd-tmpfiles --clean is run, any file older than 5 seconds should be deleted from that directory.
+
+This directory should have permissions 1777, and be owned by root:root.
+
+Create a new file called /etc/tmpfiles.d/veryveryvolatile.conf with the following content:
+
+d /run/veryveryvolatile 1777 root root 5s
+Have systemd-tmpfiles create the directory.
+
+[student@desktopX ~]$ sudo systemd-tmpfiles --create
+Verify your work by rebooting your desktopX machine and running the following command on your desktopX system:
+
+[student@desktopX ~]$ lab sa2-review grade
+If any requirement comes up as “FAIL”, revisit that requirement, and then reboot and grade again.
+
+

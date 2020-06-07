@@ -1,0 +1,297 @@
+Working with MariaDB Databases
+In this section, students learned how to:
+
+Examine databases.
+
+Search in databases.
+
+Create databases.
+
+Use SQL.
+
+Objectives
+After completing this section, students should be able to examine, search, create, and change database information using Structured Query Language (SQL) and MariaDB statements.
+
+Creating a database
+The installation of the mariadb-client group provides a program called mysql. With this program, it is possible to connect to a local or remote MariaDB database server.
+
+[root@serverX ~]# mysql1 -u2 root3 -h4 localhost5 -p6
+1
+
+Client to connect to the MariaDB database server.
+
+2
+
+Option to specify the username for this connection.
+
+3
+
+Username for this connection.
+
+4
+
+Option to specify the host name for this connection. If not specified, the default value is localhost.
+
+5
+
+Host name for this connection.
+
+6
+
+Option to prompt for password.
+
+A database in MariaDB is implemented as a directory. The default installation has four databases. To list the databases, run the command:
+
+MariaDB [(none)]> SHOW DATABASES;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| test               |
++--------------------+
+4 rows in set (0.01 sec)
+  
+IMPORTANT
+The only default database that can be erased is test.
+
+NOTE
+Unlike the shell, MariaDB—like most relational database systems—is not case-sensitive for simple commands. show databases; and SHOW DATABASES; work just as well as ShOw DATAbases;. However, table and database names are case-sensitive. Many databases are set up using all lowercase for the database names, so common practice is to use uppercase for the commands to differentiate the command itself from the target of the command (more examples follow). The important part of these commands, and of most commands entered at the prompt, is to terminate the command with a ;.
+
+To create a new database, run the command:
+
+MariaDB [(none)]> CREATE DATABASE inventory;
+After the creation of the new database, the next step is to connect to this database so that it can be populated with tables and data:
+
+MariaDB [(none)]> USE inventory;
+NOTE
+It is possible to switch between databases at any time with this command.
+
+MariaDB (like all relational database systems) can have multiple tables per database. List the tables with the SHOW TABLES; command:
+
+MariaDB [(none)]>  USE mysql;
+MariaDB [(none)]>  SHOW TABLES;  
++---------------------------+
+| Tables_in_mysql           |
++---------------------------+
+| columns_priv              |
+| db                        |
+| event                     |
+| func                      |
+| general_log               |
+| help_category             |
+| help_keyword              |
+| help_relation             |
+| help_topic                |
+| host                      |
+| ndb_binlog_index          |
+| plugin                    |
+| proc                      |
+| procs_priv                |
+| proxies_priv              |
+| servers                   |
+| slow_log                  |
+| tables_priv               |
+| time_zone                 |
+| time_zone_leap_second     |
+| time_zone_name            |
+| time_zone_transition      |
+| time_zone_transition_type |
+| user                      |
++---------------------------+
+24 rows in set (0.00 sec)
+  
+To list attributes (or the column names) from a table, use:
+
+MariaDB [(mysql)]>  DESCRIBE servers;
++-------------+----------+------+-----+---------+-------+
+| Field       | Type     | Null | Key | Default | Extra |
++-------------+----------+------+-----+---------+-------+
+| Server_name | char(64) | NO   | PRI |         |       |
+| Host        | char(64) | NO   |     |         |       |
+| Db          | char(64) | NO   |     |         |       |
+| Username    | char(64) | NO   |     |         |       |
+| Password    | char(64) | NO   |     |         |       |
+| Port        | int(4)   | NO   |     | 0       |       |
+| Socket      | char(64) | NO   |     |         |       |
+| Wrapper     | char(64) | NO   |     |         |       |
+| Owner       | char(64) | NO   |     |         |       |
++-------------+----------+------+-----+---------+-------+
+42 rows in set (0.00 sec)      
+This output completely describes the data in the servers table in the mysql database. The Port attribute is stored as an integer, using a maximum of 4 digits, and defaults to 0.
+
+The Key value is null for most of these attributes. Only the Server_name has a value: PRI. This sets the attribute as the primary key for the table. Primary keys are unique identifiers for the data in the table. No two entries can have the same primary key, and only one attribute may be set as the primary key. Primary keys are often used to link tables together, and are an important concept when designing complex databases. There are also secondary keys, and composite keys (where multiple attributes together form the unique key). A deeper discussion of keys is beyond the scope of this course.
+
+The Extra value is used to show any additional features of the attribute. This value can be complex, but a common one is auto_increment, which states that the value of this column will be incremented by 1 for each new entry made into the table. It is a common value for primary keys to have, as seen in later examples.
+
+Using SQL: Structured Query Language
+Structured Query Language (SQL) is a special programming language designed for managing data held in relational databases. Some common SQL commands include insert, update, delete, and select.
+
+NOTE
+These four basic commands are often referred to by the generic term "CRUD operations." CRUD stands for Create (insert), Read (select), Update (update), and Delete (delete).
+
+To insert data into a table, the first step is to figure out the attributes of the table.
+
+MariaDB [(inventory)]>  DESCRIBE product;
++-----------------+--------------+------+-----+---------+----------------+
+| Field           | Type         | Null | Key | Default | Extra          |
++-----------------+--------------+------+-----+---------+----------------+
+| id              | int(11)      | NO   | PRI | NULL    | auto_increment |
+| name            | varchar(100) | NO   |     | NULL    |                |
+| price           | double       | NO   |     | NULL    |                |
+| stock           | int(11)      | NO   |     | NULL    |                |
+| id_category     | int(11)      | NO   |     | NULL    |                |
+| id_manufacturer | int(11)      | NO   |     | NULL    |                |
++-----------------+--------------+------+-----+---------+----------------+
+6 rows in set (0.00 sec)  
+In this example, all attributes are required. To insert a new product, the command will be rather long and complicated:
+
+MariaDB [(inventory)]>  INSERT INTO product1(name,price,stock,id_category,id_manufacturer)2 
+                      VALUES ('SDSSDP-128G-G25 2.5',82.04,30,3,1)3;
+Query OK, 1 row affected (0.00 sec)  
+1
+
+Table name.
+
+2
+
+Attributes (columns) that will be inserted.
+
+3
+
+Values that will be inserted in the same order defined by attributes, using the proper data types.
+
+NOTE
+Note that the attribute ID was not specified, even though it is required. When inserting a new record, MariaDB will automatically assign a sequential value for that column. This is because this column is marked as auto_increment.
+
+Delete a record with the delete statement:
+
+MariaDB [(inventory)]>  DELETE FROM product1 WHERE2 id = 13 ;
+Query OK, 1 row affected (0.01 sec)
+  
+1
+
+Table name.
+
+2
+
+Clause that imposes a condition on the command execution.
+
+3
+
+The condition for the record to be deleted; often the primary key-value pair is used.
+
+WARNING
+If the where clause is not specified, all records in the table will be erased. This is the database equivalent of running rm -rf /.
+
+To update a record, use an update statement:
+
+MariaDB [(inventory)]>  UPDATE product1 SET2 price=89.90, stock=60 WHERE3 id = 54 ;
+ Query OK, 1 row affected (0.01 sec)
+  
+1
+
+Table name.
+
+2
+
+Define the new value from specified attributes.
+
+2
+
+Clause that imposes a condition on the command execution.
+
+3
+
+The condition for the record to be updated.
+
+WARNING
+If the where clause is not specified, all records will be updated.
+
+To read data records from the database, use the select statement:
+
+MariaDB [(inventory)]>  SELECT name,price,stock1 FROM product2;
++---------------------+--------+-------+
+| name                | price  | stock |
++---------------------+--------+-------+
+| ThinkServer TS140   | 539.88 |    20 |
+| RT-AC68U            | 219.99 |    10 |
+| X110 64GB           |  73.84 |   100 |
+| SDSSDP-128G-G25 2.5 |  82.04 |    30 |
++---------------------+--------+-------+
+4 rows in set (0.00 sec)
+  
+1
+
+Attributes that will be selected.
+
+2
+
+Table name.
+
+To select all attributes, use the wild card *:
+
+MariaDB [(inventory)]>  SELECT * FROM product;
++----+---------------------+--------+-------+-------------+-----------------+
+| id | name                | price  | stock | id_category | id_manufacturer |
++----+---------------------+--------+-------+-------------+-----------------+
+|  2 | ThinkServer TS140   | 539.88 |    20 |           2 |               4 |
+|  3 | RT-AC68U            | 219.99 |    10 |           1 |               3 |
+|  4 | X110 64GB           |  73.84 |   100 |           3 |               1 |
+|  5 | SDSSDP-128G-G25 2.5 |  82.04 |    30 |           3 |               1 |
++----+---------------------+--------+-------+-------------+-----------------+
+4 rows in set (0.00 sec) 
+  
+Filter results with the where clause:
+
+MariaDB [(inventory)]>  SELECT * FROM product WHERE price > 100;
++----+-------------------+--------+-------+-------------+-----------------+
+| id | name              | price  | stock | id_category | id_manufacturer |
++----+-------------------+--------+-------+-------------+-----------------+
+|  2 | ThinkServer TS140 | 539.88 |    20 |           2 |               4 |
+|  3 | RT-AC68U          | 219.99 |    10 |           1 |               3 |
++----+-------------------+--------+-------+-------------+-----------------+
+2 rows in set (0.00 sec) 
+  
+Table 24.1. Common Operators for where Clauses
+
+Operator	Description
+=	Equal
+<>	Not equal. Note: In some versions of SQL, this operator may be written as !=
+>	Greater than
+<	Less than
+>=	Greater than or equal
+<=	Less than or equal
+BETWEEN	Between an inclusive range
+LIKE	Search for a pattern
+IN	To specify multiple possible values for a column
+
+REFERENCES
+mysql(1) man page
+
+MariaDB Knowledge Base: SQL Commands
+
+MariaDB Knowledge Base: Data Types
+
+
+
+
+
+
+Quiz: Practice: MariaDB Commands
+Match the following items to their counterparts in the table.
+
+Drag and drop the items to the cell by the correct answer. Each cell should contain one answer. If you wish to change an answer, either drag it to another location, or click Reset to return the quiz to its original settings.
+
+When you have completed the quiz, click Check. Your correct answers will have a blue background and your incorrect answers will be crossed out. If you wish to try again, click Reset. Note: if you have trouble getting the quiz to function a second time, try refreshing your browser. Click Show Solution to see all of the correct answers.
+
+Objective	Statement
+Describe a table	DESCRIBE table_name;
+Update a record in the table	UPDATE table_name SET attribute=value WHERE attribute > value;
+Connect to a specific database	USE database_name;
+List databases available in MariaDB	SHOW DATABASES;
+List tables available in a database	SHOW TABLES;
+Select data records from a table	SELECT * FROM table_name;
+Delete records from a table	DELETE FROM table_name WHERE attribute = value;
+

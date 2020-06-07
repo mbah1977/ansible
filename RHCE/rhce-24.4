@@ -1,0 +1,268 @@
+Creating and Restoring MariaDB Backups
+In this section, students learned how to:
+
+Back up a MariaDB database.
+
+Restore a MariaDB database.
+
+Objectives
+After completing this section, students should be able to back up a MariaDB database safely and restore a database backup.
+
+Creating a backup
+Logical Backup and Restore with MariaDB
+It is very important to back up MariaDB databases, and databases in general. The database often contains most of a company's mission-critical data (sales, clients, etc.). Performing backups enables a system administrator to recover data after several types of events:
+
+Operating system crash
+
+Power failure
+
+File system crash
+
+Hardware problem
+
+Security breach
+
+Database corruption
+
+Data poisoning
+
+There are two ways to back up MariaDB:
+
+Logical
+
+Physical (raw)
+
+Logical backups export information and records in plain text files, while physical backups consist of copies of files and directories that store content.
+
+Logical backups have these characteristics:
+
+The database structure is retrieved by querying the database.
+
+Logical backups are highly portable, and can be restored to another database provider (such as Postgres) in some cases.
+
+Backup is slower because the server must access database information and convert it to a logical format.
+
+Performed while the server is online.
+
+Backups do not include log or configuration files.
+
+Physical backups have these characteristics:
+
+Consist of raw copies of database directories and folders.
+
+Output is more compact.
+
+Backups can include log and configuration files.
+
+Portable only to other machines with similar hardware and software.
+
+Faster than logical backup.
+
+Should be performed while the server is offline, or while all tables in the database are locked, preventing changes during the backup.
+
+Performing a logical backup
+A logical backup can be done with the mysqldump command:
+
+[root@serverX ~]# mysqldump -u root1 -p2 inventory3 > /backup/inventory.dump4
+1
+
+User name to connect to MariaDB for backup
+
+2
+
+Prompt for password for this user
+
+3
+
+Selected database for backup
+
+4
+
+Backup file
+
+NOTE
+To logically back up all databases, use option --all-databases:
+
+[root@serverX ~]# mysqldump -u root -p --all-databases > /backup/mariadb.dump
+A dump of this kind will include the mysql database, which includes all user information.
+
+The output of a logical backup will appear to be a series of SQL statements. As an example, here is a snippet from a dump of the mysql database:
+
+LOCK TABLES `user` WRITE;
+/*!40000 ALTER TABLE `user` DISABLE KEYS */;
+INSERT INTO `user` VALUES ('localhost','root','','Y','Y','Y','Y','Y','Y','Y','Y'
+,'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y'
+,'Y','','','','',0,0,0,0,'',''),('localhost.localdomain','root','','Y','Y','Y','
+Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','
+Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'',''),('127.0.0.1','root','','Y','Y'
+,'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y'
+,'Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'',''),('::1','root','','Y','Y'
+,'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y'
+,'Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'',''),('localhost','','','N','
+N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','
+N','N','N','N','N','N','N','N','','','','',0,0,0,0,'',''),('localhost.localdomai
+n','','','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N'
+,'N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'',''),('localh
+ost','mobius','*84BB5DF4823DA319BBF86C99624479A198E6EEE9','N','N','N','N','N','N
+','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N
+','N','N','N','','','','',0,0,0,0,'','');
+/*!40000 ALTER TABLE `user` ENABLE KEYS */;
+UNLOCK TABLES;    
+Notice the encrypted password for mobius is easily visible, so take care with storage of backups of this kind. Also, individual tables are locked and unlocked by default as they are read from during a logical backup.
+
+IMPORTANT
+mysqldump requires at least the Select privilege for dumped tables, SHOW VIEW for dumped views, and TRIGGER for dumped triggers.
+
+Table 24.6. Useful Options
+
+Option	Description
+--add-drop-table	Tells MariaDB to add a DROP TABLE statement before each CREATE TABLE statement.
+--no-data	Dumps only the database structure, not the contents.
+--lock-all-tables	No new record can be inserted anywhere in the database while the copy is finished. This option is very important to ensure backup integrity.
+--add-drop-database	Tells MariaDB to add a DROP DATABASE statement before each CREATE DATABASE statement.
+
+Performing a physical backup
+Several tools are available to perform physical backups, such as ibbackup, cp, mysqlhotcopy, and lvm.
+
+A MariaDB physical backup task can use the known benefits of LVM snapshots. The following process will back up MariaDB using LVM.
+
+IMPORTANT
+The key benefit of this methodology is that it is very quick, and keeps the downtime of the database short. This is a great argument for putting the database files on a dedicated LVM partition.
+
+Verify where MariaDB files are stored:
+
+[root@serverX ~]# mysqladmin variables | grep datadir
+| datadir                         | /var/lib/mysql/             |
+Verify which logical volume hosts this location:
+
+[root@serverX ~]# df /var/lib/mysql
+Filesystem              1K-blocks    Used Available Use% Mounted on
+/dev/mapper/vg0-mariadb  51475068 7320316  41516928  15% /var/lib/mysql             |
+This shows that the volume group is vg0 and the logical volume name is mariadb.
+
+Verify how much space is available for the snapshot:
+
+[root@serverX ~]# vgdisplay vg0 | grep Free
+Free  PE / Size       15321 / 61.29 GB            | 
+This shows that 61.29 GB are available for a snapshot.
+
+Connect to MariaDB, flush the tables to disk, and lock them (alternately, shut down the mariadb service):
+
+WARNING
+This step is very important so that no new records are inserted into the database while the snapshot is created.
+
+[root@serverX ~]# mysql -u root -p
+MariaDB [(none)]> FLUSH TABLES WITH READ LOCK;
+WARNING
+Do not close this session. As soon as the client disconnects, this lock is lifted. The database must remained locked until the LVM snapshot is created.
+
+In another terminal session, create the LVM snapshot:
+
+[root@serverX ~]# lvcreate -L20G -s -n mariadb-backup /dev/vg0/mariadb           |
+IMPORTANT
+This snapshot needs to be large enough to hold the backup.
+
+In the original MariaDB session, unlock the tables (or, bring the mariadb service up):
+
+MariaDB [(none)]> UNLOCK TABLES;
+The snapshot can now be mounted at an arbitrary location:
+
+[root@serverX ~]# mkdir /mnt/snapshot
+[root@serverX ~]# mount /dev/vg0/mariadb-backup /mnt/snapshot
+From here, any standard file system backup can be used to store a copy of /var/lib/mysql as mounted under /mnt/snapshot.
+
+IMPORTANT
+Do not forget to delete the snapshot once it has been backed up.
+
+[root@serverX ~]# umount /mnt/snapshot
+[root@serverX ~]# lvremove /dev/vg0/mariadb-backup
+Restoring a backup
+Logical restore
+
+A logical restore can be done with the command mysql:
+
+[root@serverX ~]# mysql -u root1 -p 2 inventory 3 < /backup/mariadb.dump 4 
+1
+
+User to connect with to restore the MariaDB backup (generally root or some other superuser)
+
+2
+
+Password for this user
+
+3
+
+Selected database for restore backup
+
+4
+
+Backup file
+
+Physical restore
+
+To do a physical restore, the mariadb service must be stopped:
+
+[root@serverX ~]#  systemctl stop mariadb 
+Verify where MariaDB files are stored:
+
+[root@serverX ~]# mysqladmin variables | grep datadir
+| datadir                         | /var/lib/mysql/             |
+Remove the actual content:
+
+[root@serverX ~]# rm -rf /var/lib/mysql/*
+From here, any standard file system restore can be used to restore a copy from backup to /var/lib/mysql.
+
+REFERENCES
+mysql(1), mysqladmin(1), mysqldump(1), lvcreate(8), lvremove(1), and vgdisplay(8) man pages
+
+MariaDB Knowledge Base: Backup and Restore Overview
+
+
+
+
+Guided Exercise: Practice: Restoring a MariaDB Database from Backup
+In this lab, you will restore a database from a MariaDB logical backup.
+
+Resources:
+Files:	/home/student/inventory.dump
+Machines:	serverX
+Outcomes:
+
+A MariaDB database with restored data records.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[root@serverX ~]# lab mariadb-restore setup
+You have been asked to restore from a logical backup to a blank MariaDB installation.
+
+Connect to MariaDB as user root (blank password).
+
+[root@serverX ~]# mysql -u root
+Create a database inventory.
+
+MariaDB [(none)]> create database inventory;
+Restore from the logical backup.
+
+[root@serverX ~]# mysql -u root inventory < /home/student/inventory.dump
+Verify restored data.
+
+Connect again to MariaDB.
+
+[root@serverX ~]# mysql -u root
+Connect to the inventory database.
+
+MariaDB [(none)]> use inventory;
+Select all categories.
+
+MariaDB [(inventory)]> SELECT * FROM category;
++----+------------+
+| id | name       |
++----+------------+
+|  1 | Networking |
+|  2 | Servers    |
+|  3 | Ssd        |
++----+------------+
+3 rows in set (0.00 sec)        
+

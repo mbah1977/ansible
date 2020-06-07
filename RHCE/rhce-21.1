@@ -1,0 +1,282 @@
+
+Chapter 21. Configuring Email Transmission
+Configuring Send-only Email Service
+Guided Exercise: Practice: Configuring Send-only Email Service
+Lab: Lab: Configuring Email Transmission
+Abstract
+
+Overview
+Goal	To relay all email sent by the system through an SMTP gateway.
+Objectives	
+Configure a Red Hat Enterprise Linux server to transmit all email through an unauthenticated SMTP gateway.
+
+Sections	
+Configuring a Send-only Email Configuration (and Practice)
+
+Lab	
+Configuring Email Transmission
+
+Configuring Send-only Email Service
+In this section, students learned how to configure the Postfix mail server to act as a null client that forwards local emails to a central SMTP server.
+
+Objectives
+After completing this section, students should be able to:
+
+Configure a Red Hat Enterprise Linux server to transmit all email through an unauthenticated SMTP gateway.
+
+Email architecture and null clients
+In today's corporate environments, email is a common method of communication. End users may use dedicated mail clients such as Evolution and mutt to read and send email, or the organization may have a web-based interface for its mail service.
+
+However, Linux servers also send email, usually for automatic purposes or to report errors to an administrator. They generally use, directly or indirectly, a standard program called /usr/sbin/sendmail (provided in RHEL 7 by Postfix) to send these messages.
+
+In practice, most servers are monitored and send out mails when incidents occur. This often requires a configured /usr/sbin/sendmail to send emails to notify the responsible system administrators by using the corporate SMTP server to transmit the messages.
+
+A null client is a client machine that runs a local mail server which forwards all emails to an outbound mail relay for delivery. A null client does not accept local delivery for any messages, it can only send them to the outbound mail relay. Users may run mail clients on the null client to read and send emails.
+
+This section will look at how to configure a RHEL 7 server as a Postfix null client, which will use sendmail and the SMTP protocol to transmit mail messages to the outside world through an existing outgoing mail server.
+
+Transmission of an email message
+To send an email, in most cases the mail client communicates with an outgoing mail server, which will help relay that message to its final destination. The mail client transmits messages to the mail server using the Simple Mail Transfer Protocol (SMTP).
+
+The outgoing mail relay may require no authentication from internal clients, in which case the server listens on port 25/TCP. In that case, the relay will restrict which hosts can relay through IP address based restrictions or firewall rules.
+
+NOTE
+In cases where the outbound SMTP relay is reachable from the Internet, it is normally configured as a mail submission agent (MSA) for security and anti-spam reasons. An MSA listens on port 587/TCP and requires authentication of the user's mail client before accepting mail. This may be by username and password (as some webmail services provide) or through other means.
+
+This course will only cover how to configure a basic unauthenticated null client.
+
+The outgoing mail relay then uses DNS to look up the MX record identifying the mail server that accepts delivery for messages sent to the recipient's domain. The relay then uses SMTP on port 25/TCP to transmit the email to that server.
+
+The recipient's mail service may provide a POP3 or IMAP server, such as Dovecot or Cyrus, to allow a dedicated mail client to download their messages. Frequently, the mail service provides a web-based interface, allowing clients to use a web browser as a mail client.
+
+The following image illustrates how an email client retrieves incoming mail from an IMAP server and sends outgoing mail through an SMTP server. The mail client on serverX.example.com fetches incoming mails from the IMAP server imapX.example.com. Outgoing mails are sent to smtpX.example.com. An MX DNS record defines smtpX.example.com as the responsible mail server for the desktopX.example.com domain.
+
+
+Figure 21.1: Email client communication
+Postfix
+Postfix is a powerful but easy-to-configure mail server. It is the default mail server in Red Hat Enterprise Linux 7. Postfix is provided by the postfix RPM package. It is a modular program made up of several cooperating programs. Its components are controlled by the master process.
+
+The main configuration file of the postfix mail server is /etc/postfix/main.cf.
+
+NOTE
+There are other configuration files present in the /etc/postfix directory. One of the important files is /etc/postfix/master.cf, which controls what subservices are started.
+
+Table 21.1. Important Postfix Configuration Settings
+
+Setting	Purpose
+inet_interfaces	
+Controls which network interfaces Postfix listens on for incoming and outgoing messages. If set to loopback-only, Postfix listens only on 127.0.0.1 and ::1. If set to all, Postfix listens on all network interfaces. One or more host names and IP addresses, separated by white space, can be listed.
+
+Default: inet_interfaces = localhost
+
+myorigin	
+Rewrite locally posted email to appear to come from this domain. This helps ensure responses return to the correct domain the mail server is responsible for.
+
+Default: myorigin = $myhostname
+
+relayhost	
+Forward all messages to the mail server specified that are supposed to be sent to foreign mail addresses. Square brackets around the host name suppress the MX record lookup.
+
+Default: relayhost =
+
+mydestination	
+Configure which domains the mail server is an end point for. Email addressed to these domains are delivered into local mailboxes.
+
+Default: mydestination = $myhostname, localhost.$mydomain, localhost
+
+local_transport	
+Determine how email addressed to $mydestination should be delivered. By default, set to local:$myhostname, which uses the local mail delivery agent to deliver incoming mail to the local message store in /var/spool/mail.
+
+Set this to error: error message, e.g., local_transport = error: local delivery disabled, to disable local delivery completely.
+
+Default: local_transport = local:$myhostname
+
+mynetworks	
+Allow relay through this mail server from a comma-separated list of IP addresses and networks in CIDR notation to anywhere, without further authentication.
+
+If the mynetworks setting is not explicitly set in /etc/postfix/main.cf, it will be filled automatically using the setting for mynetworks_style. The default for mynetworks_style is subnet, meaning that all subnets in which the server has an IP address will be added to mynetworks. This is often not a desired situation, especially in situations where the server has an external IP address. It is recommended that a mynetworks setting gets added manually, or mynetworks_style is set to host.
+
+Default: mynetworks = 127.0.0.0/8 [::1]/128
+
+
+The configuration file /etc/postfix/main.cf can be edited in two ways: by hand using a text editor such as vim, or it can be edited using the postconf utility. The postconf command allows for querying by individual or all settings, modifying settings, querying defaults, or showing all settings that differ from the built-in defaults:
+
+Run the postconf command without any parameter to query all settings from the /etc/postfix/main.cf configuration file:
+
+[root@serverX ~]# postconf
+2bounce_notice_recipient = postmaster
+access_map_defer_code = 450
+access_map_reject_code = 554
+address_verify_cache_cleanup_interval = 12h
+address_verify_default_transport = $default_transport
+...
+Query a particular set of options by listing them after the postconf command, separated by white space. Run the following to list the inet_interfaces and myorigin options with their corresponding values:
+
+[root@serverX ~]# postconf inet_interfaces  myorigin
+inet_interfaces = loopback-only
+myorigin = $myhostname
+NOTE
+If a value in /etc/postfix/main.cf starts with a dollar sign ($), it is not a literal value, but instead points to the value of a different setting. In the previous example, the myorigin setting will have the same value as the myhostname setting. Using this syntax can simplify maintenance, since the value only has to be updated in one place.
+
+Run the following to add new or change existing options in the /etc/postfix/main.cf configuration file: postconf -e 'setting = value' If there was already a setting by that name in the configuration file, it will be updated to the new value; otherwise, it will be added to the bottom of the configuration file.
+
+Run the following to change the myorigin setting to rewrite the domain part of the FROM: E-mail address to example.com:
+
+[root@serverX ~]# postconf -e 'myorigin = example.com'
+IMPORTANT
+The postfix service requires a reload or restart after the changes have been made to /etc/postfix/main.cf.
+
+NOTE
+When troubleshooting email, a log of all mail-related operations is kept in the systemd journal and /var/log/maillog, which includes information of any mail server-related actions.
+
+The postqueue -p command displays a list of any outgoing mail messages that have been queued. To attempt to deliver all queued messages again immediately, run the postqueue -f command; otherwise, Postfix will attempt to resend them about once an hour until they are accepted or expire.
+
+Postfix null client configuration
+Remember, to act as a null client, Postfix and the RHEL system must be configured so that the following things are true:
+
+The sendmail command and programs that use it forward all emails to an existing outbound mail relay for delivery
+
+The local Postfix service does not accept local delivery for any email messages
+
+Users may run mail clients on the null client to read and send emails.
+
+The following diagram illustrates how a null client setup works. For sending mails, the null client on serverX delivers all messages to the corporate SMTP mail server smtpX.example.com.
+
+
+Figure 21.2: Null client communication
+NOTE
+A complete overview of all settings that are adjustable in /etc/postfix/main.cf and their explanations can be found in the postconf(5) man page. To access this man page, use the man 5 postconf command. Omitting the 5 will display the man page for the postconf command rather than the configuration guide.
+
+Configure Postfix as null client
+In this example, please follow along with these steps while your instructor demonstrates how to configure Postfix on serverX.example.com as a null client that uses the smtpX.example.com mail server as a relay host. All mails passed on by the local null client have their sender address domain rewritten to desktopX.example.com.
+
+Adjust the configuration of the Postfix mail server on your serverX system to act as a null client that forwards all messages to the corporate mail server on smtpX.example.com, which is responsible for the desktopX.example.com domain.
+
+Adjust the relayhost directive to point to the corporate mail server. The host name of the corporate mail server needs to be enclosed in square brackets to prevent an MX record lookup with the DNS server.
+
+[root@serverX ~]# postconf -e "relayhost=[smtpX.example.com]"
+Configure the Postfix mail server to only relay emails from the local system.
+
+Let the Postfix mail server listen only on the loopback interface for emails to deliver.
+
+[root@serverX ~]# postconf -e "inet_interfaces=loopback-only"
+Change the configuration of the null client so that mails originating from the 127.0.0.0/8 IPv4 network and the [::1]/128 IPv6 network are forwarded to the relay host by the local null client.
+
+[root@serverX ~]# postconf -e "mynetworks=127.0.0.0/8 [::1]/128"
+Configure Postfix so all outgoing mails have their sender domain rewritten to the company domain desktopX.example.com.
+
+[root@serverX ~]# postconf -e "myorigin=desktopX.example.com"
+Prohibit the Postfix mail server from delivering any messages to local accounts.
+
+Configure the null client to not act as an end point for any mail domain. Mails where the recipient is a local email account are not accepted for local delivery. The mydestination option needs to be set to an empty value to achieve this.
+
+[root@serverX ~]# postconf -e "mydestination="
+Configure the local null client to not sort any mails into mailboxes on the local system. Local email delivery is turned off.
+
+[root@serverX ~]# postconf -e "local_transport=error: local delivery disabled"
+Restart the local postfix null client.
+
+[root@serverX ~]# systemctl restart postfix
+The following table shows a summary of the /etc/postfix/main.cf configuration file settings to configure Postfix on serverX.example.com as a null client that uses the smtpX.example.com mail server as a relay host. All messages that are passed on by the local null client have their sender address domain rewritten to desktopX.example.com.
+
+Table 21.2. Null Client Postfix Settings
+
+Directive	
+Null Client
+
+(serverX.example.com)
+
+inet_interfaces	
+inet_interfaces = loopback-only
+
+myorigin	
+myorigin = desktopX.example.com
+
+relayhost	relayhost = [smtpX.example.com]
+mydestination	mydestination =
+local_transport	local_transport = error: local delivery disabled
+mynetworks	mynetworks = 127.0.0.0/8, [::1]/128
+
+REFERENCES
+postconf(1), postconf(5), mail(1), and mutt(1) man page
+
+
+
+
+
+
+Guided Exercise: Practice: Configuring Send-only Email Service
+In this lab, you will configure a local mail server as a null client.
+
+Resources:
+Machines:	desktopX and serverX
+Outcome:
+
+Configure a local mail server acting as a null client that forwards all messages to a central server for delivery.
+
+Reset the serverX system.
+
+Reset the desktopX system.
+
+Log into and set up your desktop system.
+
+[student@desktopX ~]$ lab smtp-nullclient setup
+Log into and set up your server system after the desktop system setup is completed.
+
+[student@serverX ~]$ lab smtp-nullclient setup
+Become root on your serverX system.
+
+[student@serverX ~]$ sudo -i
+Adjust the configuration of the Postfix mail server on your desktopX system to act as a null client that forwards all mail to the corporate mail server on smtpX.example.com. Successfully grade the desktop and the server system with lab smtp-nullclient grade.
+
+Switch to user root on serverX and point the relayhost directive to the corporate mail server. The host name of the corporate mail server needs to be enclosed in square brackets to prevent an MX record lookup with the DNS server.
+
+[root@serverX ~]# postconf -e "relayhost=[smtpX.example.com]"
+Configure the Postfix mail server to only relay mail from the local system.
+
+Let the Postfix mail server only listen for emails to deliver on the loopback interface. Add the inet_interfaces=loopback-only directive to the /etc/postfix/main.cf configuration file.
+
+[root@serverX ~]# postconf -e "inet_interfaces=loopback-only"
+Change the Postfix configuration so that only messages that originate from the 127.0.0.0/8 IPv4 network and the [::1]/128 IPv6 network are forwarded to the relay host by the null client on serverX.
+
+[root@serverX ~]# postconf -e "mynetworks=127.0.0.0/8 [::1]/128"
+Configure the null client so that all outgoing messages have their sender domain rewritten to the company domain desktopX.example.com.
+
+[root@serverX ~]# postconf -e "myorigin=desktopX.example.com"
+Prohibit the Postfix mail server from delivering any mail to local accounts.
+
+Configure the null client to forward all mail to the relay server. The mydestination option needs to be set to an empty value to achieve this.
+
+[root@serverX ~]# postconf -e "mydestination="
+Prevent the local null client from sorting any mail into mailboxes on the serverX system.
+
+[root@serverX ~]# postconf -e "local_transport=error: local delivery disabled"
+Restart the local postfix null client on serverX.
+
+[root@serverX ~]# systemctl restart postfix
+Open a new terminal on serverX and test the null client configuration by sending an email with Subject: serverX null client and content null client test to student@desktopX.example.com with the mail command on serverX. The mail command uses /usr/sbin/sendmail, provided by Postfix to transfer email.
+
+[student@serverX ~]$ mail -s "serverX null client" student@desktopX.example.com
+null client test
+.
+EOT
+Verify the mail arrived at the specified recipient by using the mutt command-line mail client to access the IMAP server running on imapX.example.com with the IMAPS protocol. The IMAP server is accessible for user student with password student.
+
+Connect to the IMAP server running on imapX.example.com with the mutt command-line mail client with the IMAPS protocol.
+
+[student@serverX ~]$ mutt -f imaps://imapX.example.com
+Log into the IMAP server with user name student and password student.
+
+User name at imapX.example.com: student
+Password for student@imapX.example.com: student
+Verify the message arrived in the mail account of student, then exit mutt with the q key.
+
+q:Quit  d:Del  u:Undel  s:Save  m:Mail  r:Reply  g:Group  ?:Help
+...
+   1   F May 20                 (0.4K) serverX null client
+q
+Run the grading script on both serverX and desktopX:
+
+[student@serverX ~]$ lab smtp-nullclient grade
+[student@desktopX ~]$ lab smtp-nullclient grade
+

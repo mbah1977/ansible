@@ -1,0 +1,319 @@
+Providing iSCSI Targets
+In this section, students learned how to:
+
+Identify the steps to install and configure an iSCSI target server.
+
+Describe the components for building a single iSCSI target.
+
+Describe the components for providing access security for each iSCSI target.
+
+Objectives
+After completing this section, students should be able to:
+
+Prepare a Red Hat Enterprise Linux server to provide the iSCSI target service.
+
+Build iSCSI targets and LUNs for network access.
+
+Limit access to iSCSI targets and LUNs.
+
+iSCSI target overview
+In original SCSI protocol terminology, a target is a single connectible storage or output device uniquely identified on a SCSI bus. In iSCSI, in which the SCSI bus is emulated across an IP network, a target can be a dedicated physical device in a network-attached storage enclosure or an iSCSI software-configured logical device on a networked storage server. A target, like HBAs and initiators, is an end point in SCSI bus communication, passing command descriptor blocks (CDB) to request or provide storage transactions.
+
+To provide access to the storage or output device, a target is configured with one or more logical unit numbers (LUNs). In iSCSI, LUNs appear as the target's sequentially numbered disk drives, although targets typically have only one LUN. An initiator performs SCSI negotiation with a target to establish a connection to the LUN. The LUN responds as an emulated SCSI disk block device, which can be used in raw form or formatted with a client-supported file system.
+
+WARNING
+Do not mount single-system file systems to more than one system at a time. iSCSI allows shared target and LUN access from multiple initiator nodes, requiring the use of cluster-capable file systems such as GFS2. Mounting standard file systems designed for local, single-system access (e.g., btrfs, ext3, ext4, FAT32, HPFS+, NTFS, XFS, ZFS) from more than one system concurrently will cause file system corruption.
+
+iSCSI provides for LUN masking by using ACLs to restrict LUN accessibility to specific initiators. Except when shared access is intended, ACLs can ensure that only a designated client node can login to a specific target. On the target server, ACLs can be set at the TPG level to secure groups of LUNs, or set individually per LUN.
+
+iSCSI target configuration
+Creating and configuring iscsi targets
+Target server configuration demonstration
+
+targetcli is both a command-line utility and an interactive shell in which to create, delete, and configure iSCSI target components. Target stack objects are grouped into a hierarchical tree of objects, allowing easy navigation and contextual configuration. Familiar Linux commands are used in this shell: cd, ls, pwd, and set.
+
+The targetcli shell also supports TAB completion. Administrators can use TAB to either complete partially typed commands or view a list of acceptable key-words at the current location in a command.
+
+In this example, please follow along with the steps below while your instructor demonstrates using targetcli to configure a target server.
+
+Install targetcli if needed.
+
+[root@server0 ~]# yum -y install targetcli
+Run targetcli with no options to enter interactive mode.
+
+[root@server0 ~]# targetcli
+/> ls
+
+Figure 22.5: Initial targetcli blank configuration
+Create backing storage (backstores). There are several types of backing storage.
+
+block - A block device defined on the server. A disk drive, disk partition, a logical volume, multipath device, any device files defined on the server that are of type b.
+
+fileio - Create a file, of a specified size, in the filesystem of the server. This method is similar to using image files to be the storage for virtual machine disk images.
+
+pscsi - Physical SCSI. Permits passthrough to a physical SCSI device connected to the server. This backstore type is not typically used.
+
+ramdisk - Create a ramdisk device, of a specified size, in memory on the server. This type of storage will not store data persistently. When the server is rebooted, the ramdisk definition will return when the target is instantiated, but all data will have been lost.
+
+Examples include using an existing logical volume, a disk partition, and a new file at a specified size. The backstores display as deactivated.
+
+/> cd /backstores/
+/backstores> block/ create block1 /dev/iSCSI_vg/disk1_lv
+Created block storage object block1 using /dev/iSCSI_vg/disk1_lv.
+/backstores> block/ create block2 /dev/vdb2
+Created block storage object block2 using /dev/vdb2.
+/backstores> fileio/ create file1 /root/disk1_file 100M
+Created fileio file1 with size 104857600
+/backstores> ls
+o- backstores ............................................................ [...]
+  o- block ................................................ [Storage Objects: 2]
+  | o- block1 ....... [/dev/iSCSI_vg/disk1_lv (100.0MiB) write-thru deactivated]
+  | o- block2 ...................... [/dev/vdb2 (1.0GiB) write-thru deactivated]
+  o- fileio ............................................... [Storage Objects: 1]
+  | o- file1 .............. [/root/disk1_file (100.0MiB) write-back deactivated]
+  o- pscsi ................................................ [Storage Objects: 0]
+  o- ramdisk .............................................. [Storage Objects: 0]
+Create an IQN for the target. This step will also create a default TPG underneath the IQN.
+
+/backstores> cd /iscsi/
+/iscsi> create iqn.2014-06.com.example:remotedisk1
+Created target iqn.2014-06.com.example:remotedisk1.
+Created TPG 1.
+/iscsi> ls
+o- iscsi .......................................................... [Targets: 1]
+  o- iqn.2014-06.com.example:remotedisk1 ............................. [TPGs: 1]
+    o- tpg1 ............................................. [no-gen-acls, no-auth]
+      o- acls ........................................................ [ACLs: 0]
+      o- luns ........................................................ [LUNs: 0]
+      o- portals .................................................. [Portals: 0]
+An administrator can use the create without specifying the IQN to create. targetcli will generate an IQN similar to the following: iqn.2003-01.org.linux-iscsi.server0.x8664:sn.69b30d2cfd01. Specifying the IQN value provides the ability for an administrator to use a meaningful namespace for their IQNs.
+
+In the TPG, create an ACL for the client node to be used later. Because the global auto_add_mapped_luns parameter is set to true (default), any existing LUNs in the TPG are mapped to each ACL as it is created.
+
+/iscsi> cd iqn.2014-06.com.example:remotedisk1/tpg1/
+/iscsi/iqn.20...sk1/tpg1> acls/ create iqn.2014-06.com.example:desktop0
+Created NODE ACL for iqn.2014-06.com.example:desktop0
+/iscsi/iqn.20...:server0/tgp1> ls
+o- tpg1 ................................................. [no-gen-acls, no-auth]
+  o- acls ............................................................ [ACLs: 1]
+  | o- iqn.2014-06.com.example:desktop0 ....................... [Mapped LUNs: 0]
+  o- luns ............................................................ [LUNs: 0]
+  o- portals ...................................................... [Portals: 0]
+This ACL configures the target to only accept initiator connections from a client presenting iqn.2014-06.com.example:desktop0 as it's initiator IQN, also known as the initiator name.
+
+In this TPG, create a LUN for each existing backstores. This step also activates each backstore. Because acls exist for the TPG, they will be automatically assigned to each LUN created.
+
+/iscsi/iqn.20...:server0/tgp1> luns/ create /backstores/block/block1
+Created LUN 0.
+Created LUN 0->0 mapping in node ACL iqn.2014-06.com.example:desktop0
+/iscsi/iqn.20...:server0/tgp1> luns/ create /backstores/block/block2
+Created LUN 1.
+Created LUN 1->1 mapping in node ACL iqn.2014-06.com.example:desktop0
+/iscsi/iqn.20...:server0/tgp1> luns/ create /backstores/fileio/file1
+Created LUN 2.
+Created LUN 2->2 mapping in node ACL iqn.2014-06.com.example:desktop0
+/iscsi/iqn.20...:server0/tgp1> ls
+o- tpg1 ................................................. [no-gen-acls, no-auth]
+  o- acls ............................................................ [ACLs: 1]
+  | o- iqn.2014-06.com.example:desktop0 ....................... [Mapped LUNs: 3]
+  |   o- mapped_lun0 .................................. [lun0 block/block1 (rw)]
+  |   o- mapped_lun1 .................................. [lun1 block/block2 (rw)]
+  |   o- mapped_lun2 .................................. [lun2 fileio/file1 (rw)]
+  o- luns ............................................................ [LUNs: 3]
+  | o- lun0 ............................ [block/block1 (/dev/iSCSI_vg/disk1_lv)]
+  | o- lun1 ......................................... [block/block2 (/dev/vdb2)]
+  | o- lun2 .................................. [fileio/file1 (/root/disk1_file)]
+  o- portals ...................................................... [Portals: 0]
+Having three LUNs assigned to a target means that when the initiator connects to the target, it will receive three new SCSI devices.
+
+Still inside the TPG, create a portal configuration to designate the listening IP address and ports. Create a portal using the system's public network interface. Without specifying a TCP port to use, the portal creation will default to the standard iSCSI port (3260).
+
+/iscsi/iqn.20...:server0/tgp1> portals/ create 172.25.0.11
+Using default IP port 3260
+Created network portal 172.25.0.11:3260
+/iscsi/iqn.20...:server0/tgp1> ls
+o- tpg1 ................................................. [no-gen-acls, no-auth]
+  o- acls ............................................................ [ACLs: 1]
+  | o- iqn.2014-06.com.example:desktop0 ....................... [Mapped LUNs: 3]
+  |   o- mapped_lun0 .................................. [lun0 block/block1 (rw)]
+  |   o- mapped_lun1 .................................. [lun1 block/block2 (rw)]
+  |   o- mapped_lun2 .................................. [lun2 fileio/file1 (rw)]
+  o- luns ............................................................ [LUNs: 3]
+  | o- lun0 ............................ [block/block1 (/dev/iSCSI_vg/disk1_lv)]
+  | o- lun1 ......................................... [block/block2 (/dev/vdb2)]
+  | o- lun2 .................................. [fileio/file1 (/root/disk1_file)]
+  o- portals ...................................................... [Portals: 1]
+    o- 172.25.0.11:3260 ................................................... [OK]
+If the IP is not specified with the portal creation, an IP of 0.0.0.0 will be used. This will permit connections on all network interfaces defined on the server.
+
+View the entire configuration, then exit targetcli. targetcli will automatically save upon exit. The resulting persistent configuration file is stored in JavaScript Object Notation (JSON) format.
+
+/iscsi/iqn.20...:server0/tgp1> cd /
+/> ls
+o- / ..................................................................... [...]
+  o- backstores .......................................................... [...]
+  | o- block .............................................. [Storage Objects: 2]
+  | | o- block1 ....... [/dev/iSCSI_vg/disk1_lv (100.0MiB) write-thru activated]
+  | | o- block2 ...................... [/dev/vdb2 (1.0GiB) write-thru activated]
+  | o- fileio ............................................. [Storage Objects: 1]
+  | | o- file1 .............. [/root/disk1_file (100.0MiB) write-back activated]
+  | o- pscsi .............................................. [Storage Objects: 0]
+  | o- ramdisk ............................................ [Storage Objects: 0]
+  o- iscsi ........................................................ [Targets: 1]
+  | o- iqn.2014-06.com.example:remotedisk1 ........................... [TPGs: 1]
+  |   o- tpg1 ........................................... [no-gen-acls, no-auth]
+  |     o- acls ...................................................... [ACLs: 1]
+  |     | o- iqn.2014-06.com.example:desktop0 ................. [Mapped LUNs: 3]
+  |     |   o- mapped_lun0 ............................ [lun0 block/block1 (rw)]
+  |     |   o- mapped_lun1 ............................ [lun1 block/block2 (rw)]
+  |     |   o- mapped_lun2 ............................ [lun2 fileio/file1 (rw)]
+  |     o- luns ...................................................... [LUNs: 3]
+  |     | o- lun0 ...................... [block/block1 (/dev/iSCSI_vg/disk1_lv)]
+  |     | o- lun1 ................................... [block/block2 (/dev/vdb2)]
+  |     | o- lun2 ............................ [fileio/file1 (/root/disk1_file)]
+  |     o- portals ................................................ [Portals: 1]
+  |       o- 172.25.0.11:3260 ............................................. [OK]
+  o- loopback ..................................................... [Targets: 0]
+/> exit
+Global pref auto_save_on_exit=true
+Last 10 configs saved in /etc/target/backup.
+Configuration saved to /etc/target/saveconfig.json
+Add a port exemption to the default firewall for port 3260, the standard iSCSI port.
+
+[root@server0 ~]# firewall-cmd --add-port=3260/tcp
+[root@server0 ~]# firewall-cmd --add-port=3260/tcp --permanent
+Enable the target.service systemd unit. The target.service will recreate the target configuration from the json file at boot. If this step is skipped, any configured targets will work until the machine is rebooted; however, after a reboot, no targets will be offered by the server.
+
+[root@server0 ~]# systemctl enable target
+Authentication
+
+In addition to ACL node verification, password-based authentication can be implemented. Authentication can be required during the iSCSI discovery phase. Authentication can be unidirectional or bidirectional.
+
+CHAP authentication does not use strong encryption for the passing of credentials. While CHAP does offer an additional factor of authentication besides having a correctly configured initiator name, configured in an ACL, it should not be considered secure. If security of iSCSI data is a concern, controlling the network side of the protocol is a better method to assure security. Providing a dedicated, isolated network, or vlans to pass the iSCSI traffic will be a more secure implementation of the protocol.
+
+Command-line mode
+
+In the demonstration, targetcli was run in interactive mode, but targetcli can also be used to execute a series of commands via the command-line. In the following example, targetcli will be used to create a backstore device, an IQN, and activate a portal. The example, as written, will not present a usable target, but is meant to demonstrate several actions executed with targetcli. This method could be used to script target configuration. At the end of the list of commands, a saveconfig command is executed. Unlike the interactive use of targetcli, command-line mode will not save the configuration as a json file until the saveconfig command is used.
+
+[root@server0 ~]# targetcli /backstores/block create block1 /dev/vdb
+Created block storage object block1 using /dev/vdb.
+[root@server0 ~]# targetcli /iscsi create iqn.2014-06.com.example:remotedisk1
+Created target iqn.2014-06.com.example:remotedisk1.
+Created TPG 1.
+[root@server0 ~]# targetcli /iscsi/iqn.2014-06.com.example:remotedisk1/tpg1/portals create 172.25.0.11
+Using default IP port 3260
+Created network portal 172.25.0.11:3260.
+[root@server0 ~]# targetcli saveconfig
+Last 10 configs saved in /etc/target/backup.
+Configuration saved to /etc/target/saveconfig.json
+REFERENCES
+targetcli(8) man page
+
+LINUX I/O Targetcli
+
+
+
+
+
+Guided Exercise: Practice: Providing iSCSI Targets
+In this lab, you will configure a RHEL server to become an iSCSI target server, including opening firewall access, creating a backing store, and setting target and LUN access parameters.
+
+Resources:
+Files:	/etc/target/saveconfig.json
+Machines:	serverX
+Outcomes:
+
+The creation and configuration of an iSCSI target block device with ACL-validated access.
+
+Reset your serverX system.
+
+Log in to your serverX system and become root.
+
+[student@serverX ~]$ sudo -i
+Prepare the server system to become an iSCSI target server by installing the target configuration utility, starting the target service and opening the firewall for the iSCSI server port.
+
+Install the targetcli RPM.
+
+[root@serverX ~]# yum -y install targetcli
+Enable and start the target service.
+
+[root@serverX ~]# systemctl enable target; systemctl start target
+Open the iSCSI server port on the firewall as a permanent change. Reload the configuration for immediate use.
+
+[root@serverX ~]# firewall-cmd --permanent --add-port=3260/tcp
+[root@serverX ~]# firewall-cmd --reload
+Create the physical disk structure to use as a backing store device for a target to be created in a later step. Partition a disk, build a volume group, and create a logical volume.
+
+NOTE
+These solutions use /dev/vdb as the device node for the secondary disk. In your environment this might be a different device, like /dev/xvdj. Adjust the instructions as necessary.
+
+Create a 1 GB partition using the second physical disk on the server system.
+
+[root@serverX ~]# fdisk /dev/vdb
+Use fdisk to create a new primary partition with a size of 1 GB. Use the partition tag appropriate for use as a Linux LVM partition ("8e"). Remember to write before exiting. This exercise uses the expected partition name /dev/vdb1.
+
+Create a logical volume manager volume group named iSCSI_vg using the partition created in the previous step.
+
+[root@serverX services]# pvcreate /dev/vdb1
+[root@serverX services]# vgcreate iSCSI_vg /dev/vdb1
+[root@serverX services]# vgdisplay iSCSI_vg
+Create a 100 MiB logical volume named disk1_lv in the new volume group.
+
+[root@serverX ~]# lvcreate -n disk1_lv -L 100m iSCSI_vg
+[root@serverX ~]# lvdisplay iSCSI_vg/disk1_lv
+Go into targetcli's interactive mode to configure the iSCSI target.
+
+[root@serverX ~]# targetcli
+Configure the existing /dev/iSCSI_vg/disk1_lv logical volume as a block-type backing store. Use the name serverX.disk1 for the backstore, replacing X with your system number.
+
+/> /backstores/block/ create serverX.disk1 /dev/iSCSI_vg/disk1_lv
+Create a unique iSCSI Qualified Name (IQN) for the target. The target will be iqn.2014-06.com.example:serverX.
+
+/> /iscsi create iqn.2014-06.com.example:serverX
+Creating the IQN name automatically created a default target portal group named tpg1.
+
+Create an ACL for the client node (initiator). The initiator will be connecting with it's initiator name set to iqn.2014-06.com.example:desktopX.
+
+/> /iscsi/iqn.2014-06.com.example:serverX/tpg1/acls/ create iqn.2014-06.com.example:desktopX
+Create a LUN under the target, the LUN should use the previously defined backing storage device named serverX.disk1.
+
+/> /iscsi/iqn.2014-06.com.example:serverX/tpg1/luns create /backstores/block/serverX.disk1
+Configure a portal for the target to listen on 172.25.X.11, port 3260.
+
+/> /iscsi/iqn.2014-06.com.example:serverX/tpg1/portals create 172.25.X.11
+View, verify, and save the target server configuration.
+
+View and verify the configuration.
+
+/> ls
+o- / ............................................................. [...]
+  o- backstores .................................................. [...]
+  | o- block ...................................... [Storage Objects: 1]
+  | | o- serverX.disk1 .....
+           .....[/dev/iSCSI_vg/disk1_lv (100.0MiB) write-thru activated]
+  | o- fileio ..................................... [Storage Objects: 0]
+  | o- pscsi ...................................... [Storage Objects: 0]
+  | o- ramdisk .................................... [Storage Objects: 0]
+  o- iscsi ................................................ [Targets: 1]
+  | o- iqn.2014-06.com.example:serverX ....................... [TPGs: 1]
+  |   o- tpg1 ................................... [no-gen-acls, no-auth]
+  |     o- acls .............................................. [ACLs: 1]
+  |     | o- iqn.2014-06.com.example:desktopX ......... [Mapped LUNs: 1]
+  |     | | o- mapped_lun0 ............ [lun1 block/serverX.disk1 (rw)]
+  |     o- luns .............................................. [LUNs: 1]
+  |     | o- lun0 ...... [block/serverX.disk1 (/dev/iSCSI_vg/disk1_lv)]
+  |     o- portals ........................................ [Portals: 1]
+  |       o- 172.25.X.11:3260 ..................................... [OK]
+  o- loopback ............................................. [Targets: 0]
+Exit and save the configuration to the default /etc/target/saveconfig.json.
+
+/> exit
+NOTE
+The outcome of the practice will be used in the next practice. Therefore, do not reset your serverX host after the completion of this practice.
+
+NOTE
+A practical method to test this configuration is to install the iSCSI client tools package and perform a discovery from a separate client system. This is presented in the Accessing iSCSI Storage exercise.
+
+Although an iSCSI client configuration can be installed on this target server, an administrator must ensure that any iSCSI node records created during test discoveries are deleted prior to target discovery from client systems. These procedures are presented in the Accessing iSCSI Storage section.
+
+

@@ -1,0 +1,79 @@
+Lab: Lab: Configuring Email Transmission
+In this lab, you will configure a local mail server as a null client.
+
+Resources:
+Machines:	desktopX and serverX
+Outcome:
+
+Configure a local mail server acting as a null client that forwards all messages to a central server for delivery.
+
+Reset the serverX system.
+
+Reset the desktopX system.
+
+Log into and set up your desktop system.
+
+[student@desktopX ~]$ lab smtp-nullclient setup
+Log into and set up your server system after the desktop system setup is completed.
+
+[student@serverX ~]$ lab smtp-nullclient setup
+Become root on your serverX system.
+
+[student@serverX ~]$ sudo -i
+Configure the Postfix mail server on serverX.example.com as a null client which relays mail through smtpX.example.com, using desktopX.example.com as your organization's domain name on outgoing email.
+
+Verify that the mail server is working by using an IMAPS-capable mail client to retrieve a test email from imapX.example.com (as user and mail recipient student with IMAP password student).
+
+Successfully grade the desktop and the server system with lab smtp-nullclient grade.
+
+Switch to user root on serverX and point the relayhost directive to the corporate mail server. The host name of the corporate mail server needs to be enclosed in square brackets to prevent the null client from performing an MX record lookup using DNS.
+
+[root@serverX ~]# postconf -e "relayhost=[smtpX.example.com]"
+Configure the Postfix mail server to only relay mail from the local system.
+
+Let the Postfix mail server only listen for emails to deliver on the loopback interface. Add the inet_interfaces=loopback-only directive to the /etc/postfix/main.cf configuration file.
+
+[root@serverX ~]# postconf -e "inet_interfaces=loopback-only"
+Change the Postfix configuration so that only messages that originate from the 127.0.0.0/8 IPv4 network and the [::1]/128 IPv6 network are forwarded to the relay host by the null client on serverX.
+
+[root@serverX ~]# postconf -e "mynetworks=127.0.0.0/8 [::1]/128"
+Configure the null client so that all outgoing messages have their sender domain rewritten to the company domain desktopX.example.com.
+
+[root@serverX ~]# postconf -e "myorigin=desktopX.example.com"
+Prohibit the Postfix mail server from delivering any mail to local accounts.
+
+Configure the null client to forward all mail to the relay server. The mydestination option needs to be set to an empty value to achieve this.
+
+[root@serverX ~]# postconf -e "mydestination="
+Prevent the local null client from sorting any mail into mailboxes on the serverX system.
+
+[root@serverX ~]# postconf -e "local_transport=error: local delivery disabled"
+Restart the local postfix null client on serverX.
+
+[root@serverX ~]# systemctl restart postfix
+Open a new terminal on serverX and test the null client configuration by using the mail command to send an email with Subject: serverX null client and content null client test to student@desktopX.example.com.
+
+[student@serverX ~]$ mail -s "serverX null client" student@desktopX.example.com
+null client test
+.
+EOT
+Verify the mail arrived at the specified recipient by using the mutt command-line mail client to access the IMAP server running on imapX.example.com with the IMAPS protocol. The IMAP server is accessible for user student with password student.
+
+Connect to the IMAP server running on imapX.example.com with the mutt command-line mail client with the IMAPS protocol.
+
+[student@serverX ~]$ mutt -f imaps://imapX.example.com
+Log into the IMAP server with user name student and password student.
+
+User name at imapX.example.com: student
+Password for student@imapX.example.com: student
+Verify the message arrived in the mail account of student, then exit mutt with the q key.
+
+q:Quit  d:Del  u:Undel  s:Save  m:Mail  r:Reply  g:Group  ?:Help
+...
+   1   F May 20                 (0.4K) serverX null client
+q
+Run the grading script on both serverX and desktopX:
+
+[student@serverX ~]$ lab smtp-nullclient grade
+[student@desktopX ~]$ lab smtp-nullclient grade
+

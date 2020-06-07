@@ -1,0 +1,194 @@
+Accessing iSCSI Storage
+In this section, students learned how to:
+
+Describe the installation and configuration of an iSCSI initiator.
+
+Outline the steps to access and login to an iSCSI LUN.
+
+Describe how iSCSI persistent connections are implemented.
+
+Objectives
+After completing this section, students should be able to:
+
+Prepare a Red Hat Enterprise Linux client to access an iSCSI target service.
+
+Access and log into a remote iSCSI portal, target, and LUN.
+
+Practice iSCSI persistence through the use and deletion of persistent node records.
+
+iSCSI initiator introduction
+Logging in to and using iscsi targets
+In Red Hat Enterprise Linux an iSCSI initiator is typically implemented in software, and functions similar to a hardware iSCSI HBA to access targets from a remote storage server. Using a software-based iSCSI initiator requires connecting to an existing Ethernet network of sufficient bandwidth to carry the expected storage traffic.
+
+iSCSI can also be implemented using a hardware initiator that includes the required protocols in a dedicated host bus adapter. iSCSI HBAs and TCP offload engines (TOE), which include the TCP network stack on an Ethernet NIC, move the processing of iSCSI or TCP overhead and Ethernet interrupts to hardware, easing the load on system CPUs.
+
+Configuring an iSCSI client initiator requires installing the iscsi-initiator-utils package, which includes the iscsi and iscsid services and the /etc/iscsi/iscsid.conf and /etc/iscsi/initiatorname.iscsi configuration files.
+
+As an iSCSI node, the client requires a unique IQN. The default /etc/iscsi/initiatorname.iscsi file contains a generated IQN using Red Hat's domain. Administrators typically reset the IQN to their own domain and an appropriate client system string.
+
+The /etc/iscsi/iscsid.conf file contains default settings for node records created during new target discovery. Settings include iSCSI timeouts, retry parameters, and authentication usernames and passwords. Changing this file requires restarting the iscsi service.
+
+[root@desktopX ~]# systemctl restart iscsi
+To be able to discover targets, install the iscsi-initiator-utils package, then enable and start the iscsi service. Targets must be discovered before device connection and use. The discovery process stores target node information and settings in the /var/lib/iscsi/nodes directory, using defaults from /etc/iscsi/iscsid.conf. Since the same target can exist on multiple portals, node records are stored for each portal. Perform discovery with the following command:
+
+[root@desktopX ~]# iscsiadm -m discovery -t sendtargets -p target_server[:port]
+172.25.X.11:3260,1 iqn.2014-06.com.example:serverX
+In discovery mode, the sendtargets request returns only targets with access configured for this initiator. The port number can be omitted when the target server is configured on default port 3260. Upon discovery, a node record is written to /var/lib/iscsi/nodes and used for subsequent logins. To use the listed target, log in using the following command:
+
+[root@desktopX ~]# iscsiadm -m node -T iqn.2014-06.com.example:serverX [-p target_server[:port]] -l 
+Specifying the portal is optional. If the target exists on multiple portals (e.g., in a multipathed, redundant server configuration), performing a login without specifying a portal will connect to every portal node that accepts this target name.
+
+Once discovered, obtain information about targets with the iscsiadm command. Use the option -P N to set the command detail level, with 0 specifying the least verbose output.
+
+• iscsiadm -m discovery [-P 0|1]: Show information about discovered targets.
+• iscsiadm -m node [-P 0|1]: Show information about known targets.
+• iscsiadm -m session [-P 0|1|2|3]: Show information about active sessions.
+To discontinue using a target, use iscsiadm to log out temporarily. By design, node records remain after logout and are used to automatically log into targets upon system reboot or iscsi service restart. Log out of a target using the following command (notice the similarity to login):
+
+[root@desktopX ~]# iscsiadm -m node -T iqn.2012-04.com.example:example [-p target_server[:port]] -u
+If a portal is not specified, the target logs out of all relevant portals. To log into the target again, repeating discovery is not necessary since the node records already exist. Permanently logging out of a target requires deleting the node records so that manual or automatic login cannot reoccur without performing another discovery. Not specifying a portal removes the target node records for all relevant portals. Delete the node record permanently by using the following command (notice again the command similarity):
+
+[root@desktopX ~]# iscsiadm -m node -T iqn.2012-04.com.example:example [-p target_server[:port]] -o delete
+REFERENCES
+iscsiadm(8), iscsid(8) man pages
+
+Open-iSCSI
+
+
+
+
+
+
+Guided Exercise: Practice: Accessing iSCSI Storage
+In this lab, you will discover targets on an iSCSI target portal, then practice manual and automatic login and logout of an iSCSI target.
+
+Resources:
+Files:	
+/etc/iscsi/initiatorname.iscsi
+/var/lib/iscsi/nodes/*
+Machines:	desktopX
+Outcomes:
+
+Discover and connect to an access-controlled remote iSCSI target and LUN.
+
+This practice uses the outcome of the previous lab. DO NOT reset serverX.
+
+From your home directory on desktopX, switch user to root.
+
+Prepare the client system to become an iSCSI initiator node by installing the initiator utilities, setting the unique iSCSI client name, and starting the iSCSI client service.
+
+Install the iscsi-initiator-utils RPM, if not already installed.
+
+[root@desktopX ~]# yum install -y iscsi-initiator-utils
+Create a unique iSCSI Qualified Name for the client initiator by modifying the InitiatorName setting in /etc/iscsi/initiatorname.iscsi. Use the client system name as the optional string after the colon.
+
+[root@desktopX ~]# vi /etc/iscsi/initiatorname.iscsi
+InitiatorName=iqn.2014-06.com.example:desktopX
+Enable and start the iscsi client service.
+
+[root@desktopX ~]# systemctl enable iscsi; systemctl start iscsi
+Discover and log into the configured target from the iSCSI target server.
+
+Discover the configured iSCSI target(s) provided by the iSCSI target server portal.
+
+[root@desktopX ~]# iscsiadm -m discovery -t st -p 172.25.X.11
+172.25.X.11:3260,1 iqn.2014-06.com.example:serverX
+Log into the presented iSCSI target.
+
+[root@desktopX ~]# iscsiadm -m node -T iqn.2014-06.com.example:serverX -p 172.25.X.11 -l
+Identify the newly available block device created by the iSCSI target login.
+
+[root@desktopX ~]# lsblk
+[root@desktopX ~]# tail /var/log/messages
+Browse the connection information about the target portal, connection, and parameters used by the connected device. Locate the node record.
+
+List the targets recognized by the iscsi service.
+
+[root@desktopX ~]# iscsiadm -m session -P 3
+iSCSI Transport Class version 2.0-870
+version 6.2.0-873-21
+Target: iqn.2014-06.com.example:serverX
+        Current Portal: 172.25.X.11:3260,1
+        Persistent Portal: 172.25.X.11:3260,1
+                **********
+                Interface:
+                **********Resources
+                Iface Name: default
+                Iface Transport: tcp
+                Iface Initiatorname: iqn.2014-06.com.example:desktopX
+                Iface IPaddress: 172.25.X.10
+                Iface HWaddress: <empty>
+                Iface Netdev: <empty>
+                SID: 3
+                iSCSI Connection State: LOGGED IN
+                iSCSI Session State: LOGGED_IN
+                Internal iscsid Session State: NO CHANGE
+                ************************
+                Negotiated iSCSI params:
+                ************************
+                HeaderDigest: None
+                DataDigest: None
+                MaxRecvDataSegmentLength: 262144
+                MaxXmitDataSegmentLength: 8192
+                FirstBurstLength: 65536
+                MaxBurstLength: 262144
+                ImmediateData: Yes
+                InitialR2T: Yes
+                MaxOutstandingR2T: 1
+                ************************
+                Attached SCSI devices:
+                ************************
+                Host Number: 5  State: running
+                scsi5 Channel 00 Id 0 Lun: 0
+                scsi5 Channel 00 Id 0 Lun: 1
+                        Attached scsi disk sdb          State: running
+Change directory to the location of the iSCSI node records for the remainder of this exercise. Locate the persistent node record for the new iSCSI target.
+
+[root@desktopX ~]# cd /var/lib/iscsi/nodes
+[root@desktopX nodes]$ ls -lR
+View the connection parameters defaults in an iSCSI node record.
+
+[root@desktopX nodes]# less iqn.2014-06.com.example:serverX/172.25.X.11,3260,1/default
+Connect to and disconnect from the target, using both manual commands and methods that utilize the node record(s) to connect automatically.
+
+Disconnect the iSCSI block device by logging out of the iSCSI target. Confirm that the corresponding iSCSI block device has disappeared.
+
+IMPORTANT
+In this exercise, the block device was not formatted or otherwise used. If the device is in use, unmount it properly before continuing.
+
+[root@desktopX nodes]# iscsiadm -m node -T iqn.2014-06.com.example:serverX -p 172.25.X.11 -u
+[root@desktopX nodes]$ lsblk
+Confirm that the node record for the disconnected iSCSI target still exists.
+
+[root@desktopX nodes]# ls -lR
+Restart the iscsi client service. Confirm that the iSCSI block device returns. The iscsi performs logins for all node records found.
+
+[root@desktopX nodes]# systemctl restart iscsi
+[root@desktopX nodes]# lsblk
+Disconnect the iSCSI block device again by logging out of the iSCSI target. Additionally, delete the node record using the proper command. Confirm that the iSCSI block device has again disappeared.
+
+[root@desktopX nodes]# iscsiadm -m node -T iqn.2014-06.com.example:serverX -p 172.25.X.11 -u
+[root@desktopX nodes]# iscsiadm -m node -T iqn.2014-06.com.example:serverX -p 172.25.X.11 -o delete
+[root@desktopX nodes]# lsblk
+Confirm that the node record for the disconnected iSCSI target no longer exists.
+
+[root@desktopX nodes]# ls -lR
+Restart the iscsi client service. Confirm that the iSCSI block device does not return since there is no node record to trigger the target login.
+
+[root@desktopX nodes]# systemctl restart iscsi
+[root@desktopX nodes]# lsblk
+Rediscover the target and confirm that the discovery step alone creates the node record(s).
+
+Rediscover the configured iSCSI targets provided by a specific iSCSI target server portal, but do not log into the target.
+
+[root@desktopX nodes]# iscsiadm -m discovery -t st -p 172.25.X.11
+172.25.X.11:3260,1 iqn.2014-06.com.example:serverX
+Confirm that the node record for the iSCSI target is created by discovery, even before login has occurred.
+
+[root@desktopX nodes]# ls -R
+Clean up by deleting the node record again. Confirm that the node record no longer exists. When finished, return to your home directory.
+
+[root@desktopX nodes]# iscsiadm -m node -T iqn.2014-06.com.example:serverX -p 172.25.X.11 -o delete
+[root@desktopX nodes]# ls -lR
+[root@desktopX nodes]# cd ~
+

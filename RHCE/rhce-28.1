@@ -1,0 +1,212 @@
+
+Chapter 28. Configuring the Shell Environment
+Changing the Shell Environment
+Guided Exercise: Practice: Working with Login and Non-Login Shells
+Lab: Lab: Configuring the Shell Environment
+Abstract
+
+Overview
+Goal	To customize Bash startup and use environment variables, Bash aliases, and Bash functions.
+Objectives	
+Use bash startup scripts to define environment variables, aliases, and functions
+
+Sections	
+Changing the Shell Environment (and Practice)
+
+Lab	
+Configuring the Shell Environment
+
+Changing the Shell Environment
+In this section, students learned how to configure bash start up scripts to define environment variables, aliases, and functions.
+
+Objectives
+After completing this section, students should be able to describe environment variables, configure them in bash start up scripts, define bash aliases, and use functions.
+
+Environment variables
+The shell and scripts use variables to store data; some variables can be passed to sub-processes along with their content. These special variables are called environment variables.
+
+Applications and sessions use these variables to determine their behavior. Some of them are likely familiar to administrators, such as PATH, USER, and HOSTNAME, among others. What makes variables environment variables is that they have been exported in the shell. A variable that is flagged as an export will be passed, with its value, to any sub-process spawned from the shell. Users can use the env command to view all environment variables that are defined in their shell.
+
+Any variable defined in the shell can be an environment variable. The key to making a variable become an environment variable is flagging it for export using the export command.
+
+In the following example, a variable, MYVAR, will be set. A sub-shell is spawned, and the MYVAR variable does not exist in the sub-shell.
+
+[student@demo ~]$ MYVAR="some value"
+[student@demo ~]$ echo $MYVAR
+some value
+[student@demo ~]$ bash
+[student@demo ~]$ echo $MYVAR
+[student@demo ~]$ exit
+In a similar example, the export command will be used to tag the MYVAR variable as an environment variable, which will be passed to a sub-shell.
+
+[student@demo ~]$ MYVAR="some value"
+[student@demo ~]$ export MYVAR
+[student@demo ~]$ echo $MYVAR
+some value
+[student@demo ~]$ bash
+[student@demo ~]$ echo $MYVAR
+some value
+[student@demo ~]$ exit
+bash start-up scripts
+One place where environment variables are used is in initializing the bash environment upon user log in. When a user logs in, several shell scripts are executed to initialize their environment, starting with the /etc/profile, followed by a profile in the user's home directory, typically ~/.bash_profile.
+
+NOTE
+A bash shell will look for one of three files in a user's home directory: .bash_profile, .bash_login, or .profile. The shell will look for the files in the given order, and will execute the first file it locates.
+
+Because these profiles have additional scripting in them, which calls other shell scripts, the bash login scripting will typically be the following:
+
+/etc/profile
+           \__ /etc/profile.d/*.sh
+
+~/.bash_profile
+              \__ ~/.bashrc
+                         \__ /etc/bashrc
+Generally, there are two types of login scripts, profiles and "RCs". Profiles are for setting and exporting of environment variables, as well as running commands that should only be run upon login. RCs, such as /etc/bashrc, are for running commands, setting aliases, defining functions, and other settings that cannot be exported to sub-shells. Usually, profiles are only executed in a login shell, whereas RCs are executed every time a shell is created, login or non-login.
+
+The layout of the file call is such that a user can override the default settings provided by the system wide scripts. Many of the configuration files provided by Red Hat will contain a comment indicating where user-specific changes should be added.
+
+Using alias
+alias is a way administrators or users can define their own command to the system or override the use of existing system commands. Aliases are parsed and substituted prior to the shell checking PATH. alias can also be used to display all existing aliases defined in the shell.
+
+[student@demo ~]$ alias
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias grep='grep --color=auto'
+alias l.='ls -d .* --color=auto'
+alias ll='ls -l --color=auto'
+alias ls='ls --color=auto'
+alias vi='vim'
+alias which='alias | /usr/bin/which --tty-only --read-alias --show-dot --show-tilde'
+All the default aliases defined in a user environment are in the previously shown output of alias. The definition of the ll alias means that when the user types ll as a command, the shell will expand the alias and execute ls -l --color=auto. In this way, a new command ll has been added to the shell. In another example, the alias for grep, the alias overrides the default invocation of an existing command on the system. When a user enters the grep command, the shell will expand the alias and substitute the grep --color=auto command. Due to the alias, all calls to grep are overridden to become calls to grep with the --color option passed automatically.
+
+Use the alias command to set an alias. The defined alias will exist for the duration of the current shell only.
+
+alias mycomm="<command to execute>"
+[student@demo ~]$ alias usercmd='echo "Hurrah!"; ls -l'
+[student@demo ~]$ usercmd
+Hurrah!
+total 0
+-rw-rw-r--. 1 student student 0 Jun  9 13:21 file1
+-rw-rw-r--. 1 student student 0 Jun  9 13:21 file2
+-rw-rw-r--. 1 student student 0 Jun  9 13:21 file3
+To make the alias persistent, the user would need to add the command to the bottom of their ~/.bashrc.
+
+[student@demo ~]$ vi ~/.bashrc
+...
+# User specific aliases and functions
+alias usercmd='echo "Hurrah!"; ls -l'
+After the alias is added to the ~/.bashrc, it will be available in every shell created.
+
+To remove an alias from the environment, use the unalias command.
+
+Using functions
+When used in shell scripts, functions are a way of isolating a segment of code so that it can be called repeatedly without having to write the entire segment again. Additionally, if the code requires an update, the function's content can be updated, and everywhere the function is referenced, the updated code is now executed.
+
+An example of defining and using a function within a shell script follows, taken from /etc/profile. The pathmunge function takes two arguments; the first is a directory, the second (optional) is the word "after". Based on whether "after" is passed as $2, the directory will be added to the PATH environment variable at the front or end of the existing list of directories. Later, the function is invoked several times to build the PATH for root or regular users. Notice that for root, all the directories are prepended to PATH, where regular users have their PATH built by appending.
+
+ pathmunge () {
+  if [ "$2" = "after" ] ; then
+    PATH=$PATH:$1
+  else
+    PATH=$1:$PATH
+  fi
+}
+...
+if [ "$EUID" = "0" ]; then
+    pathmunge /sbin
+    pathmunge /usr/sbin
+    pathmunge /usr/local/sbin
+else
+    pathmunge /usr/local/sbin after
+    pathmunge /usr/sbin after
+    pathmunge /sbin after
+fi 
+Functions can also be set in the bash shell environment. When set in the environment, they can be executed as commands on the command line, similar to aliases. Unlike aliases, they can take arguments, be much more sophisticated in their actions, and provide a return code. Functions can be defined in the current shell by typing them into the command line, but more realistically, they should be set in a user's ~/.bashrc or the global /etc/bashrc.
+
+There are many functions set by default in the user environment, which can be viewed with the set command. set will display all functions and variables in the current shell environment. To remove a function from the environment, a user or administrator may use the unset command, passing the function or variable name to remove.
+
+REFERENCES
+bash(1), env(1), and builtins(1) man pages
+
+
+
+
+
+Guided Exercise: Practice: Working with Login and Non-Login Shells
+In this lab, you will apply changes to the scripts used to establish the initial shell environment for log in and non-login shells.
+
+Resources:
+Files:	
+/etc/profile
+
+/etc/bashrc
+
+~/.bash_profile
+
+~/.bashrc
+
+Machines:	serverX
+Outcomes:
+
+Shells will now have additional environment variables, functions, and aliases defined.
+
+Reset your serverX system. After the reset completes, log in as the student user.
+
+Change the student user's PS1 environment variable to [\u@\h \t \w]$ .
+
+Since this is an environment variable, and it should affect only student, edit ~/.bash_profile.
+
+[student@serverX ~]$ vi ~/.bash_profile
+Add an entry for the PS1 variable, setting it to [\u@\h \t \w]$ .
+
+ ...
+# User specific environment and startup programs
+
+PATH=$PATH:$HOME/.local/bin:$HOME/bin
+PS1='[\u@\h \t \w]$ '
+
+export PATH PS1 
+Set aliases for the student user so that when the rm, cp, or mv commands are used, they are automatically called with the -i option.
+
+Edit the student's ~/.bashrc configuration file.
+
+[student@serverX ~]$ vi ~/.bashrc
+Add aliases for the commands into the file.
+
+ ...
+# User specific aliases and functions
+
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+You have decided that users on serverX need to have an application to help them divine the future. Add a function called 8ball, available to all users, that selects a random number between zero and three. Based on the random value, the function should present a message to help them make a decision about the future.
+
+Edit the /etc/bashrc file.
+
+[student@serverX ~]$ sudo vi /etc/bashrc
+At the bottom of the file, add the 8ball function.
+
+ ...
+8ball () {
+  echo "Shaking ..."
+  echo
+  sleep 3
+  value="$[ $RANDOM % 4 ]"
+  case $value in
+    0) echo "All signs point to yes." ;;
+    1) echo "The answer is no." ;;
+    2) echo "Ask again later." ;;
+    3) echo "Outlook hazy." ;;
+  esac
+  echo
+}
+Use an ssh session to create a login shell to verify that the environment changes are effective.
+
+[student@serverX ~]$ ssh student@localhost
+student@localhost's password: student
+[student@serverX 00:06:57 ~]$ touch file1
+[student@serverX 00:06:57 ~]$ rm file1
+rm: remove regular empty file ‘file1’? y
+[student@serverX 00:06:57 ~]$ 8ball
+The answer is no.
+

@@ -1,0 +1,163 @@
+Integrating Dynamic Web Content
+In this section, students learned how to configure Apache httpd to serve dynamic database-driven web content.
+
+Objectives
+After completing this section, students should be able to configure Apache httpd to serve dynamic database-driven web content.
+
+Dynamic content
+Most modern websites do not consist of purely static content. Most content served out is actually generated dynamically, on demand. Integrating dynamic content with Apache HTTPD can be done in numerous ways. This section describes a number of the most common ways, but more ways exist.
+
+Common Gateway Interface
+One of the oldest forms of generating dynamic content is by using Common Gateway Interface (CGI). When a CGI resource is requested, httpd does not simply read the resource and serve it out; instead, it executes the resource as a process, and serves the stdout of that process. Although CGI resources are mostly written in scripting languages like Perl, it is also quite common for CGI resources to be compiled C programs, or Java executables.
+
+Information from the request (including client information) is made available to the CGI program using environment variables.
+
+Configuring httpd for CGI
+
+To have httpd treat a location as CGI executables, the following syntax is used in the httpd configuration.
+
+ScriptAlias /cgi-bin/ "/var/www/cgi-bin/"
+This instructs httpd to redirect any request for files under the /cgi-bin/ URI to the /var/www/cgi-bin/ directory, and treat the files in that directory as executable scripts.
+
+A number of caveats exist when using CGI:
+
+CGI scripts will be executed as the apache user and group.
+
+CGI scripts should be executable by the apache user and group.
+
+CGI scripts should have the httpd_sys_script_exec_t SELinux context.
+
+The CGI directory should have Options None, and access should be granted using a normal <Directory> block.
+
+Serving dynamic PHP content
+A popular method of providing dynamic content is using the PHP scripting language. While PHP scripts can be served using old-fashioned CGI, both performance and security can be improved by having httpd run a PHP interpreter internally.
+
+By installing the php package, a special mod_php module is added to httpd. The default configuration for this module adds the following lines to the main httpd configuration:
+
+<FilesMatch \.php$>
+  SetHandler application/x-httpd-php
+<FilesMatch>
+DirectoryIndex index.php
+The <FilesMatch> block instructs httpd to use mod_php for any file with a name ending in .php, and the DirectoryIndex directive adds index.php to the list of files that will be sought when a directory is requested.
+
+Serving dynamic Python content
+Also popular is generating dynamic content using Python scripts. Python scripts can be served out using regular CGI, but both python and httpd also support a newer protocol: Web Server Gateway Interface (WSGI).
+
+WSGI support can be added to httpd by installing the mod_wsgi package.
+
+Unlike the mod_php or CGI approach, WSGI does not start a new script/interpreter for every request. Instead, a main application is started, and all requests are routed into that application.
+
+Configuring httpd to support a WSGI application takes two steps:
+
+Install the mod_wsgi package.
+
+Add a WSGIScriptAlias line to a virtual host definition.
+
+The following is an example of a WSGIScriptAlias directive, which sends all requests for http://servername/myapp and any resources below it to the WSGI application /srv/myapp/www/myapp.py:
+
+WSGIScriptAlias /myapp/ /srv/myapp/www/myapp.py
+WSGI applications should be executable by the apache user and group, and their SELinux contexts should be set to httpd_sys_content_t.
+
+Database connectivity
+Most web applications will need to store and retrieve persistent data. A common approach to this is to store the data in a database such as MariaDB or PostgreSQL.
+
+When the database is running on the same host as the web server, and the database is using a standard network port, SELinux will allow the network connection from the web application to happen.
+
+When a database on a remote host is used, the SELinux Boolean httpd_can_network_connect_db must be set to 1 to allow the connection.
+
+When a network connection to another needs to be made from within the web application, and the target is not a well-known database port, the SELinux Boolean httpd_can_network_connect must be set to 1.
+
+Various other SELinux Booleans can also affect the way in which web applications are executed by httpd.
+
+REFERENCES
+httpd(8) and httpd_php_selinux(8) man pages
+
+httpd-manual package contents
+
+/usr/share/doc/mod_wsgi-*/README
+
+
+
+
+
+
+
+
+Guided Exercise: Practice: Configuring a Web Application
+In this lab, you will configure your serverX system to serve a PHP application that uses a MariaDB database backend.
+
+Resources:
+Files:	/var/www/html/index.html
+Machines:	desktopX and serverX
+Outcomes:
+
+A working PHP application with a database backend running on serverX.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab phpdb setup
+Your company is trying to push into the collectible card game market. One of the major focuses in that push is to provide an online database of all cards in the popular game “Tragic: The Saddening”.
+
+Your web developers are hard at work, and have provided you with an early alpha version of the web interface in /var/www/html/index.php.
+
+Your database administrators, not wanting to be outdone by the web developers, have populated a MariaDB database, ready for use.
+
+One of your former coworkers was tasked with configuring the web server for this project. Sadly, after a number of weeks trying to get the code to run, that coworker was let go.
+
+It's now up to you to get this project on the road again. Both the database server and the web server are already running on serverX, but clients have trouble connecting to http://serverX.example.com.
+
+Your web developers have delivered bug-free code as usual, and the DBA has delivered a working database, with correct records.
+
+Replicate the issue of users not being able to connect to serverX.example.com.
+
+On your desktopX machine, start an instance of firefox and point it at serverX.example.com.
+
+That “Unable to connect” message has two likely causes: httpd.service not running on serverX, or a firewall issue. Investigate both.
+
+Check if httpd.service is running on serverX.
+
+[student@serverX ~]$ sudo systemctl status -l httpd.service
+Investigate if the http service is opened for the default zone on serverX.
+
+[student@serverX ~]$ sudo firewall-cmd --list-all
+Configure the firewall on serverX to allow http traffic.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-service=http
+[student@serverX ~]$ sudo firewall-cmd --reload
+Test if opening up the firewall solved your issue.
+
+From desktopX, point a browser at http://serverX.example.com.
+
+That test page is typically shown when httpd cannot find an index page. Verify that there is indeed a file named /var/www/html/index.php, and that it is readable by the httpd process.
+
+[student@serverX ~]$ ls -lZ /var/www/html/index.php
+httpd only searches for .php files when php is properly installed. Verify that this is the case.
+
+[student@serverX ~]$ yum list php
+Install the php package.
+
+[student@serverX ~]$ sudo yum install php
+Restart the httpd.service on serverX to activate the new PHP modules.
+
+[student@serverX ~]$ sudo systemctl restart httpd.service
+From your desktopX system, use firefox to check if http://serverX.example.com is now working.
+
+That empty page does not look good. Investigate the issue.
+
+Check the httpd error log.
+
+[student@serverX ~]$ sudo tail /var/log/httpd/error_log
+That “undefined function mysqli_connect” error looks like a missing PHP library. Install the php-mysql package to install the needed bits.
+
+[student@serverX ~]$ sudo yum install php-mysql
+Restart httpd.service to make any running PHP instances aware of the new libraries.
+
+[student@serverX ~]$ sudo systemctl restart httpd.service
+From desktopX, use firefox to verify that the application now works. When a database listing is returned, execute lab phpdb grade on desktopX to verify your work.
+
+[student@desktopX ~]$ lab phpdb grade
+

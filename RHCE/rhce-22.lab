@@ -1,0 +1,151 @@
+Lab: Lab: Providing Block-based Storage
+In this lab, you will build a target server and connect to a target from a client node, then use the resulting block devices to create a file system.
+
+Resources:
+Files:	
+/etc/target/saveconfig.json
+
+/etc/iscsi/initiatorname.iscsi
+
+Machines:	serverX and desktopX
+Outcomes:
+
+An iSCSI target exported from your serverX machine, limited with ACLs so that it can only be used by your desktopX, used by your desktopX system with a persistent mount.
+
+Reset your serverX system.
+
+Reset your desktopX system.
+
+You have been asked to create a new 1 GiB iSCSI target on your serverX machine. This target should be called iqn.2014-06.com.example:serverX. This target should only be available to clients with an initiatorname of iqn.2014-06.com.example:desktopX.
+
+Your desktopX machine should persistently log in to this target, and persistently mount a (new) XFS file system created on that target on /iscsidisk.
+
+On your serverX machine create a new 1 GiB partition on your secondary hard disk for use as a backing store.
+
+NOTE
+These solutions use /dev/vdb as the device node for the secondary hard drive. In your environment this might be different, for example /dev/xvdj. Adjust all instructions in this exercise as necessary.
+
+[student@serverX ~]$ sudo fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table
+Building a new DOS disklabel with disk identifier 0xaa23f397.
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+Partition number (1-4, default 1): Enter
+First sector (2048-20971519, default 2048): Enter
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-20971519, default 20971519): +1G
+Partition 1 of type Linux and of size 1 GiB is set
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+Syncing disks.
+Install all needed packages on serverX, then start and enable all relevant services.
+
+Install the targetcli package.
+
+[student@serverX ~]$ sudo yum install targetcli
+Enable and start the target.service service.
+
+[student@serverX ~]$ sudo systemctl enable target.service
+[student@serverX ~]$ sudo systemctl start target.service
+Create a new iSCSI target called iqn.2014-06.com.example:serverX, using your new partition as a backing store, and limited only to clients with the initiatorname iqn.2014-06.com.example:desktopX.
+
+[student@serverX ~]$ sudo targetcli
+targetcli shell version 2.1.fb34
+Copyright 2011-2013 by Datera, Inc and others.
+For help on commands, type 'help'.
+
+/> /backstores/block create disk1 /dev/vdb1
+Created block storage object disk1 using /dev/vdb1.
+/> /iscsi create iqn.2014-06.com.example:serverX
+Created target iqn.2014-06.com.example:serverX.
+Created TPG 1.
+/> /iscsi/iqn.2014-06.com.example:serverX/tpg1/acls create iqn.2014-06.com.example:desktopX
+Created Node ACL for iqn.2014-06.com.example:desktopX
+/> /iscsi/iqn.2014-06.com.example:serverX/tpg1/luns create /backstores/block/disk1
+Created LUN 0.
+Created LUN 0->0 mapping in node ACL iqn.2014-06.com.example:desktopX
+/> /iscsi/iqn.2014-06.com.example:serverX/tpg1/portals create 172.25.X.11 3260
+Using default IP port 3260
+Created network portal 172.25.X.11:3260.
+/> ls
+o- / ................................................................. [...]
+  o- backstores ...................................................... [...]
+  | o- block .......................................... [Storage Objects: 1]
+  | | o- disk1 ................... [/dev/vdb1 (1.0GiB) write-thru activated]
+  | o- fileio ......................................... [Storage Objects: 0]
+  | o- pscsi .......................................... [Storage Objects: 0]
+  | o- ramdisk ........................................ [Storage Objects: 0]
+  o- iscsi .................................................... [Targets: 1]
+  | o- iqn.2014-06.com.example:serverX ........................... [TPGs: 1]
+  |   o- tpg1 ....................................... [no-gen-acls, no-auth]
+  |     o- acls .................................................. [ACLs: 1]
+  |     | o- iqn.2014-06.com.example:desktopX ............. [Mapped LUNs: 1]
+  |     |   o- mapped_lun0 ......................... [lun0 block/disk1 (rw)]
+  |     o- luns .................................................. [LUNs: 1]
+  |     | o- lun0 ................................ [block/disk1 (/dev/vdb1)]
+  |     o- portals ............................................ [Portals: 1]
+  |       o- 172.25.X.11:3260 ......................................... [OK]
+  o- loopback ................................................. [Targets: 0]
+/> saveconfig
+Last 10 configs saved in /etc/target/backup.
+Configuration saved to /etc/target/saveconfig.json
+/> exit
+Open all relevant ports for iSCSI on the firewall on your serverX machine.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-port=3260/tcp
+[student@serverX ~]$ sudo firewall-cmd --reload
+On your desktopX machine verify that the iscsi-initiator-utils package is installed, then set the initiatorname to iqn.2014-06.com.example:desktopX.
+
+Verify that the iscsi-initiator-utils package is installed.
+
+[student@desktopX ~]$ sudo yum install iscsi-initiator-utils
+Set your initiatorname to iqn.2014-06.com.example:desktopX. Edit /etc/iscsi/initiatorname.iscsi so that it reads:
+
+InitiatorName=iqn.2014-06.com.example:desktopX
+NOTE
+After changing the initiatorname when a target has already been discovered do not forget to restart the iscsid.service service.
+
+Discover and login to the new target. Verify the device node for the new target.
+
+Discover the target.
+
+[student@desktopX ~]$ sudo iscsiadm -m discovery -t st -p serverX.example.com
+Log in to the target.
+
+[student@desktopX ~]$ sudo iscsiadm -m node -T iqn.2014-06.com.example:serverX -l
+Verify the device node for the iSCSI disk.
+
+[student@desktopX ~]$ sudo iscsiadm -m session -P3 | grep Attached
+    Attached SCSI devices:
+        Attached scsi disk sda      State: running
+Create an XFS file system on the new disk, then persistently mount it on /iscsidisk.
+
+Create the file system, make sure to use the device node you discovered in the previous step, then find the UUID for the new files system.
+
+[student@desktopX ~]$ sudo mkfs -t xfs /dev/sda
+[student@desktopX ~]$ sudo blkid /dev/sda
+Create the mountpoint.
+
+[student@desktopX ~]$ sudo mkdir /iscsidisk
+Add the following line to /etc/fstab, where XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXX is the UUID you discovered for your new filesystem:
+
+UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX /iscsidisk xfs _netdev 0 2
+Mount the file system and verify.
+
+[student@desktopX ~]$ sudo mount /iscsidisk
+[student@desktopX ~]$ df -h /iscsidisk
+Filesystem     Size  Used Avail Use% Mounted on
+/dev/sda      1014M   33M  982M   4% /iscsidisk
+

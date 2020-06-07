@@ -1,0 +1,332 @@
+Configuring HTTPS
+In this section, students learned how to configure Apache httpd to provide TLS-encrypted virtual hosts.
+
+Objectives
+After completing this section, students should be able to configure Apache httpd to provide TLS-encrypted virtual hosts.
+
+Transport Layer Security (TLS)
+Transport Layer Security Basics
+Transport Layer Security (TLS) is a method for encrypting network communications. TLS is the successor to Secure Sockets Layer (SSL). TLS allows a client to verify the identity of the server and, optionally, allows the server to verify the identity of the client.
+
+TLS is based around the concepts of certificates. A certificate has multiple parts: a public key, server identity, and a signature from a certificate authority. The corresponding private key is never made public. Any data encrypted with the private key can only be decrypted with the public key, and vice versa.
+
+During the initial handshake, when setting up the encrypted connection, the client and server agree on a set of encryption ciphers supported by both the server and the client, and they exchange bits of random data. The client uses this random data to generate a session key, a key that will be used for much faster symmetric encryption, where the same key is used for both encryption and decryption. To make sure that this key is not compromised, it is sent to the server encrypted with the server's public key (part of the server certificate).
+
+The following diagram shows a (simplified) version of a TLS handshake.
+
+
+Figure 25.1: A simplified representation of a TLS handshake
+The client initiates a connection to the server with a ClientHello message. As part of this message, the client sends a 32-byte random number including a timestamp, and a list of encryption protocols and ciphers supported by the client.
+
+The server responds with a ServerHello message, containing another 32-byte random number with a timestamp, and the encryption protocol and ciphers the client should use.
+
+The server also sends the server certificate, which consists of a public key, general server identity information like the FQDN, and a signature from a trusted certificate authority (CA). This certificate can also include the public certificates for all certificate authorities that have signed the certificate, up to a root CA.
+
+The client verifies the server certificate by checking if the supplied identity information matches, and by verifying all signatures, checking if they are made by a CA trusted by the client.
+
+If the certificate verifies, the client creates a session key using the random numbers previously exchanged. The client then encrypts this session key using the public key from the server certificate, and sends it to the server using a ClientKeyExchange message.
+
+The server decrypts the session key, and the client and server both start encrypting and decrypting all data sent over the connection using the session key.
+
+NOTE
+This is a simplification of the actual protocol; for example, the actual session key never gets transmitted with many cipher suites, not even in encrypted form. The server and client both create a pre-master key which gets exchanged, and both the server and client calculate the actual session key from that one.
+
+During the negotiations, both the server and client also use a variety of methods to ensure against replay and man-in-the-middle attacks.
+
+Configuring TLS certificates
+Configuring TLS virtual hosts
+To configure a virtual host with TLS, multiple steps must be completed:
+
+Obtain a (signed) certificate.
+
+Install Apache HTTPD extension modules to support TLS.
+
+Configure a virtual host to use TLS, using the certificates obtained earlier.
+
+Obtaining a certificate
+
+When obtaining a certificate, there are two options: creating a self-signed certificate (a certificate signed by itself, not an actual CA), or creating a certificate request and having a reputable CA sign that request so it becomes a certificate.
+
+The crypto-utils package contains a utility called genkey that supports both methods. To create a certificate (signing request) with genkey, run the following command, where <FQDN> is the fully qualified domain name clients will use to connect to your server:
+
+[root@serverX ~]# genkey <FQDN>
+During the creation, genkey will ask for the desired key size (choose at least 2048 bits), if a signing request should be made (answering no will create a self-signed certificate), whether the private key should be protected with a passphrase, and general information about the identity of the server.
+
+After the process has completed, a number of files will be generated:
+
+/etc/pki/tls/private/<fqdn>.key: This is the private key. The private key should be kept at 0600 or 0400 permissions, and an SELinux context of cert_t. This key file should never be shared with the outside world.
+
+/etc/pki/tls/certs/<fqdn>.0.csr: This file is only generated if you requested a signing request. This is the file that you send to your CA to get it signed. You never need to send the private key to your CA.
+
+/etc/pki/tls/certs/<fqdn>.crt: This is the public certificate. This file is only generated when a self-signed certificate is requested. If a signing request was requested and sent to a CA, this is the file that will be returned from the CA. Permissions should be kept at 0644, with an SELinux context of cert_t.
+
+Install Apache HTTPD modules
+
+Apache HTTPD needs an extension module to be installed to activate TLS support. On Red Hat Enterprise Linux 7, you can install this module using the mod_ssl package.
+
+This package will automatically enable httpd for a default virtual host listening on port 443/TCP. This default virtual host is configured in the file /etc/httpd/conf.d/ssl.conf.
+
+Configure a virtual host with TLS
+
+Virtual hosts with TLS are configured in the same way as regular virtual hosts, with some additional parameters. It is possible to use name-based virtual hosting with TLS, but some older browsers are not compatible with this approach.
+
+The following is a simplified version of /etc/httpd/conf.d/ssl.conf:
+
+Listen 443 https1
+SSLPassPhraseDialog exec:/usr/libexec/httpd-ssl-pass-dialog2
+SSLSessionCache         shmcb:/run/httpd/sslcache(512000)
+SSLSessionCacheTimeout  300
+SSLRandomSeed startup file:/dev/urandom  256
+SSLRandomSeed connect builtin
+SSLCryptoDevice builtin
+<VirtualHost _default_:443>3
+  ErrorLog logs/ssl_error_log
+  TransferLog logs/ssl_access_log
+  LogLevel warn
+  SSLEngine on4
+  SSLProtocol all -SSLv25
+  SSLCipherSuite HIGH:MEDIUM:!aNULL:!MD56
+  SSLCertificateFile /etc/pki/tls/certs/localhost.crt7
+  SSLCertificateKeyFile /etc/pki/tls/private/localhost.key8
+  CustomLog logs/ssl_request_log \
+          "%t %h %{SSL_PROTOCOL}x %{SSL_CIPHER}x \"%r\" %b"
+</VirtualHost>
+1
+
+This directive instructs https to listen on port 443/TCP. The second argument (https) is optional, since https is the default protocol for port 443/TCP.
+
+2
+
+If the private key is encrypted with a passphrase, httpd needs a method of requesting a passphrase from a user at the console at startup. This directive specifies what program to execute to retrieve that passphrase.
+
+3
+
+This is the virtual host definition for a catch-all virtual host on port 443/TCP.
+
+4
+
+This is the directive that actually turns on TLS for this virtual host.
+
+5
+
+This directive specifies the list of protocols that httpd is willing to speak with clients. For security, the older, unsafe SSLv3 protocol should also be disabled:
+
+SSLProtocol all -SSLv2 -SSLv3
+6
+
+This directive lists what encryption ciphers httpd is willing to use when communicating with clients. The selection of ciphers can have big impacts on both performance and security.
+
+7
+
+This directive instructs httpd where it can read the certificate for this virtual host.
+
+8
+
+This directive instructs httpd where it can read the private key for this virtual host. httpd reads all private keys before privileges are dropped, so file permissions on the private key can remain locked down.
+
+If a certificate signed by an CA is used, and the certificate itself does not have copies of all the CA certificates used in signing, up to a root CA, embedded in it, the server will also need to provide a certificate chain, a copy of all CA certificates used in the signing process concatenated together. The SSLCertificateChainFile directive is used to identify such a file.
+
+When defining a new TLS-encrypted virtual host, it is not needed to copy the entire contents of ssl.conf. Only a <VirtualHost> block with the SSLEngine On directive, and configuration for certificates, is strictly needed. The following is an example of a name-based TLS virtual host:
+
+<VirtualHost *:443>
+  ServerName demo.example.com
+  SSLEngine on
+  SSLCertificateFile /etc/pki/tls/certs/demo.example.com.crt
+  SSLCertificateKeyFile /etc/pki/tls/private/demo.example.com.key
+  SSLCertificateChainFile /etc/pki/tls/certs/example-ca.crt
+</VirtualHost>
+This example misses some important directives such as DocumentRoot; these will be inherited from the main configuration.
+
+WARNING
+Not defining what protocols and ciphers can be used will result in httpd using default options for these. httpd defaults are not considered secure, and it is highly recommended to restrict both to a more secure subset.
+
+Configuring forward secrecy
+As mentioned earlier, the client and the server select the encryption cipher to be used to secure the TLS connection based on a negotiation during the initial handshake. Both the client and the server must find a cipher that both sides of the communication support.
+
+If a weaker encryption cipher has been used, and the private key of the server has been compromised—for example, after a server break-in or due to a bug in the cryptography code—an attacker could possibly decrypt a recorded session.
+
+One way to protect against these types of attacks is to use ciphers that ensure forward secrecy. Sessions encrypted using ciphers with this characteristic can not be decrypted if the private key is compromised at some later date. Forward secrecy can be established by carefully tuning the allowed ciphers in the SSLCipherSuite directive, to preferentially pick ciphers that support forward secrecy which both the server and client can use.
+
+The following is an example that, at the date of publication, was considered a very good set of ciphers to allow. This list prioritizes ciphers that perform the initial session key exchange using elliptic curve Diffie-Hellman (EECDH) algorithms which support forward secrecy before falling back to less secure algorithms. Using Diffie-Hellman, the actual session key is never transmitted, but rather calculated by both sides.
+
+SSLCipherSuite "EECDH+ECDSA+AESGCM EECDH+aRSA+AESGCM EECDH+ECDSA+SHA384 EECDH+ECDSA+SHA256 EECDH+aRSA+SHA384 EECDH+aRSA+SHA256 EECDH EDH+aRSA DES-CBC3-SHA !RC4 !aNULL !eNULL !LOW !DES !MD5 !EXP !PSK !SRP !DSS"
+SSLHonorCipherOrder On
+The example also disables RC4, due to its increasing vulnerability. This has the somewhat negative side effect of removing server-side BEAST (CVE-2011-3389) mitigation for very old web clients that only support TLSv1.0 and earlier. DES-CBC3-SHA is used in place of RC4 as a "last resort" cipher for support of old Internet Explorer 8 / Microsoft Windows XP clients. (In addition, to protect against other issues, the insecure SSLv3 and SSLv2 protocols should also be disabled on the web server, as previously discussed in this section.)
+
+The SSLHonorCipherOrder On directive instructs httpd to preferentially select ciphers based on the order of the SSLCipherSuite list, regardless of the order preferred by the client.
+
+IMPORTANT
+Security research is an always ongoing arms race. It is recommended that administrators re-evaluate their selected ciphers on a regular basis.
+
+Configuring HTTP Strict Transport Security (HSTS)
+A common misconfiguration, and one that will result in warnings in most modern browsers, is having a web page that is served out over https include resources served out over clear-text http.
+
+To protect against this type of misconfiguration, add the following line inside a <VirtualHost> block that has TLS enabled:
+
+Header always set Strict-Transport-Security "max-age=15768000"
+Sending this extra header informs clients that they are not allowed to fetch any resources for this page that are not served using TLS.
+
+Another possible issue comes from clients connecting over http to a resource they should have been using https for.
+
+Simply not serving any content over http would alleviate this issue, but a more subtle approach is to automatically redirect clients connecting over http to the same resource using https.
+
+To set up these redirects, configure a http virtual host for the same ServerName and ServerAlias as the TLS protected virtual host (a catch-all virtual host can be used), and add the following lines inside the <VirtualHost *:80> block:
+
+RewriteEngine on
+RewriteRule ^(/.*)$ https://%{HTTP_HOST}$1 [redirect=301]
+The RewriteEngine on directive turns on the URL rewrite module for this virtual host, and the RewriteRule matches any resource (^(/.*)$) and redirects it using a http Moved Permanently message ([redirect=301]) to the same resource served out over https. The %{HTTP_HOST} variable uses the hostname that was requested by the client, while the $1 part is a back-reference to whatever was matched between the first set of parentheses in the regular expression.
+
+REFERENCES
+httpd(8) man page
+
+httpd-manual contents
+
+Qualys SSL Labs: SSL/TLS Deployment Best Practices
+
+RFC 7465 - Prohibiting RC4 Cipher Suites
+
+
+
+
+
+Guided Exercise: Practice: Configuring a TLS-enabled Virtual Host
+In this lab, you will configure TLS-encrypted virtual hosts.
+
+Resources:
+Files:	
+http://classroom.example.com/pub/example-ca.crt
+
+http://classroom.example.com/pub/tls/certs/wwwX.crt
+
+http://classroom.example.com/pub/tls/private/wwwX.key
+
+http://classroom.example.com/pub/tls/certs/webappX.crt
+
+http://classroom.example.com/pub/tls/private/webappX.key
+
+Machines:	desktopX and serverX
+Outcomes:
+
+A web server configured with two virtual hosts, wwwX.example.com and webappX.example.com, both protected by TLS.
+
+Reset your serverX system.
+
+Reset your desktopX system.
+
+Your company has decided to start selling Jim Whitehurst action figures online. Since most Red Hat fans enjoy privacy and security, the website will need to be protected with TLS.
+
+You have been asked to configure a web server on your serverX machine to host this site. This web server will need to host two virtual hosts: https://wwwX.example.com and https://webappX.example.com. The nonencrypted version of these two sites should send browsers an automatic redirect to the encrypted version.
+
+Certificates and private keys for these two sites have already been provided. The certificates can be downloaded from http://classroom.example.com/pub/tls/certs/{www,webapp}X.crt, and the private keys can be found at http://classroom.example.com/pub/tls/private/{www,webapp}X.key. The public part of the signing CA can be found at http://classroom.example.com/pub/example-ca.crt.
+
+Content for these sites should be served out of /srv/wwwX/www and /srv/webappX/www, respectively. Since your web designers are currently on a two-week lunch break, you will have to provide temporary content that uniquely identifies each host yourself.
+
+Custom logfiles are not required for now.
+
+Install both the httpd and mod_ssl packages.
+
+[student@serverX ~]$ sudo yum install httpd mod_ssl
+Create the content directories, with identifying content and appropriate SELinux contexts.
+
+Create the two directories.
+
+[student@serverX ~]$ sudo mkdir -p /srv/{www,webapp}X/www
+In both content directories, create an index.html file with distinct content.
+
+[student@serverX ~]$ sudo vim /srv/wwwX/www/index.html
+[student@serverX ~]$ sudo vim /srv/webappX/www/index.html
+Reset the SELinux context on your new directories.
+
+[student@serverX ~]$ sudo restorecon -Rv /srv/
+Download all the needed certificates and private keys to their correct locations with their correct permissions.
+
+Download the CA certificate used to sign your certificates.
+
+[student@serverX ~]$ cd /etc/pki/tls/certs
+[student@serverX certs]$ sudo wget http://classroom.example.com/pub/example-ca.crt
+While still in the certs directory, download the two certificates for your virtual hosts.
+
+[student@serverX certs]$ sudo wget http://classroom.example.com/pub/tls/certs/wwwX.crt
+[student@serverX certs]$ sudo wget http://classroom.example.com/pub/tls/certs/webappX.crt
+Switch to the private directory and download the private keys. Do not forget to set the permissions on the private keys to 0600.
+
+[student@serverX certs]$ cd /etc/pki/tls/private
+[student@serverX private]$ sudo wget http://classroom.example.com/pub/tls/private/wwwX.key
+[student@serverX private]$ sudo wget http://classroom.example.com/pub/tls/private/webappX.key
+[student@serverX private]$ sudo chmod 0600 w*X.key
+Configure the TLS name-based virtual host for your wwwX.example.com domain in a new file called /etc/httpd/conf.d/wwwX.conf. You can use the existing /etc/httpd/conf.d/ssl.conf as a template, but if you do, do not forget to strip out all the content outside of the <VirtualHost> block.
+
+Do not forget to add an automatic redirect from the non-TLS-based http site to the TLS-encrypted https site.
+
+Create /etc/httpd/conf.d/wwwX.conf with the following content:
+
+<VirtualHost *:443>
+  ServerName wwwX.example.com
+  SSLEngine On
+  SSLProtocol all -SSLv2 -SSLv3
+  SSLCipherSuite HIGH:MEDIUM:!aNull:!MD5
+  SSLHonorCipherOrder on
+  SSLCertificateFile /etc/pki/tls/certs/wwwX.crt
+  SSLCertificateKeyFile /etc/pki/tls/private/wwwX.key
+  SSLCertificateChainFile /etc/pki/tls/certs/example-ca.crt
+  DocumentRoot /srv/wwwX/www
+</VirtualHost>
+Add a <Directory> block for /srv/wwwX/www to /etc/httpd/conf.d/wwwX.conf like the following:
+
+<Directory /srv/wwwX/www>
+  Require all granted              
+</Directory>
+To accomplish the automatic redirect from http to https, add the following block to /etc/httpd/conf.d/wwwX.conf:
+
+<VirtualHost *:80>
+  ServerName wwwX.example.com
+  RewriteEngine on
+  RewriteRule ^(/.*)$ https://%{HTTP_HOST}$1 [redirect=301]
+</VirtualHost>
+Configure the webappX.example.com virtual host by copying the configuration for your wwwX.example.com virtual host, and changing every occurrence of wwwX to webappX.
+
+Copy the configuration to /etc/httpd/conf.d/webappX.conf.
+
+[student@serverX ~]$ sudo cp /etc/httpd/conf.d/{www,webapp}X.conf
+Replace every occurrence of wwwX with webappX in the new configuration file.
+
+[student@serverX ~]$ sudo sed -i 's/wwwX/webappX/g' /etc/httpd/conf.d/webappX.conf
+Start and enable the httpd.service, and open the relevant firewall ports.
+
+Start and enable httpd.service.
+
+[student@serverX ~]$ sudo systemctl start httpd.service
+[student@serverX ~]$ sudo systemctl enable httpd.service
+Open both the http and https ports on the firewall.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-service=http --add-service=https
+[student@serverX ~]$ sudo firewall-cmd --reload
+Test your new configuration from your desktopX system. You will have to import the http://classroom.example.com/pub/example-ca.crt into the list of trusted CA certificates for your browser as part of this process.
+
+Perform all of the following steps on your desktopX system.
+
+Download the example-ca.crt certificate to your home directory.
+
+[student@desktopX ~]$ wget http://classroom.example.com/pub/example-ca.crt
+Launch firefox and open the Edit → Preferences dialog. Navigate to the Advanced → Certificates tab.
+
+Click View Certificates, then use the Import button. Navigate to the file you just downloaded and click Open. In the resulting dialog, check Trust this CA to identify websites and click OK.
+
+Close all open dialogs.
+
+Point your browser at both http://wwwX.example.com and http://webappX.example.com. Both should redirect to their https counterpart automatically, without a certificate warning.
+
+NOTE
+When troubleshooting a web server using firefox, it can be useful to empty the cache from within the Preferences dialog. The Clear Now button can be found in the Advanced → Network tab. If the cache is not cleared in between server restarts, firefox might show old, outdated information.
+
+Bonus question:
+
+Without further configuration, a visit to http://serverX.example.com will also result in a redirect to https. Why is this, and how could you prevent this from happening?
+
+Answer:
+
+This happens because there is an explicit catch-all virtual host defined for *:80, resulting in the first virtual host for *:80 being used as a default virtual host. Since this is the virtual host for your webappX domain, the redirect rule is included.
+
+This can be solved by defining either a <VirtualHost _default_:80> block, or by defining a <VirtualHost *:80> block in a location where it will be parsed before any other virtual hosts; for example, before the includes in /etc/httpd/conf/httpd.conf or as a separate file in /etc/httpd/conf.d/00-default.conf.
+
+

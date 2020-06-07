@@ -1,0 +1,358 @@
+Chapter 24. Configuring MariaDB Databases
+Installing MariaDB
+Guided Exercise: Practice: Installing MariaDB
+Working with MariaDB Databases
+Quiz: Practice: MariaDB Commands
+Managing Database Users and Access Rights
+Guided Exercise: Practice: Managing Users
+Creating and Restoring MariaDB Backups
+Guided Exercise: Practice: Restoring a MariaDB Database from Backup
+Lab: Lab: Configuring MariaDB Databases
+Abstract
+
+Overview
+Goal	To provide a MariaDB SQL database for use by programs and database administrators.
+Objectives	
+Install MariaDB.
+
+Configure and administer MariaDB.
+
+Configure user and access rights.
+
+Back up and restore MariaDB databases.
+
+Sections	
+Installing MariaDB (and Practice)
+
+Working with MariaDB Databases (and Practice)
+
+Managing Database Users and Access Rights (and Practice)
+
+Creating and Restoring MariaDB Backups (and Practice)
+
+Lab	
+Configuring MariaDB Databases
+
+Installing MariaDB
+In this section, students learned how to:
+
+Describe relational databases.
+
+Describe database concepts.
+
+Perform a MariaDB installation.
+
+Objectives
+After completing this section, students should be able to describe a relational database and be able to install and perform a basic configuration of a simple MariaDB relational database server.
+
+Relational databases
+A relational database is a mechanism that allows the persistence of data in an organized way. Databases store data items organized as a set of tables, with each table representing an entity. In a given table, each row corresponds to a record, while each column corresponds to an attribute of that record.
+
+MariaDB [inventory]> SELECT * FROM product; 
++----+-------------------+---------+-------+-------------+-----------------+
+| id | name              | price   | stock | id_category | id_manufacturer |
++----+-------------------+---------+-------+-------------+-----------------+
+|  1 | ThinkServer TS140 | 539.88  |    20 |           2 |               4 |
+|  2 | ThinkServer TS440 | 1736.00 |    10 |           2 |               4 |
+|  3 | RT-AC68U          | 219.99  |    10 |           1 |               3 |
+|  4 | X110 64GB         |  73.84  |   100 |           3 |               1 |
++----+-------------------+---------+-------+-------------+-----------------+
+4 rows in set (0.00 sec)  
+MariaDB [inventory]> SELECT * FROM category; 
++----+------------+
+| id | name       |
++----+------------+
+|  1 | Networking |
+|  2 | Servers    |
+|  3 | Ssd        |
++----+------------+
+3 rows in set (0.00 sec)
+MariaDB [inventory]> SELECT * FROM manufacturer; 
++----+----------+----------------+-------------------+
+| id | name     | seller         | phone_number      |
++----+----------+----------------+-------------------+
+|  1 | SanDisk  | John Miller    | +1 (941) 329-8855 |
+|  2 | Kingston | Mike Taylor    | +1 (341) 375-9999 |
+|  3 | Asus     | Wilson Jackson | +1 (432) 367-8899 |
+|  4 | Lenovo   | Allen Scott    | +1 (876) 213-4439 |
++----+----------+----------------+-------------------+
+4 rows in set (0.00 sec)  
+The previous tables show:
+
+The product table has four records. Each record has six attributes: (id, name, price, stock, id_category, id_manufacturer).
+
+X110 64GB is an SSD manufactured by SanDisk.
+
+The seller responsible for the ThinkServer TS140 product is Allen Scott.
+
+There are two relational database packages provided with Red Hat Enterprise Linux 7:
+
+PostgreSQL—An open source database developed by the PostgreSQL Global Development Group, consisting of Postgres users (both individuals and companies) and other companies and volunteers, supervised by companies such as Red Hat and EnterpriseDB.
+
+MariaDB—A community-developed branch of MySQL built by some of the original authors of MySQL. It offers a rich set of feature enhancements, including alternate storage engines, server optimizations, and patches. The MariaDB Foundation works closely and cooperatively with the larger community of users and developers in the spirit of free and open source software.
+
+NOTE
+MariaDB is a community-developed replacement for MySQL. MySQL is not shipped in the core toolset for Red Hat Enterprise Linux 7, but it is available through Red Hat Software Collections 1.1.
+
+Red Hat Software Collections is a fully-supported parallel set of tools included as part of most RHEL 7 subscriptions. Red Hat Software Collections provides a set of dynamic programming languages, database servers, web servers and various related packages that are either more recent than the version shipped in the core RHEL distribution or are not otherwise available in it at all. Packages in Red Hat Software Collections have a faster but shorter support cycle (up to 3 years of support).
+
+More information is available in the Red Hat Software Collections 1.1 Release Notes at https://access.redhat.com/documentation/.
+
+MariaDB installation
+Installing MariaDB
+A full MariaDB database installation requires both the mariadb and mariadb-client groups of software to be installed.
+
+The following packages will be installed with the mariadb group:
+
+mariadb-server—The MariaDB server and related files (mandatory package).
+
+mariadb-bench—MariaDB benchmark scripts and data (optional package).
+
+mariadb-test—The test suite distributed with MariaDB (optional package).
+
+The following packages will be installed with the mariadb-client group:
+
+mariadb—A community-developed branch of MySQL (mandatory package).
+
+MySQL-python—A MariaDB interface for Python (default package).
+
+mysql-connector-odbc—ODBC driver for MariaDB (default package).
+
+libdbi-dbd-mysql—MariaDB plug-in for libdbi (optional package).
+
+mysql-connector-java—Native Java driver for MariaDB (optional package).
+
+perl-DBD-MySQL—A MariaDB interface for Perl (optional package).
+
+The /etc/my.cnf file has default configurations for MariaDB, such as the data directory, socket bindings, and log and error file location.
+
+NOTE
+Instead of adding new configurations to the /etc/my.cnf file, a newly created file named *.cnf can be added to the /etc/my.cnf.d/ directory holding the configuration of MariaDB.
+
+MariaDB installation demonstration
+In this example, please follow along with these steps while your instructor demonstrates how to install a MariaDB database server.
+
+Install MariaDB on serverX with the yum command.
+
+[root@serverX ~]# yum groupinstall mariadb mariadb-client -y
+Start the MariaDB service on serverX with the systemctl command.
+
+[root@serverX ~]# systemctl start mariadb
+NOTE
+The default MariaDB log file is /var/log/mariadb/mariadb.log. This file should be the first place to look when troubleshooting MariaDB.
+
+Enable the MariaDB service to start at boot on serverX.
+
+[root@serverX ~]# systemctl enable mariadb
+Verify the status of the service on serverX.
+
+[root@serverX ~]# systemctl status mariadb
+The status option reports some attributes, if the database is started:
+
+Loaded—Shows if this service is loaded and enabled.
+
+Active—Shows if this service is activated.
+
+Main PID—Shows the main process ID from this service.
+
+CGroup—Shows all processes that belong to this service.
+
+NOTE
+If the database is stopped, the status option will report the last known PID, and that the service is inactive.
+
+Improve MariaDB installation security
+MariaDB provides a program to improve security from the baseline install state. Run mysql_secure_installation without arguments:
+
+[root@serverX ~]# mysql_secure_installation
+This program enables improvement of MariaDB security in the following ways:
+
+Sets a password for root accounts.
+
+Removes root accounts that are accessible from outside the local host.
+
+Removes anonymous-user accounts.
+
+Removes the test database.
+
+The script is fully interactive, and will prompt for each step in the process.
+
+MariaDB and networking
+MariaDB can be configured to be accessed remotely, or limited to just local connections.
+
+
+Figure 24.1: Local access to MariaDB
+
+Figure 24.2: Remote access to MariaDB
+In the first scenario, the database can only be accessed locally. Security is greatly improved, because the records will only be accessed from applications that are on the same server. The disadvantage is that the server will share the same resources with other services, and this may impact performance in the database server.
+
+In the second scenario, the database can be accessed remotely. In this case, safety decreases because another port is opened on the server, which may result in an attack. On the other hand, the performance of the server increases by not having to share resources.
+
+When MariaDB is accessed remotely, by default, the server listens for TCP/IP connections on all available interfaces on port 3306.
+
+NOTE
+Although the MariaDB service listens on all interfaces by default, no users have remote access permission, also by default.
+
+Configuring MariaDB networking
+
+MariaDB network configuration directives are found in the /etc/my.cnf file, under the [mysqld] section.
+
+bind-address
+The server will listen based on this directive. Only one value may be entered. Possible values are:
+
+Host name
+
+IPv4 address
+
+IPv6 address
+
+Set this value to :: to connect to all available addresses (IPv6 and IPv4), or leave blank (or set to 0.0.0.0) for all IPv4 addresses.
+
+IMPORTANT
+There can be only one bind-address entry in /etc/my.cnf. On a system with multiple addresses, selecting a single address is possible, or all addresses, but nothing in between.
+
+skip-networking
+If set to 1, the server will listen only for local clients. All interaction with the server will be through a socket, located by default at /var/lib/mysql/mysql.sock. This location can be changed with a socket value in /etc/my.cnf.
+
+IMPORTANT
+Be aware that if networking is shut off in this manner, this disables connections via localhost as well. The MySQL client can still make local connections through the socket file automatically.
+
+port
+Port to listen on for TCP/IP connections.
+
+IMPORTANT
+For remote access, the firewall needs to be modified. Fortunately, it is a known service, so it can be simply added via:
+
+[root@serverX ~]# firewall-cmd --permanent --add-service=mysql
+[root@serverX ~]# firewall-cmd --reload
+REFERENCES
+mysql_secure_installation(1), mysql.server(1), and mysqld_selinux(8) man pages
+
+Red Hat Software Collections documentation
+
+
+
+
+Guided Exercise: Practice: Installing MariaDB
+In this lab, you will install a MariaDB database server.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+A MariaDB database server running on your serverX machine.
+
+Reset your desktopX machine.
+
+Reset your serverX machine.
+
+You have been asked to install a MariaDB database server on your serverX machine. You need to secure the MariaDB service, and must configure it to accept connections only from local clients.
+
+Install the mariadb and mariadb-client groups.
+
+[root@serverX ~]# yum groupinstall mariadb mariadb-client -y
+Start and enable the mariadb service.
+
+[root@serverX ~]# systemctl start mariadb
+[root@serverX ~]# systemctl enable mariadb
+Verify that MariaDB is listening on all interfaces.
+
+[root@serverX ~]# ss -tulpn | grep mysql
+
+tcp  LISTEN 0  50  *:3306    *:*  users:(("mysqld", 13611,13))
+NOTE
+Why grep on mysql when you are running MariaDB? MariaDB is a fork of MySQL which is meant to act as a drop-in replacement.
+
+Enable the skip-networking directive.
+
+Open the file /etc/my.cnf in a text editor, and in section [mysqld], add the line
+
+skip-networking=1
+Restart the mariadb service.
+
+[root@serverX ~]# systemctl restart mariadb
+Verify that MariaDB is not listening on all interfaces.
+
+[root@serverX ~]# ss -tulpn | grep mysql
+This command should now return nothing.
+
+Secure the Mariadb service using the mysql_secure_installation tool. Set the root password to redhat, and answer Yes to all other questions.
+
+[root@serverX ~]# mysql_secure_installation
+
+In order to log into MariaDB to secure it, we'll need the current
+password for the root user.  If you've just installed MariaDB, and
+you haven't set the root password yet, the password will be blank,
+so you should just press enter here.
+
+Enter current password for root (enter for none): 
+OK, successfully used password, moving on...
+
+Setting the root password ensures that nobody can log into the MariaDB
+root user without the proper authorisation.
+
+Set root password? [Y/n] Y
+New password: redhat
+Re-enter new password: redhat
+Password updated successfully!
+Reloading privilege tables..
+ ... Success!
+
+By default, a MariaDB installation has an anonymous user, allowing anyone
+to log into MariaDB without having to have a user account created for
+them.  This is intended only for testing, and to make the installation
+go a bit smoother.  You should remove them before moving into a
+production environment.
+
+Remove anonymous users? [Y/n] Y
+ ... Success!
+
+Normally, root should only be allowed to connect from 'localhost'.  This
+ensures that someone cannot guess at the root password from the network.
+
+Disallow root login remotely? [Y/n] Y
+ ... Success!
+
+By default, MariaDB comes with a database named 'test' that anyone can
+access.  This is also intended only for testing, and should be removed
+before moving into a production environment.
+
+Remove test database and access to it? [Y/n] Y
+ - Dropping test database...
+ ... Success!
+ - Removing privileges on test database...
+ ... Success!
+
+Reloading the privilege tables will ensure that all changes made so far
+will take effect immediately.
+
+Reload privilege tables now? [Y/n] Y
+ ... Success!
+
+Cleaning up...
+
+All done!  If you've completed all of the above steps, your MariaDB
+installation should now be secure.
+
+Thanks for using MariaDB!
+
+            
+Verify that the root user cannot log in without a password.
+
+[root@serverX ~]# mysql -u root
+ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: NO)
+Verify that the test database is removed.
+
+[root@serverX ~]# mysql -u root -p
+Enter password: redhat
+MariaDB [(none)]> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
++--------------------+
+3 rows in set (0.00 sec)
+MariaDB [(none)]> exit;
+Bye
+

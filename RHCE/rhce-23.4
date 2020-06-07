@@ -1,0 +1,157 @@
+Performing a Multiuser SMB Mount
+In this section, students learned how to perform a multiuser SMB mount.
+
+Objectives
+After completing this section, students should be able to mount an SMB share with the multiuser mount option, using password-based authentication and cifscreds to control access.
+
+Perform a multiuser SMB mount.
+
+Access the multiuser SMB mount.
+
+Multiuser mounts with Samba
+When a Samba share is mounted, the mount credentials determine the access permissions on the mount point by default. The new multiuser mount option separates the mount credentials from the credentials used to determine file access for each user. In Red Hat Enterprise Linux 7, this can be used with sec=ntlmssp authentication (contrary to the mount.cifs(8) man page).
+
+The root user mounts the share using the multiuser option and an SMB username that has minimal access to the contents of the share. Regular users can then stash their own SMB usernames and passwords in the current session's kernel keyring with the cifscreds command. Their accesses to the share are authenticated with their own credentials from the keyring, not the mount credentials. The users can clear or change their credentials for that login session at any time, and they are cleared when the session ends. File access permissions are enforced entirely by the SMB server based on the access credentials currently in use.
+
+For example, to create a new mount point /mnt/multiuser and mount the share myshare from the SMB file server serverX, authenticating as SMB user fred, who has the NTLM password redhat, and using the multiuser mount option:
+
+[root@desktopX ~]# mkdir /mnt/multiuser
+[root@desktopX ~]# mount -o multiuser,sec=ntlmssp,username=fred \
+> //serverX/myshare /mnt/multiuser
+Password for fred@//serverX/myshare:  redhat
+The command cifscreds is required to store authentication credentials in the keyring of the local user. Those authentication credentials are forwarded to the Samba server on a multiuser mount. The cifs-utils package provides the cifscreds command, so it is required on the desktopX system.
+
+[root@desktopX ~]# yum -y install cifs-utils
+The cifscreds command has various actions:
+
+add to add SMB credentials to the session keyring of a user. This option is followed by the host name of the SMB file server.
+
+update to update existing credentials in the session keyring of the user. This option is followed by the host name of the SMB file server.
+
+clear to remove a particular entry from the session keyring of the user. This option is followed by the host name of the Samba server.
+
+clearall to clear all existing credentials from the session keyring of the user.
+
+NOTE
+By default, cifscreds assumes that the username to use with the SMB credentials matches the current Linux username. A different username can be used for SMB credentials with the -u username option after the add, update, or clear action.
+
+For example, assume that root has mounted //serverX/myshare on the mount point /mnt/multiuser using the multiuser option. In order to access files on that share, user frank must use cifscreds to temporarily stash his username and password in the kernel-managed session keyring.
+
+[frank@desktopX ~]$ cifscreds add serverX
+Password:  redhat
+[frank@desktopX ~]$ echo "Frank was here" >/mnt/multiuser/frank2.txt
+[frank@desktopX ~]$ cat /mnt/multiuser/frank2.txt
+Frank was here.
+[frank@desktopX ~]$ exit
+Assume that the permissions on the files in the SMB share grant frank read-write access to the directory, but jane is only granted read access.
+
+[jane@desktopX ~]$ cifscreds add serverX
+Password:  redhat
+[jane@desktopX ~]$ echo "Jane was not here" >/mnt/multiuser/jane2.txt
+-bash: /mnt/multiuser/jane2.txt: Permission denied
+[jane@desktopX ~]$ cat /mnt/multiuser/frank2.txt
+Frank was here
+REFERENCES
+mount(8), mount.cifs(8), and cifscreds(1) man pages
+
+
+
+
+
+
+Guided Exercise: Practice: Performing a Multiuser SMB Mount
+In this lab, you will mount a SMB share with the multiuser option.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+The SMB share provided by serverX is mounted on the desktopX system with the multiuser mount option.
+
+Reset the serverX system.
+
+Reset the desktopX system.
+
+Log into and set up your server system.
+
+[student@serverX ~]$ lab smbmultiuser setup
+Log into and set up your desktop system.
+
+[student@desktopX ~]$ lab smbmultiuser setup
+Become root on your serverX system.
+
+[student@serverX ~]$ sudo -i
+Become root on your desktopX system.
+
+[student@desktopX ~]$ sudo -i
+Mount the SMB share //serverX/smbshare permanently on the desktopX system according to the following requirements:
+
+The mount point on the desktopX system is the newly created directory /mnt/multiuser.
+
+The SMB share is mounted with a newly created credentials file /root/smb-multiuser.txt. The credentials used to mount the SMB share are username brian and password redhat.
+
+The SMB share is mounted with the multiuser mount option enabled.
+
+The already existing user brian on the desktopX system has a corresponding SMB account on serverX. Associate the system user brian on the desktopX system with the SMB user brian on the serverX system to access the /mnt/multiuser mount point. The password for brian is redhat. Verify that user brian has read and write access to the mounted SMB share.
+
+The already existing user rob on the desktopX system has a corresponding SMB account on serverX. Associate the system user rob on the desktopX system with the SMB user rob on the serverX system to access the /mnt/multiuser mount point. The password for rob is redhat. Verify that user rob has read but no write access to the mounted SMB share.
+
+Install the cifs-utils RPM package on the desktopX system because it contains the cifscreds command required to store and forward authentication credentials to the Samba server with a multiuser mount.
+
+[root@desktopX ~]# yum -y install cifs-utils
+Mount the Samba share permanently on the /mnt/multiuser mount point on desktopX and authenticate with a credentials file. Mount the Samba share with the credentials of user brian.
+
+Create the mount point /mnt/multiuser on desktopX.
+
+[root@desktopX ~]# mkdir /mnt/multiuser
+Create the credentials file /root/smb-multiuser.txt with the username and password of user brian on the desktopX system.
+
+[root@desktopX ~]# echo 'username=brian' >/root/smb-multiuser.txt
+[root@desktopX ~]# echo 'password=redhat' >>/root/smb-multiuser.txt
+Create the entry in /etc/fstab to permanently mount the Samba share with multiuser option as user brian on the /mnt/multiuser mount point on desktopX.
+
+//serverX/smbshare /mnt/multiuser cifs credentials=/root/smb-multiuser.txt,multiuser,sec=ntlmssp 0 0
+Verify the entry in /etc/fstab to permanently mount the Samba share on desktopX is correct by mounting the share with the fstab entry.
+
+[root@desktopX ~]# mount /mnt/multiuser
+Access the SMB multiuser mount /mnt/multiuser as the already existing user brian on desktopX. Automatically authenticate to Samba as the corresponding Samba user that exists with the same name on serverX and has read and write permission on the SMB share.
+
+Switch to user brian on the terminal on desktopX.
+
+[root@desktopX ~]# su - brian
+Try to write to the /mnt/multiuser mount point with user brian on the desktopX system.
+
+[brian@desktopX ~]$ touch /mnt/multiuser/testfile.txt
+touch: cannot touch `test.txt´: Permission denied
+Record the Samba credentials for the local user brian with the cifscreds command on desktopX.
+
+[brian@desktopX ~]$ cifscreds add serverX
+Password:  redhat
+Verify user brian has read and write permission on the mount point /mnt/multiuser on desktopX.
+
+[brian@desktopX ~]$ echo "Multiuser" >/mnt/multiuser/brian2.txt
+[brian@desktopX ~]$ cat /mnt/multiuser/brian2.txt
+Multiuser
+Exit the shell on the desktopX system.
+
+[brian@desktopX ~]$ exit
+[root@desktopX ~]# 
+Access the SMB multiuser mount /mnt/multiuser as the already existing user rob on desktopX. Automatically authenticate to Samba as the corresponding Samba user rob that exists on serverX with the same name and has read permission on the SMB share.
+
+Switch to user rob on the terminal.
+
+[root@desktopX ~]# su - rob
+Record the Samba credentials for the local user rob with cifscreds on desktopX.
+
+[rob@desktopX ~]$ cifscreds add serverX
+Password:  redhat
+Verify user rob has read but no write permission on the mount point /mnt/multiuser on desktopX.
+
+[rob@desktopX ~]$ echo "Multiuser" >/mnt/multiuser/rob2.txt
+-bash: /mnt/multiuser/rob2.txt: Permission denied
+[rob@desktopX ~]$ cat /mnt/multiuser/brian2.txt
+Multiuser
+Open a new terminal on desktopX and run the grading script:
+
+[student@desktopX ~]$ lab smbmultiuser grade
+

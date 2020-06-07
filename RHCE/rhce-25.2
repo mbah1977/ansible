@@ -1,0 +1,179 @@
+Configuring and Troubleshooting Virtual Hosts
+In this section, students learned how to configure Apache httpd to provide IP-based and name-based virtual hosts.
+
+Objectives
+After completing this section, students should be able to configure Apache httpd to provide IP-based and name-based virtual hosts.
+
+Virtual hosts
+Virtual hosts allow a single httpd server to serve content for multiple domains. Based on either the IP address of the server that was connected to, the hostname requested by the client in the http request, or a combination of both, httpd can use different configuration settings, including a different DocumentRoot.
+
+Virtual hosts are typically used when it is not cost-effective to spin up multiple (virtual) machines to serve out many low-traffic sites; for example, in a shared hosting environment.
+
+Configuring virtual hosts
+Virtual hosts are configured using <VirtualHost> blocks inside the main configuration. To ease administration, these virtual host blocks are typically not defined inside /etc/httpd/conf/httpd.conf, but rather in separate .conf files in /etc/httpd/conf.d/.
+
+The following is an example file, /etc/httpd/conf.d/site1.conf.
+
+<Directory /srv/site1/www>1
+  Require all granted
+  AllowOverride None
+</Directory>
+
+<VirtualHost 192.168.0.1:80>2
+  DocumentRoot /srv/site1/www3
+  ServerName site1.example.com4
+  ServerAdmin webmaster@site1.example.com5
+  ErrorLog "logs/site1_error_log"6
+  CustomLog "logs/site1_access_log" combined7
+</VirtualHost>
+1
+
+This block provides access to the DocumentRoot defined further down.
+
+2
+
+This is the main tag of the block. The 192.168.0.1:80 part indicates to httpd that this block should be considered for all connections coming in on that IP/port combination.
+
+3
+
+Here the DocumentRoot is being set, but only for within this virtual host.
+
+4
+
+This setting is used to configure name-based virtual hosting. If multiple <VirtualHost> blocks are declared for the same IP/port combination, the block that matches ServerName with the hostname: header sent in the client http request will be used.
+
+There can be exactly zero or one ServerName directives inside a single <VirtualHost> block. If a single virtual host needs to be used for more than one domain name, one or more ServerAlias statements can be used.
+
+5
+
+To help with sorting mail messages regarding the different websites, it is helpful to set unique ServerAdmin addresses for all virtual hosts.
+
+6
+
+The location for all error messages related to this virtual host.
+
+7
+
+The location for all access messages regarding this virtual host.
+
+If a setting is not made explicitly for a virtual host, the same setting from the main configuration will be used.
+
+Name-based vs. IP-based virtual hosting
+
+By default, every virtual host is an IP-based virtual host, sorting traffic to the virtual hosts based on what IP address the client had connected to. If there are multiple virtual hosts declared for a single IP/port combination, the ServerName and ServerAlias directives will be consulted, effectively enabling name-based virtual hosting.
+
+Wildcards and priority
+
+The IP address part of a <VirtualHost> directive can be replaced with one of two wildcards: _default_ and *. Both have exactly the same meaning: “Match Anything”.
+
+When a request comes in, httpd will first try to match against virtual hosts that have an explicit IP address set. If those matches fail, virtual hosts with a wildcard IP address are inspected. If there is still no match, the “main” server configuration is used.
+
+IMPORTANT
+A <VirtualHost *:80> will always match for regular http traffic on port 80/TCP, effectively disabling the main server configuration from ever being used for traffic on port 80/TCP.
+
+If no exact match has been found for a ServerName or ServerAlias directive, and there are multiple virtual hosts defined for the IP/port combination the request came in on, the first virtual host that matches an IP/port is used, with first being seen as the order in which virtual hosts are defined in the configuration file.
+
+When using multiple *.conf files, they will be included in alphanumeric sorting order. To create a catch-all (default) virtual host, the configuration file should be named something like 00-default.conf to make sure that it is included before any others.
+
+Troubleshooting virtual hosts
+When troubleshooting virtual hosts, there are a number of approaches that can help.
+
+Configure a separate DocumentRoot for each virtual host, with identifying content.
+
+Configure separate logfiles, both for error logging and access logging, for each virtual host.
+
+Evaluate the order in which the virtual host definitions are parsed by httpd. Included files are read in alphanumeric sort order based on their filenames.
+
+Disable virtual hosts one by one to isolate the problem. Virtual host definitions can be commented out of the configuration file(s), and include files can be temporarily renamed to something that does not end in .conf.
+
+journalctl UNIT=httpd.service can isolate log messages from just the httpd.service service.
+
+REFERENCES
+httpd(8) man page
+
+httpd-manual package contents
+
+
+
+Guided Exercise: Practice: Configuring a Virtual Host
+In this lab, you will configure a new web server to serve out content for multiple virtual hosts.
+
+Resources:
+Machines:	desktopX and serverX
+Outcomes:
+
+A new web server running on serverX, serving out content for wwwX.example.com from /srv/wwwX.example.com/www/, and all other domains from /srv/default/www/.
+
+Reset your serverX machine.
+
+Reset your desktopX machine.
+
+Over the past few years, your company has been spinning up many web servers for new projects. Unfortunately, there was no structure or coordination between the various projects.
+
+In an effort to clean up the mess, you have been asked to consolidate these various web servers into one, serving out the different domains using name-based virtual hosting.
+
+For now, you will only have to set up a default virtual host that serves out a placeholder site from /srv/default/www/, and a virtual host for wwwX.example.com that serves out content from /srv/wwwX.example.com/www.
+
+DNS CNAME records for the relevant domains have already been converted to point at your serverX machine.
+
+Start by installing the httpd package.
+
+[student@serverX ~]$ sudo yum install httpd
+Create the content directories. The placeholder site should have an index.html file that reads:
+
+Coming Soon!
+The wwwX.example.com site should have an index.html that reads:
+
+wwwX
+Create the directories.
+
+[student@serverX ~]$ sudo mkdir -p /srv/{default,wwwX.example.com}/www
+Create the index.html files using a text editor. /srv/default/www/index.html gets the “Coming Soon!” text, and the /srv/wwwX.example.com/www/index.html file should read “wwwX”.
+
+The SELinux policy is already configured for the correct file contexts for any files under srv/*/www, but you will still have to reset the context on the files you just created.
+
+[student@serverX ~]$ sudo restorecon -Rv /srv/
+Create a new virtual host definition for the _default_:80 virtual host. This virtual host should serve out content from /srv/default/www/, and log to logs/default-vhost.log using the combined format.
+
+Create a new file called /etc/httpd/conf.d/00-default-vhost.conf. Give it the following content:
+
+<VirtualHost _default_:80>
+  DocumentRoot /srv/default/www
+  CustomLog "logs/default-vhost.log" combined
+</VirtualHost>
+Since in a default configuration, httpd blocks access to all directories, you will need to open up the content directory for your default vhost. Add the following block to /etc/httpd/conf.d/00-default-vhost.conf.
+
+<Directory /srv/default/www>
+  Require all granted
+</Directory>
+Create a new virtual host definition for a wwwX.example.com virtual host in /etc/httpd/conf.d/01-wwwX.example.com-vhost.conf. This virtual host should respond to requests for both wwwX.example.com and wwwX, serve out content from /srv/wwwX.example.com/www, and store logs in logs/wwwX.example.com.log.
+
+Create the file /etc/httpd/conf.d/01-wwwX.example.com-vhost.conf with the following contents:
+
+<VirtualHost *:80>
+  ServerName wwwX.example.com
+  ServerAlias wwwX
+  DocumentRoot /srv/wwwX.example.com/www
+  CustomLog "logs/wwwX.example.com.log" combined
+</VirtualHost>
+
+<Directory /srv/wwwX.example.com/www>
+  Require all granted
+</Directory>
+Start and enable the httpd service.
+
+[student@serverX ~]$ sudo systemctl start httpd.service
+[student@serverX ~]$ sudo systemctl enable httpd.service
+Open up the firewall on serverX to allow traffic to the httpd service.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-service=http
+[student@serverX ~]$ sudo firewall-cmd --reload
+From your desktopX system, use a web browser to visit the following URLs; the first two should respond with the “wwwX” text, while the last two should respond with “Coming Soon!”.
+
+http://wwwX.example.com
+
+http://wwwX
+
+http://serverX.example.com
+
+http://172.25.X.11

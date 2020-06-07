@@ -1,0 +1,138 @@
+Lab: Lab: Bash Conditionals and Control Structures
+In this lab, you will enhance and add new features to a Bash script that automates the creation of user accounts.
+
+Resources:
+Files:	
+/usr/local/sbin/mkaccounts
+
+/tmp/support/newusers
+
+Machines:	serverX
+Outcomes:
+
+A shell script, /usr/local/sbin/mkaccounts, which creates new user accounts based on information provided in a data file. The shell script will support two different options for an argument to offer a verbose mode or to display a usage message. Prior to the creation of new accounts, the script will check for and report conflicts with existing accounts.
+
+Reset serverX.
+
+Log into serverX and become the root user with sudo -i.
+
+Run lab bashconditionals setup.
+
+Your company provides hosting service to customers, and currently uses a Bash shell script called /usr/local/sbin/mkaccounts to automate the daily task of creating accounts for new customers by processing a colon-separated data file located at /tmp/support/newusers.
+
+You have been tasked with extending the script to add the following new features:
+
+The script should accept a command-line argument so that it can either be run in verbose mode or generate a usage message.
+
+When in verbose mode, the script should generate a message to indicate the creation of each account.
+
+Prior to the creation of an account, the script should check existing accounts and report if a conflict or duplication occurs.
+
+Once you have completed the script, run lab bashconditionals grade to verify its functionality.
+
+Begin by extending the script located at /usr/local/sbin/mkaccounts by storing the first argument to the OPTION variable.
+
+Back up the script prior to making edits.
+
+[root@serverX ~]# cp -a /usr/local/sbin/mkaccounts /usr/local/sbin/mkaccounts.orig
+After the existing line declaring the NEWUSERSFILE variable, add a new variable, OPTION, to store the first argument.
+
+OPTION=$1
+After the variable declaration at the top of the script, add a case statement that expects three patterns for the value of the OPTION variable and takes the following corresponding actions.
+
+Pattern	Action
+Blank value	No action.
+-v	Set variable VERBOSE to value of 'y'.
+-h	Display usage message "Usage: mkaccounts [-h|-v]" and exit.
+All other patterns	Display usage message "Usage: mkaccounts [-h|-v]" and exit with status 1.
+case $OPTION in
+      '')
+            ;;
+      -v)
+            VERBOSE=y
+            ;;
+      -h)
+            echo "Usage: $0 [-h|-v]"
+            echo
+            exit
+            ;;
+      *)
+            echo "Usage: $0 [-h|-v]"
+            echo
+            exit 1
+            ;;
+esac
+Within the existing for loop, prior to creating the new user account, check whether an account of the same name already exists. If an account already exists, set the value of the ACCTEXIST variable to 'y'. Store the value of the GECOS field of the existing account in the variable ACCTEXISTNAME.
+
+      # Test for dups and conflicts
+         ACCTEXIST=''
+         ACCTEXISTNAME=''
+
+         id $ACCTNAME &> /dev/null
+
+         if [ $? -eq 0 ]; then
+                 ACCTEXIST=y
+                 ACCTEXISTNAME="$(grep ^$ACCTNAME: /etc/passwd | cut -f5 -d:)"
+         fi
+Within the existing for loop, use the ACCTEXIST and ACCTEXISTNAME variables to perform the following evaluations and corresponding actions.
+
+Condition	Action
+Account exists and the full name of the existing account matches that of a new customer.	Display message "Skipping <ACCOUNTNAME>. Duplicate found."
+Account exists and the full name of the existing account does not match that of a new customer.	Display message "Skipping <ACCOUNTNAME>. Conflict found."
+Account does not already exist.	Create the account. If the value of the variable VERBOSE is set to 'y', display message "Added <ACCOUNTNAME>."
+      # Test for dups and conflicts
+            if [ "$ACCTEXIST" = 'y' ] && [ "$ACCTEXISTNAME" = "$FIRSTNAME $LASTNAME" ]; then
+                  echo "Skipping $ACCTNAME. Duplicate found."
+            elif [ "$ACCTEXIST" = 'y' ]; then
+                  echo "Skipping $ACCTNAME. Conflict found."
+            else
+                  useradd $ACCTNAME -c "$FIRSTNAME $LASTNAME"
+
+                  if [ "$VERBOSE" =  'y' ]; then
+                        echo "Added $ACCTNAME."
+                  fi
+            fi
+Save and execute the script. Verify that the script performed as intended with each of the expected options. You may need to run lab bashconditionals clean to purge out accounts that might have been created before rerunning your script.
+
+Make the script executable.
+
+[root@serverX ~]# chmod u+x /usr/local/sbin/mkaccounts
+Execute the script with an invalid argument.
+
+[root@serverX ~]# /usr/local/sbin/mkaccounts test
+Usage: ./mkaccounts [-h|-v]
+
+[root@serverX sbin]# echo $?
+1
+Execute the script with the -h argument.
+
+[root@serverX ~]# /usr/local/sbin/mkaccounts -h
+Usage: ./mkaccounts [-h|-v]
+
+[root@serverX sbin]# echo $?
+0
+Execute the script with the -v argument.
+
+[root@serverX ~]# /usr/local/sbin/mkaccounts -v
+Added bwerts.
+Added hballa.
+...
+Added crundle.
+Added tgrana.
+Skipping bwerts. Conflict found.
+Skipping hballa. Duplicate found.
+"Tier 1","24","46%"
+"Tier 2","15","28%"
+"Tier 3","13","25%"
+Execute the script with no arguments. Since accounts have already been created, they will first need to be purged with lab bashconditionals clean.
+
+[root@serverX ~]# lab bashconditionals clean
+[root@serverX ~]# /usr/local/sbin/mkaccounts
+Skipping bwerts. Conflict found.
+Skipping hballa. Duplicate found.
+"Tier 1","24","46%"
+"Tier 2","15","28%"
+"Tier 3","13","25%"
+Verify your script by running lab bashconditionals grade.
+
+

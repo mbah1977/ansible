@@ -1,0 +1,101 @@
+Lab: Lab: Providing Apache HTTPD Web Service
+In this lab, you will configure your serverX to serve a Python WSGI web application over HTTPS.
+
+Resources:
+Files:	/home/student/webapp.wsgi
+Machines:	desktopX and serverX
+Outcomes:
+
+A TLS virtual host serving a Python WSGI web application on the https://webappX.example.com domain.
+
+Reset your desktopX system.
+
+Reset your serverX system.
+
+Log into and set up your serverX system.
+
+[student@serverX ~]$ lab webapp setup
+Your developers are working on a new web-based application written in Python. They have asked you to configure the httpd service on serverX to run this application on the https://webappX.example.com domain, using TLS encryption.
+
+The application is programmed to be run behind a web server that support WSGI.
+
+To configure the application, you will need the following information:
+
+File	Download location
+TLS certificate	http://classroom/pub/tls/certs/webappX.crt
+TLS private key	http://classroom/pub/tls/private/webappX.key
+TLS CA certificate	http://classroom/pub/example-ca.crt
+Python application	/home/student/webapp.wsgi
+The web application should be copied to a suitable location outside of any DocumentRoot.
+
+Once you are done with your work, you can run the following command on your desktopX machine to validate your work:
+
+[student@desktopX ~]$ lab webapp grade
+Install the packages needed for httpd, TLS, and WSGI support.
+
+[student@serverX ~]$ sudo yum install httpd mod_ssl mod_wsgi
+Create a suitable location on the file system on serverX to host the web application, then copy the application there.
+
+Create a new directory /srv/webappX/www.
+
+[student@serverX ~]$ sudo mkdir -p /srv/webappX/www
+Copy the application to its new home.
+
+[student@serverX ~]$ sudo cp ~/webapp.wsgi /srv/webappX/www/
+Reset the SELinux context on the new directory.
+
+[student@serverX ~]$ sudo restorecon -Rv /srv/webappX
+Download all the certificates and keys that you will need to configure TLS.
+
+Download the example.com CA certificate to /etc/pki/tls/certs.
+
+[student@serverX ~]$ cd /etc/pki/tls/certs
+[student@serverX certs]$ sudo wget http://classroom.example.com/pub/example-ca.crt
+Download the webappX.example.com certificate to /etc/pki/tls/certs.
+
+[student@serverX certs]$ sudo wget http://classroom.example.com/pub/tls/certs/webappX.crt
+Download the webappX private key to /etc/pki/tls/private/ and set the permissions to 0600.
+
+[student@serverX certs]$ cd /etc/pki/tls/private
+[student@serverX private]$ sudo wget http://classroom.example.com/pub/tls/private/webappX.key
+[student@serverX private]$ sudo chmod 0600 webappX.key
+Configure a new TLS name-based virtual host for https://webappX.example.com, using the web application for /, and using the keys and certificates you downloaded earlier.
+
+Create a new file /etc/httpd/conf.d/webappX.conf with the following content:
+
+<VirtualHost *:443>
+  ServerName webappX.example.com
+  SSLEngine on
+  SSLProtocol all -SSLv2 -SSLv3
+  SSLCipherSuite HIGH:MEDIUM:!aNULL:!MD5
+  SSLHonorCipherOrder on 
+  SSLCertificateFile /etc/pki/tls/certs/webappX.crt
+  SSLCertificateKeyFile /etc/pki/tls/private/X.key
+  SSLCertificateChainFile /etc/pki/tls/certs/example-ca.crt
+  WSGIScriptAlias / /srv/webappX/www/webapp.wsgi
+</VirtualHost>
+Add a <Directory> block to your new configuration to allow access to the web application:
+
+<Directory /srv/webappX/www>
+  require all granted
+</Directory>
+Start and enable your web server, and make the TLS-enabled web server available to the outside.
+
+Start and enable httpd.
+
+[student@serverX ~]$ sudo systemctl start httpd.service
+[student@serverX ~]$ sudo systemctl enable httpd.service
+Open https in the default zone of the firewall on serverX.
+
+[student@serverX ~]$ sudo firewall-cmd --permanent --add-service=https
+[student@serverX ~]$ sudo firewall-cmd --reload
+From your desktopX system, test the new web application.
+
+Point an instance of firefox at https://webappX.example.com. Either import the example.com CA certificate as a trusted CA first, or accept the certificate warning.
+
+Alternatively, you can run the following command on desktopX:
+
+[student@desktopX ~]$ curl -k https://webappX.example.com
+Validate your work by running lab webapp grade on desktopX.
+
+
